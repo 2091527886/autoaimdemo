@@ -10,6 +10,8 @@
 #include <memory>
 #include <sstream> // For std::ostringstream
 #include <thread>  // For std::this_thread
+#include <limits>
+#include <tuple>
 // Windows & DirectX
 #include <windows.h>
 #include <d3d11.h>
@@ -59,10 +61,70 @@ struct Detection {
 };
 
 struct TimingDetails {
-    double preprocess_ms = 0;
     double inference_ms = 0;
     double postprocess_ms = 0;
     double total_loop_ms = 0;
+};
+
+// 单帧延迟记录
+struct FrameLatency {
+    double capture_ms = 0.0;
+    double detect_ms  = 0.0;
+    double mouse_ms   = 0.0;
+    double loop_ms    = 0.0;
+};
+
+// 简单的每 N 帧聚合并打印统计（平均/最小/最大），使用 std::chrono 的毫秒单位
+class LatencyAggregator {
+public:
+    explicit LatencyAggregator(size_t window) : window_(window ? window : 30) {
+        buffer_.reserve(window_);
+    }
+
+    void add(const FrameLatency& f) {
+        buffer_.push_back(f);
+        if (buffer_.size() >= window_) {
+            print_and_clear();
+        }
+    }
+
+    void force_print() {
+        if (!buffer_.empty()) print_and_clear();
+    }
+
+private:
+    void print_and_clear() {
+        auto [cap_avg, cap_min, cap_max] = stats([](const FrameLatency& f){ return f.capture_ms; });
+        auto [det_avg, det_min, det_max] = stats([](const FrameLatency& f){ return f.detect_ms;  });
+        auto [mou_avg, mou_min, mou_max] = stats([](const FrameLatency& f){ return f.mouse_ms;   });
+        auto [loo_avg, loo_min, loo_max] = stats([](const FrameLatency& f){ return f.loop_ms;    });
+
+        std::cout << std::fixed << std::setprecision(2)
+                  << "[LAT] over " << buffer_.size() << " frames"
+                  << " | capture ms avg/min/max: " << cap_avg << "/" << cap_min << "/" << cap_max
+                  << " | detect: " << det_avg << "/" << det_min << "/" << det_max
+                  << " | mouse: "  << mou_avg << "/" << mou_min << "/" << mou_max
+                  << " | loop: "   << loo_avg << "/" << loo_min << "/" << loo_max
+                  << std::endl;
+
+        buffer_.clear();
+    }
+
+    template<typename Getter>
+    std::tuple<double,double,double> stats(Getter g) const {
+        if (buffer_.empty()) return {0.0, 0.0, 0.0};
+        double sum = 0.0, mn = std::numeric_limits<double>::infinity(), mx = 0.0;
+        for (const auto& f : buffer_) {
+            const double v = g(f);
+            sum += v;
+            mn = std::min(mn, v);
+            mx = std::max(mx, v);
+        }
+        return { sum / static_cast<double>(buffer_.size()), (std::isinf(mn)?0.0:mn), mx };
+    }
+
+    size_t window_;
+    std::vector<FrameLatency> buffer_;
 };
 
 // --- PID 控制器 ---
@@ -128,7 +190,6 @@ public:
     const int crop_size = 640;
     const int max_lock_distance_pixels = 320;
     const float confidence_threshold = 0.6f;
-    const float nms_threshold = 0.4f;
     const int smooth_aim_key = VK_RBUTTON;
     const int single_shot_key = VK_F8;
     const double target_y_ratio = 0.6;
@@ -158,6 +219,11 @@ public:
     // 类别可读名称与追踪 ID 都在此配置，不从外部读取
     std::vector<std::string> class_names = { "enemy","teammate"};
     std::vector<int> target_class_ids = {0};
+
+    // === 延迟统计配置 ===
+    bool enable_latency_log = true;               // 打印延迟统计
+    int  latency_log_interval_frames = 30;        // 每 N 帧打印一次
+    bool latency_only_on_captured = true;         // 仅统计成功截屏的帧
 
     bool is_target_class(int cid) const {
         return std::find(target_class_ids.begin(), target_class_ids.end(), cid) != target_class_ids.end();
@@ -464,7 +530,6 @@ public:
         trtyolo::DetectRes res = detector_->predict(input);
 
         auto t1 = std::chrono::high_resolution_clock::now();
-        timings.preprocess_ms = 0.0; // no explicit preprocess here
         timings.inference_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
         auto t2 = std::chrono::high_resolution_clock::now();
 
@@ -531,7 +596,8 @@ public:
         mouse(),
         crop_region((capturer.getWidth() - cfg.crop_size) / 2, (capturer.getHeight() - cfg.crop_size) / 2, cfg.crop_size, cfg.crop_size),
         crop_center(cfg.crop_size / 2, cfg.crop_size / 2),
-        is_visualizing(cfg.enable_visualization)
+        is_visualizing(cfg.enable_visualization),
+        aggregator_(static_cast<size_t>(std::max(1, cfg.latency_log_interval_frames)))
     {
         if (capturer.getWidth() < cfg.crop_size || capturer.getHeight() < cfg.crop_size) {
             throw std::runtime_error("Screen resolution is smaller than configured crop_size.");
@@ -558,15 +624,41 @@ public:
     void Run() {
         while (true) {
             auto loop_start_time = std::chrono::high_resolution_clock::now();
-            if (!capturer.CaptureFrame(captured_frame, crop_region)) {
+
+            FrameLatency fl; // 本帧延迟统计
+
+            // 1) 截屏计时
+            auto t_cap_start = std::chrono::high_resolution_clock::now();
+            bool got = capturer.CaptureFrame(captured_frame, crop_region);
+            auto t_cap_end = std::chrono::high_resolution_clock::now();
+            fl.capture_ms = std::chrono::duration<double, std::milli>(t_cap_end - t_cap_start).count();
+            if (!got) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                // 仅统计成功截屏帧：直接继续下一帧
+                if (cfg.enable_latency_log && !cfg.latency_only_on_captured) {
+                    // 如果也要统计失败帧，则把仅有 capture_ms 的 fl 加入
+                    aggregator_.add(fl);
+                }
                 continue;
             }
+
+            // 2) 检测计时（外层整体）
+            auto t_det_start = std::chrono::high_resolution_clock::now();
             detector.Detect(captured_frame, detections, cfg, timings);
+            auto t_det_end = std::chrono::high_resolution_clock::now();
+            fl.detect_ms = std::chrono::duration<double, std::milli>(t_det_end - t_det_start).count();
+
+            // 3) 鼠标控制计时（整体阶段）
+            auto t_mouse_start = std::chrono::high_resolution_clock::now();
             Detection* best_target = findBestTarget();
             handleMouseInput(best_target);
+            auto t_mouse_end = std::chrono::high_resolution_clock::now();
+            fl.mouse_ms = std::chrono::duration<double, std::milli>(t_mouse_end - t_mouse_start).count();
+
             auto loop_end_time = std::chrono::high_resolution_clock::now();
             timings.total_loop_ms = std::chrono::duration<double, std::milli>(loop_end_time - loop_start_time).count();
+            fl.loop_ms = timings.total_loop_ms;
+
             // 计算 dt（秒）供 PID 使用
             if (cfg.pid_use_measured_dt) {
                 pid_dt_s = std::max(0.001, timings.total_loop_ms / 1000.0);
@@ -574,6 +666,11 @@ public:
                 pid_dt_s = std::max(0.001, cfg.pid_fixed_dt_ms / 1000.0);
             }
             updateAndPrintStats();
+
+            if (cfg.enable_latency_log) {
+                aggregator_.add(fl);
+            }
+
             if (is_visualizing) {
                 handleVisualization(best_target);
             }
@@ -666,14 +763,12 @@ private:
         const double smoothing_factor = 0.05;
         if (is_first_frame) {
             smoothed_total = timings.total_loop_ms;
-            smoothed_pre = timings.preprocess_ms;
             smoothed_inf = timings.inference_ms;
             smoothed_post = timings.postprocess_ms;
             is_first_frame = false;
         }
         else {
             smoothed_total = smoothing_factor * timings.total_loop_ms + (1.0 - smoothing_factor) * smoothed_total;
-            smoothed_pre = smoothing_factor * timings.preprocess_ms + (1.0 - smoothing_factor) * smoothed_pre;
             smoothed_inf = smoothing_factor * timings.inference_ms + (1.0 - smoothing_factor) * smoothed_inf;
             smoothed_post = smoothing_factor * timings.postprocess_ms + (1.0 - smoothing_factor) * smoothed_post;
         }
@@ -722,9 +817,10 @@ private:
     std::vector<Detection> detections;
     TimingDetails timings;
     bool is_visualizing;
-    double smoothed_total = 0.0, smoothed_pre = 0.0, smoothed_inf = 0.0, smoothed_post = 0.0;
+    double smoothed_total = 0.0, smoothed_inf = 0.0, smoothed_post = 0.0;
     bool is_first_frame = true;
-    int frame_count_for_console = 0;
+    // 延迟统计
+    LatencyAggregator aggregator_;
 
     // PID 控制
     PidController pid_x;
