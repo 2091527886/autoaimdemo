@@ -1,0 +1,66 @@
+# C/C++ build artifacts
+build/
+build-*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+Makefile
+CMakeScripts/
+Testing/
+compile_commands.json
+install_manifest.txt
+CTestTestfile.cmake
+cmake_install.cmake
+
+# Object files and libraries
+*.o
+*.obj
+*.lo
+*.la
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+
+# Executables and generated binaries
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# IDE / editor
+.vscode/
+.idea/
+*.code-workspace
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.VC.db
+*.VC.opendb
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and caches
+*.log
+*.cache
+
+# Coverage / profiling
+coverage/
+*.gcno
+*.gcda
+*.gcov
+*.profraw
+*.profdata
+*.lcov
+
+# Misc
+*.tmp
+*.swp
+*.bak

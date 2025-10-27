@@ -1,0 +1,41 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Kitware/CMake/master/Help/manual/presets/schema.json",
+  "version": 8,
+  "configurePresets": [
+    {
+      "name": "win-vs-debug",
+      "displayName": "Windows-MSVC Debug (VS/Ninja可选)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_CXX_COMPILER": "cl"
+      }
+    },
+    {
+      "name": "win-vs-release",
+      "displayName": "Windows-MSVC Release (VS/Ninja可选)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_CXX_COMPILER": "cl"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "win-vs-debug",
+      "configurePreset": "win-vs-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "win-vs-release",
+      "configurePreset": "win-vs-release",
+      "configuration": "Release"
+    }
+  ],
+  "testPresets": []
+}
