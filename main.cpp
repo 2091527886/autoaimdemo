@@ -19,6 +19,39 @@
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 
+// --- Priority helpers (process/thread/DXGI) ---
+static inline void RaiseProcessPrioritySafely() {
+    if (!SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS)) {
+        std::cerr << "SetPriorityClass(HIGH) failed: " << GetLastError() << std::endl;
+    }
+}
+
+static inline void RaiseThisThreadPrioritySafely() {
+    if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST)) {
+        std::cerr << "SetThreadPriority(HIGHEST) failed: " << GetLastError() << std::endl;
+    }
+}
+
+static inline void RaiseDxgiGpuPriorityAndLatency(ID3D11Device* d3dDevice) {
+    if (!d3dDevice) return;
+    IDXGIDevice1* dxgiDevice1 = nullptr;
+    HRESULT hr = d3dDevice->QueryInterface(__uuidof(IDXGIDevice1), (void**)&dxgiDevice1);
+    if (FAILED(hr) || !dxgiDevice1) {
+        std::cerr << "QueryInterface(IDXGIDevice1) failed: 0x" << std::hex << (unsigned long)hr << std::dec << std::endl;
+        return;
+    }
+    hr = dxgiDevice1->SetGPUThreadPriority(7);
+    if (FAILED(hr)) {
+        std::cerr << "SetGPUThreadPriority(7) failed: 0x" << std::hex << (unsigned long)hr << std::dec << std::endl;
+    }
+    hr = dxgiDevice1->SetMaximumFrameLatency(1);
+    if (FAILED(hr)) {
+        std::cerr << "SetMaximumFrameLatency(1) failed: 0x" << std::hex << (unsigned long)hr << std::dec << std::endl;
+    }
+    dxgiDevice1->Release();
+}
+
+
 // TensorRT-YOLO
 #include <trtyolo.hpp>
 #pragma comment(lib, "trtyolo.lib")
@@ -201,7 +234,7 @@ public:
     // 是否启用 TensorRT-YOLO 内部性能报告
     bool enable_performance_report = true;
     // 性能日志打印频率控制：默认每 30 帧打印一次；当 perf_report_every_frame=true 时每帧打印
-    int  perf_report_interval_frames = 30;
+    int  perf_report_interval_frames = 60;
     bool perf_report_every_frame = false;
 
     // PID 参数（像素域），输出会再乘 mouse_correction_factor
@@ -222,7 +255,7 @@ public:
 
     // === 延迟统计配置 ===
     bool enable_latency_log = true;               // 打印延迟统计
-    int  latency_log_interval_frames = 30;        // 每 N 帧打印一次
+    int  latency_log_interval_frames = 60;        // 每 N 帧打印一次
     bool latency_only_on_captured = true;         // 仅统计成功截屏的帧
 
     bool is_target_class(int cid) const {
@@ -349,6 +382,8 @@ public:
             if (FAILED(hr_create_device)) {
                 throw std::runtime_error("Failed to create D3D11 device.");
             }
+            // Raise DXGI GPU priority and reduce frame latency for this device
+            RaiseDxgiGpuPriorityAndLatency(pDevice);
         }
         {
             HRESULT hr_qi_output1 = pOutput->QueryInterface(__uuidof(IDXGIOutput1), (void**)&pOutput1);
@@ -830,6 +865,9 @@ private:
 
 // --- 主函数 ---
 int main() {
+    // Raise process and main thread priority early
+    RaiseProcessPrioritySafely();
+    RaiseThisThreadPrioritySafely();
     try {
         AimAssistant assistant;
         assistant.Run();
