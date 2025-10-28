@@ -12,12 +12,15 @@
 #include <thread>  // For std::this_thread
 #include <limits>
 #include <tuple>
+#include <array>
 // Windows & DirectX
 #include <windows.h>
 #include <d3d11.h>
 #include <dxgi1_2.h>
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
+#include <avrt.h>
+#pragma comment(lib, "Avrt.lib")
 
 // --- Priority helpers (process/thread/DXGI) ---
 static inline void RaiseProcessPrioritySafely() {
@@ -49,6 +52,57 @@ static inline void RaiseDxgiGpuPriorityAndLatency(ID3D11Device* d3dDevice) {
         std::cerr << "SetMaximumFrameLatency(1) failed: 0x" << std::hex << (unsigned long)hr << std::dec << std::endl;
     }
     dxgiDevice1->Release();
+}
+
+// --- Power throttling/background-mode helpers ---
+static inline HANDLE EnableMmcssIfConfigured(bool enable, const wchar_t* task_name, AVRT_PRIORITY priority, DWORD* out_task_index=nullptr) {
+    if (!enable) return nullptr;
+    if (!task_name) task_name = L"Games";
+    DWORD task_index = 0;
+    HANDLE h = AvSetMmThreadCharacteristicsW(task_name, &task_index);
+    if (!h) {
+        std::cerr << "[MMCSS] AvSetMmThreadCharacteristicsW failed: " << GetLastError() << std::endl;
+        return nullptr;
+    }
+    if (!AvSetMmThreadPriority(h, priority)) {
+        std::cerr << "[MMCSS] AvSetMmThreadPriority failed: " << GetLastError() << std::endl;
+    }
+    if (out_task_index) *out_task_index = task_index;
+    std::wcout << L"[MMCSS] Enabled for thread. Task=" << task_name << L", priority=" << (int)priority << std::endl;
+    return h;
+}
+static inline void DisableMmcss(HANDLE h) {
+    if (h) AvRevertMmThreadCharacteristics(h);
+}
+static inline void DisablePowerThrottlingForProcessAndThread(bool verbose=true) {
+   // Disable process-wide execution speed throttling
+   PROCESS_POWER_THROTTLING_STATE pstate = {};
+   pstate.Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION;
+   pstate.ControlMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
+   pstate.StateMask = 0; // clear EXECUTION_SPEED -> no throttling
+   if (!SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling, &pstate, sizeof(pstate))) {
+       if (verbose) std::cerr << "[BOOT] ProcPowerThrottling=OFF failed: " << GetLastError() << std::endl;
+   } else if (verbose) {
+       std::cout << "[BOOT] ProcPowerThrottling=OFF OK" << std::endl;
+   }
+
+   // Disable thread execution speed throttling for current thread
+   THREAD_POWER_THROTTLING_STATE tstate = {};
+   tstate.Version = THREAD_POWER_THROTTLING_CURRENT_VERSION;
+   tstate.ControlMask = THREAD_POWER_THROTTLING_EXECUTION_SPEED;
+   tstate.StateMask = 0; // clear EXECUTION_SPEED
+   if (!SetThreadInformation(GetCurrentThread(), ThreadPowerThrottling, &tstate, sizeof(tstate))) {
+       if (verbose) std::cerr << "[BOOT] ThreadPowerThrottling=OFF failed: " << GetLastError() << std::endl;
+   } else if (verbose) {
+       std::cout << "[BOOT] ThreadPowerThrottling=OFF OK" << std::endl;
+   }
+
+   // Prevent Windows from automatically reducing this thread's priority during heavy paging
+   if (!SetThreadPriorityBoost(GetCurrentThread(), FALSE)) {
+       if (verbose) std::cerr << "[BOOT] ThreadPriorityBoost(FALSE) failed: " << GetLastError() << std::endl;
+   } else if (verbose) {
+       std::cout << "[BOOT] ThreadPriorityBoost(FALSE) OK" << std::endl;
+   }
 }
 
 
@@ -217,47 +271,72 @@ private:
 // --- 1. 配置中心 (Config) ---
 class Config {
 public:
-    // Configuration center: resolve engine file path via Config only
-    std::string engine_path = "best.engine"; // default value, can be edited in code
+    // ========== 0) 基础与可视化 ==========
+    // Engine 文件（仅通过 Config 解析路径）
+    std::string engine_path = "best.engine";
     std::string resolve_engine_path() const { return engine_path; }
-    const int crop_size = 640;
-    const int max_lock_distance_pixels = 320;
-    const float confidence_threshold = 0.6f;
-    const int smooth_aim_key = VK_RBUTTON;
-    const int single_shot_key = VK_F8;
-    const double target_y_ratio = 0.6;
-    const double pixels_for_360_turn = 3000;
-    const double horizontal_fov = 75.0;
+    // 可视化窗口
     const bool enable_visualization = true;
     const std::string window_name = "YOLO Real-time Detection";
 
-    // 是否启用 TensorRT-YOLO 内部性能报告
-    bool enable_performance_report = true;
-    // 性能日志打印频率控制：默认每 30 帧打印一次；当 perf_report_every_frame=true 时每帧打印
-    int  perf_report_interval_frames = 60;
-    bool perf_report_every_frame = false;
+    // ========== 1) 截屏与检测区域 ==========
+    const int crop_size = 640;                    // 截取居中正方形区域尺寸
+    const int max_lock_distance_pixels = 320;     // 目标距离中心阈值（像素）
+    const float confidence_threshold = 0.6f;      // 检测阈值
 
-    // PID 参数（像素域），输出会再乘 mouse_correction_factor
+    // ========== 2) 操作与热键 ==========
+    const int smooth_aim_key = VK_RBUTTON;        // 按住平滑跟随
+    const int single_shot_key = VK_F8;            // 单次移动测试
+
+    // ========== 3) 瞄准与视角参数 ==========
+    const double target_y_ratio = 0.6;            // 目标Y锚定比例（命中头/胸）
+    const double pixels_for_360_turn = 3000;      // 鼠标360度所需像素（用于校正）
+    const double horizontal_fov = 75.0;           // 游戏水平FOV（度）
+
+    // ========== 4) PID（像素域） ==========
     const double pid_kp_x = 0.54;
     const double pid_ki_x = 0.001;
     const double pid_kd_x = 0.00600;
     const double pid_kp_y = 0.54;
     const double pid_ki_y = 0.001;
     const double pid_kd_y = 0.00600;
-    const double pid_output_limit = 400.0;   // 每帧最大像素输出
-    const double pid_integral_limit = 300.0; // 积分限幅
-    const bool   pid_use_measured_dt = true; // 用实测 dt 计算；不稳定时可改成 false
-    const double pid_fixed_dt_ms = 16.0;     // 固定 dt（毫秒），当 pid_use_measured_dt=false 时生效
+    const double pid_output_limit = 400.0;        // 每帧最大像素输出
+    const double pid_integral_limit = 300.0;      // 积分限幅
+    const bool   pid_use_measured_dt = true;      // 用实测 dt 计算
+    const double pid_fixed_dt_ms = 16.0;          // 固定 dt（毫秒），当 pid_use_measured_dt=false 时生效
 
-    // 类别可读名称与追踪 ID 都在此配置，不从外部读取
+    // ========== 5) 类别/标签 ==========
     std::vector<std::string> class_names = { "enemy","teammate"};
     std::vector<int> target_class_ids = {0};
 
-    // === 延迟统计配置 ===
+    // ========== 6) 运行时日志/统计 ==========
+    // 6.1 延迟统计（粗粒度：capture/detect/mouse/loop）
     bool enable_latency_log = true;               // 打印延迟统计
     int  latency_log_interval_frames = 60;        // 每 N 帧打印一次
     bool latency_only_on_captured = true;         // 仅统计成功截屏的帧
+    // 6.2 采集分步计时（细粒度：acquire/qi/copy/map/cvt/unmap/total）
+    bool enable_capture_step_timing = true;       // 启用细粒度计时
+    int  capture_timing_interval_frames = 60;     // [CAPTURE PERF] 打印周期（帧）
+    bool capture_timing_every_frame = false;      // 每帧打印（调试用）
+    bool capture_timing_only_on_success = true;   // 仅统计成功帧
+    // 6.3 TensorRT-YOLO 内部性能报告
+    bool enable_performance_report = true;
+    int  perf_report_interval_frames = 60;        // TRTYOLO 报告频率（帧）
+    bool perf_report_every_frame = false;
 
+    // ========== 7) 优化启用报告（启动与周期性） ==========
+    bool enable_optimization_report = true;       // 总开关：是否打印优化启用信息
+    bool enable_capture_opt_report = true;        // 打印捕获链路优化信息
+    bool enable_system_opt_report = true;         // 打印系统/调度优化信息
+    bool optimization_report_verbose = true;      // 详细：打印OK/failed等细节
+    int  optimization_report_interval_frames = 60;// [CAPTURE OPT] 打印周期（帧）
+
+    // ========== 8) 线程调度（MMCSS） ==========
+    bool enable_mmcss_for_main_loop = true;       // 在主循环线程启用 MMCSS
+    std::wstring mmcss_task_name = L"Pro Audio"; // 任务类别（"Games"/"Pro Audio"/"Capture"等）
+    AVRT_PRIORITY mmcss_priority = AVRT_PRIORITY_HIGH; // MMCSS 线程优先级
+
+    // ========== 辅助 ==========
     bool is_target_class(int cid) const {
         return std::find(target_class_ids.begin(), target_class_ids.end(), cid) != target_class_ids.end();
     }
@@ -330,11 +409,11 @@ private:
 // --- 3. 屏幕捕捉器 (ScreenCapturer) - 优化版本 ---
 class ScreenCapturer {
 public:
-    ScreenCapturer(int crop_width, int crop_height) {
+    ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_height) : cfg(cfg_ref) {
         std::cout << "--- Initializing D3D for screen capture... ---" << std::endl;
         std::cout << "Crop size: " << crop_width << "x" << crop_height << std::endl;
         HRESULT hr;
-        std::cout << "Init pointers: m_pStagingTexture=" << m_pStagingTexture
+        std::cout << "Init pointers: m_pStagingTexture=nullptr"
                   << ", pFactory=" << pFactory
                   << ", pAdapter=" << pAdapter
                   << ", pOutput=" << pOutput
@@ -404,6 +483,7 @@ public:
             throw std::runtime_error("Failed to create output duplication.");
         }
 
+        // 创建多缓冲 staging 纹理与事件查询
         D3D11_TEXTURE2D_DESC desc;
         desc.Width = crop_width;
         desc.Height = crop_height;
@@ -417,16 +497,42 @@ public:
         desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
         desc.MiscFlags = 0;
 
-        hr = pDevice->CreateTexture2D(&desc, NULL, &m_pStagingTexture);
-        if (FAILED(hr)) {
-            throw std::runtime_error("Failed to create staging texture for cropping.");
+        for (size_t i = 0; i < kStagingCount; ++i) {
+            hr = pDevice->CreateTexture2D(&desc, NULL, &staging_[i]);
+            if (FAILED(hr)) {
+                throw std::runtime_error("Failed to create staging texture[" + std::to_string(i) + "]");
+            }
+            D3D11_QUERY_DESC qd{}; qd.Query = D3D11_QUERY_EVENT; qd.MiscFlags = 0;
+            hr = pDevice->CreateQuery(&qd, &copy_done_queries_[i]);
+            if (FAILED(hr)) {
+                throw std::runtime_error("Failed to create EVENT query for staging[" + std::to_string(i) + "]");
+            }
         }
-        std::cout << "--- Screen capture initialized successfully (" << width << "x" << height << ") ---" << std::endl;
+        std::cout << "--- Screen capture initialized successfully (" << width << "x" << height << ") with " << kStagingCount << " staging buffers ---" << std::endl;
+
+        // 捕获链路启动横幅（仅在启用报告时）
+        if (cfg.enable_optimization_report && cfg.enable_capture_opt_report) {
+            std::cout << "[BOOT] Capture pipeline: "
+                      << "dirty-skip=ON"
+                      << " | staging-buffers=" << kStagingCount
+                      << " | event-query=ON"
+                      << " | map=DO_NOT_WAIT"
+                      << " | cache-reuse=ON"
+                      << std::endl;
+            std::cout << "[BOOT] Timing: "
+                      << "step-timing=" << (cfg.enable_capture_step_timing?"ON":"OFF")
+                      << " | interval=" << cfg.capture_timing_interval_frames
+                      << " | success-only=" << (cfg.capture_timing_only_on_success?"ON":"OFF")
+                      << std::endl;
+        }
     }
 
     ~ScreenCapturer() {
         std::cout << "--- Cleaning up D3D resources... ---" << std::endl;
-        SafeRelease(&m_pStagingTexture);
+        for (size_t i = 0; i < kStagingCount; ++i) {
+            SafeRelease(&staging_[i]);
+            SafeRelease(&copy_done_queries_[i]);
+        }
         SafeRelease(&pDuplicator);
         SafeRelease(&pOutput1);
         SafeRelease(&pOutput);
@@ -440,22 +546,72 @@ public:
     ScreenCapturer& operator=(const ScreenCapturer&) = delete;
 
     bool CaptureFrame(cv::Mat& frame, const cv::Rect& crop_region) {
+        // 高精度分步计时
+        auto t_total_start = std::chrono::high_resolution_clock::now();
+        double t_acquire_ms = 0.0, t_qi_ms = 0.0, t_copy_ms = 0.0, t_map_ms = 0.0, t_cvt_ms = 0.0, t_unmap_ms = 0.0, t_total_ms = 0.0;
+
         IDXGIResource* pDesktopResource = nullptr;
         DXGI_OUTDUPL_FRAME_INFO frameInfo;
-        HRESULT hr = pDuplicator->AcquireNextFrame(16, &frameInfo, &pDesktopResource);
 
-        if (hr == DXGI_ERROR_WAIT_TIMEOUT) return false;
+        auto t_acq_s = std::chrono::high_resolution_clock::now();
+        HRESULT hr = pDuplicator->AcquireNextFrame(16, &frameInfo, &pDesktopResource);
+        auto t_acq_e = std::chrono::high_resolution_clock::now();
+        t_acquire_ms = std::chrono::duration<double, std::milli>(t_acq_e - t_acq_s).count();
+
+        if (hr == DXGI_ERROR_WAIT_TIMEOUT) {
+            // 无更新：尝试复用上一帧缓存
+            if (try_serve_cache(frame)) {
+                ++stat_cache_reused_;
+                return true;
+            }
+            // 仅在需要时统计失败帧
+            if (cfg.enable_capture_step_timing && !cfg.capture_timing_only_on_success) {
+                t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
+                accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            }
+            return false;
+        }
         if (FAILED(hr)) {
-            pDuplicator->ReleaseFrame();
             std::cerr << "AcquireNextFrame failed. HRESULT: 0x" << std::hex << hr << std::endl;
+            if (cfg.enable_capture_step_timing && !cfg.capture_timing_only_on_success) {
+                t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
+                accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            }
             return false;
         }
 
         ID3D11Texture2D* pAcquiredDesktopImage = nullptr;
+        auto t_qi_s = std::chrono::high_resolution_clock::now();
         hr = pDesktopResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&pAcquiredDesktopImage);
+        auto t_qi_e = std::chrono::high_resolution_clock::now();
+        t_qi_ms = std::chrono::duration<double, std::milli>(t_qi_e - t_qi_s).count();
         SafeRelease(&pDesktopResource);
         if (FAILED(hr)) {
+            if (cfg.enable_capture_step_timing && !cfg.capture_timing_only_on_success) {
+                t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
+                accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            }
+            return false;
+        }
+
+        // Desktop Duplication 脏矩形检测：若无变化，跳过本帧（复用上一帧）
+        UINT dirty_size = 0;
+        HRESULT hr_dirty = pDuplicator->GetFrameDirtyRects(0, nullptr, &dirty_size);
+        if (SUCCEEDED(hr_dirty) && dirty_size == 0) {
+            // 无脏矩形：复用上一帧缓存，释放当前帧
+            bool served = try_serve_cache(frame);
+            SafeRelease(&pDesktopResource); // 保险起见
+            SafeRelease(&pAcquiredDesktopImage);
             pDuplicator->ReleaseFrame();
+            if (served) {
+                ++stat_dirty_skips_;
+                ++stat_cache_reused_;
+                return true;
+            }
+            t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
+            if (cfg.enable_capture_step_timing && !cfg.capture_timing_only_on_success) {
+                accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            }
             return false;
         }
 
@@ -467,22 +623,88 @@ public:
         sourceRegion.front = 0;
         sourceRegion.back = 1;
 
-        pContext->CopySubresourceRegion(m_pStagingTexture, 0, 0, 0, 0, pAcquiredDesktopImage, 0, &sourceRegion);
+        // 双缓冲 staging + EVENT 查询：本帧拷贝到 curr，上一帧 prev 做 Map 读取
+        const size_t curr = frame_index_ % kStagingCount;
+        const size_t prev = (frame_index_ + kStagingCount - 1) % kStagingCount;
 
+        auto t_copy_s = std::chrono::high_resolution_clock::now();
+        pContext->CopySubresourceRegion(staging_[curr], 0, 0, 0, 0, pAcquiredDesktopImage, 0, &sourceRegion);
+        auto t_copy_e = std::chrono::high_resolution_clock::now();
+        t_copy_ms = std::chrono::duration<double, std::milli>(t_copy_e - t_copy_s).count();
+
+        // 在 curr 上标记拷贝完成事件
+        pContext->End(copy_done_queries_[curr]);
+
+        // 释放当前获取的桌面帧（Duplication 侧）
+        SafeRelease(&pAcquiredDesktopImage);
+        pDuplicator->ReleaseFrame();
+
+        // 仅在上一帧拷贝完成时尝试 Map 读取 prev；否则直接返回 false（上层复用上一帧）
+        BOOL copy_done = FALSE;
+        HRESULT qhr = pContext->GetData(copy_done_queries_[prev], &copy_done, sizeof(copy_done), 0);
+        if (qhr != S_OK || !copy_done) {
+            // 未就绪：不阻塞等待，直接跳过本帧的 Map（复用上一帧缓存）
+            ++stat_event_not_ready_;
+            bool served = try_serve_cache(frame);
+            if (served) ++stat_cache_reused_;
+            t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
+            if (cfg.enable_capture_step_timing && !cfg.capture_timing_only_on_success) {
+                accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            }
+            frame_index_++;
+            return served; // 若有缓存则返回 true，保证上层有图像
+        }
+
+        // 非阻塞 Map 读取上一帧
         D3D11_MAPPED_SUBRESOURCE mappedResource;
-        hr = pContext->Map(m_pStagingTexture, 0, D3D11_MAP_READ, 0, &mappedResource);
+        auto t_map_s = std::chrono::high_resolution_clock::now();
+        hr = pContext->Map(staging_[prev], 0, D3D11_MAP_READ, D3D11_MAP_FLAG_DO_NOT_WAIT, &mappedResource);
+        auto t_map_e = std::chrono::high_resolution_clock::now();
+        t_map_ms = std::chrono::duration<double, std::milli>(t_map_e - t_map_s).count();
+        if (hr == DXGI_ERROR_WAS_STILL_DRAWING) {
+            // 未就绪：不阻塞等待，直接跳过本帧 Map（复用上一帧缓存）
+            ++stat_map_still_drawing_;
+            bool served = try_serve_cache(frame);
+            if (served) ++stat_cache_reused_;
+            t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
+            if (cfg.enable_capture_step_timing && !cfg.capture_timing_only_on_success) {
+                accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            }
+            frame_index_++;
+            return served;
+        }
         if (FAILED(hr)) {
-            SafeRelease(&pAcquiredDesktopImage);
-            pDuplicator->ReleaseFrame();
+            // 其它错误
+            t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
+            if (cfg.enable_capture_step_timing && !cfg.capture_timing_only_on_success) {
+                accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            }
+            frame_index_++;
             return false;
         }
 
         cv::Mat bgra_frame(crop_region.height, crop_region.width, CV_8UC4, mappedResource.pData, mappedResource.RowPitch);
+        auto t_cvt_s = std::chrono::high_resolution_clock::now();
         cv::cvtColor(bgra_frame, frame, cv::COLOR_BGRA2BGR);
+        // 缓存当前 BGR 结果以便无变化/未就绪时复用
+        frame.copyTo(last_bgr_cache_);
+        auto t_cvt_e = std::chrono::high_resolution_clock::now();
+        t_cvt_ms = std::chrono::duration<double, std::milli>(t_cvt_e - t_cvt_s).count();
 
-        pContext->Unmap(m_pStagingTexture, 0);
-        SafeRelease(&pAcquiredDesktopImage);
-        pDuplicator->ReleaseFrame();
+        auto t_unmap_s = std::chrono::high_resolution_clock::now();
+        pContext->Unmap(staging_[prev], 0);
+        auto t_unmap_e = std::chrono::high_resolution_clock::now();
+        t_unmap_ms = std::chrono::duration<double, std::milli>(t_unmap_e - t_unmap_s).count();
+
+        t_total_ms = std::chrono::duration<double, std::milli>(t_unmap_e - t_total_start).count();
+        frame_index_++;
+
+        t_total_ms = std::chrono::duration<double, std::milli>(t_unmap_e - t_total_start).count();
+
+        if (cfg.enable_capture_step_timing || (cfg.enable_optimization_report && cfg.enable_capture_opt_report)) {
+            accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+        }
+        ++stat_success_;
         return true;
     }
 
@@ -490,7 +712,113 @@ public:
     int getHeight() const { return height; }
 
 private:
-    ID3D11Texture2D* m_pStagingTexture = nullptr;
+    // 返回缓存图像（若存在），用于无变化/未就绪时复用上一帧
+    bool try_serve_cache(cv::Mat& out) {
+        if (!last_bgr_cache_.empty()) {
+            // 确保尺寸匹配
+            if (last_bgr_cache_.rows == out.rows && last_bgr_cache_.cols == out.cols && last_bgr_cache_.type() == out.type()) {
+                last_bgr_cache_.copyTo(out);
+                return true;
+            } else {
+                // 直接克隆为所需尺寸（若上层传入空 Mat，这里可直接赋值）
+                out = last_bgr_cache_.clone();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // 采集计时聚合与打印（平均值），满足频率后输出并清零
+    void accumulate_and_maybe_print(double t_acquire_ms, double t_qi_ms, double t_copy_ms,
+                                    double t_map_ms, double t_cvt_ms, double t_unmap_ms, double t_total_ms) {
+       // 统计优化触发计数（按周期打印）
+       static size_t opt_counter = 0;
+       static size_t stat_dirty_skips = 0, stat_event_not_ready = 0, stat_map_still_drawing = 0, stat_cache_reused = 0, stat_success = 0;
+       // 将成员级累积并入周期统计
+       stat_dirty_skips += stat_dirty_skips_;
+       stat_event_not_ready += stat_event_not_ready_;
+       stat_map_still_drawing += stat_map_still_drawing_;
+       stat_cache_reused += stat_cache_reused_;
+       stat_success += stat_success_;
+       // 清零成员计数，避免重复累加
+       stat_dirty_skips_ = stat_event_not_ready_ = stat_map_still_drawing_ = stat_cache_reused_ = stat_success_ = 0;
+       // 递增优化统计的帧计数
+       opt_counter++;
+        static size_t counter = 0;
+        static double acc_acq = 0.0, acc_qi = 0.0, acc_copy = 0.0, acc_map = 0.0, acc_cvt = 0.0, acc_unmap = 0.0, acc_total = 0.0;
+        counter++;
+        acc_acq += t_acquire_ms;
+        acc_qi += t_qi_ms;
+        acc_copy += t_copy_ms;
+        acc_map += t_map_ms;
+        acc_cvt += t_cvt_ms;
+        acc_unmap += t_unmap_ms;
+        acc_total += t_total_ms;
+
+        bool should_print = cfg.capture_timing_every_frame;
+        if (!should_print) {
+            int interval = std::max(1, cfg.capture_timing_interval_frames);
+            if (interval <= 1) should_print = true;
+            else if (counter % static_cast<size_t>(interval) == 0) should_print = true;
+        }
+        if (should_print) {
+            double n = static_cast<double>(counter);
+            std::cout << std::fixed << std::setprecision(3)
+                      << "[CAPTURE PERF] over " << counter << " frames"
+                      << " | acquire=" << (acc_acq / n) << " ms"
+                      << " | qi=" << (acc_qi / n) << " ms"
+                      << " | copy=" << (acc_copy / n) << " ms"
+                      << " | map=" << (acc_map / n) << " ms"
+                      << " | cvt=" << (acc_cvt / n) << " ms"
+                      << " | unmap=" << (acc_unmap / n) << " ms"
+                      << " | total=" << (acc_total / n) << " ms"
+                      << std::endl;
+
+            // 按独立周期打印优化触发统计（仅当启用报告开关）
+            if (cfg.enable_optimization_report && cfg.enable_capture_opt_report) {
+                bool should_print_opt = false;
+                int opt_interval = std::max(1, cfg.optimization_report_interval_frames);
+                if (opt_interval <= 1) should_print_opt = true;
+                else if (opt_counter % static_cast<size_t>(opt_interval) == 0) should_print_opt = true;
+                if (should_print_opt) {
+                    size_t total = static_cast<size_t>(opt_counter);
+                    auto pct = [&](size_t v){ return total? (100.0 * double(v) / double(total)) : 0.0; };
+                    std::cout << std::fixed << std::setprecision(1)
+                              << "[CAPTURE OPT] over " << total << " frames"
+                              << " | dirty-skip=" << stat_dirty_skips << " (" << pct(stat_dirty_skips) << "%)"
+                              << " | event-not-ready=" << stat_event_not_ready << " (" << pct(stat_event_not_ready) << "%)"
+                              << " | map-still-drawing=" << stat_map_still_drawing << " (" << pct(stat_map_still_drawing) << "%)"
+                              << " | cache-reused=" << stat_cache_reused << " (" << pct(stat_cache_reused) << "%)"
+                              << " | success=" << stat_success << " (" << pct(stat_success) << "%)"
+                              << std::endl;
+                    // 清零周期统计
+                    opt_counter = 0;
+                    stat_dirty_skips = stat_event_not_ready = stat_map_still_drawing = stat_cache_reused = stat_success = 0;
+                }
+            }
+
+            counter = 0;
+            acc_acq = acc_qi = acc_copy = acc_map = acc_cvt = acc_unmap = acc_total = 0.0;
+        }
+    }
+
+    // 配置引用
+    const Config& cfg;
+
+    // 多缓冲 staging 与事件查询
+    static constexpr size_t kStagingCount = 2;
+    std::array<ID3D11Texture2D*, kStagingCount> staging_{}; // CPU 读 staging textures
+    std::array<ID3D11Query*,     kStagingCount> copy_done_queries_{}; // EVENT queries 标记拷贝完成
+    size_t frame_index_ = 0;
+    cv::Mat last_bgr_cache_; // 上一帧 BGR 缓存（与输出相同尺寸格式）
+
+    // 捕获优化触发计数（成员级，周期内累加）
+    size_t stat_dirty_skips_ = 0;
+    size_t stat_event_not_ready_ = 0;
+    size_t stat_map_still_drawing_ = 0;
+    size_t stat_cache_reused_ = 0;
+    size_t stat_success_ = 0;
+
     IDXGIFactory1* pFactory = nullptr;
     IDXGIAdapter1* pAdapter = nullptr;
     IDXGIOutput* pOutput = nullptr;
@@ -626,7 +954,7 @@ class AimAssistant {
 public:
     AimAssistant()
         : cfg(),
-        capturer(cfg.crop_size, cfg.crop_size), // 传递 crop_size
+        capturer(cfg, cfg.crop_size, cfg.crop_size), // 传递 cfg + crop_size
         detector(cfg),
         mouse(),
         crop_region((capturer.getWidth() - cfg.crop_size) / 2, (capturer.getHeight() - cfg.crop_size) / 2, cfg.crop_size, cfg.crop_size),
@@ -865,6 +1193,25 @@ private:
 
 // --- 主函数 ---
 int main() {
+    // Disable process/thread power throttling and background limits as early as possible
+    DisablePowerThrottlingForProcessAndThread();
+    // Raise process and main thread priority early
+    RaiseProcessPrioritySafely();
+    RaiseThisThreadPrioritySafely();
+
+    // Enable MMCSS for main loop thread based on default Config values
+    Config boot_cfg;
+    HANDLE hMmcss = EnableMmcssIfConfigured(boot_cfg.enable_mmcss_for_main_loop,
+                                            boot_cfg.mmcss_task_name.c_str(),
+                                            boot_cfg.mmcss_priority);
+
+    if (boot_cfg.enable_optimization_report && boot_cfg.enable_system_opt_report) {
+        std::wcout << L"[BOOT] Scheduling: MMCSS=" << (hMmcss?L"ON":L"OFF")
+                   << L" (task=" << boot_cfg.mmcss_task_name << L", prio=" << (int)boot_cfg.mmcss_priority << L")" << std::endl;
+    }
+
+    // Disable process/thread power throttling and background limits as early as possible
+    DisablePowerThrottlingForProcessAndThread(boot_cfg.enable_optimization_report && boot_cfg.enable_system_opt_report);
     // Raise process and main thread priority early
     RaiseProcessPrioritySafely();
     RaiseThisThreadPrioritySafely();
@@ -873,6 +1220,7 @@ int main() {
         assistant.Run();
     }
     catch (const std::exception& e) {
+        DisableMmcss(hMmcss);
         std::cerr << "\n\n[FATAL ERROR] An unrecoverable error occurred: " << e.what() << std::endl;
         std::cerr << "Please check the following:\n"
             << "Press Enter to exit." << std::endl;
@@ -880,5 +1228,6 @@ int main() {
         return -1;
     }
     std::cout << "\nProgram finished successfully." << std::endl;
+    DisableMmcss(hMmcss);
     return 0;
 }
