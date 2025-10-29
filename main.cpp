@@ -150,6 +150,7 @@ static inline void DisablePowerThrottlingForProcessAndThread(bool verbose=true) 
 #include "InputSimulator.hpp"
 #include "Config.hpp"
 #include "Timing.hpp"
+#include "PidController.hpp"
 
 // Forward Declarations
 struct Detection;
@@ -178,59 +179,7 @@ struct Detection {
 };
 
 
-// --- PID 控制器 ---
-class PidController {
-public:
-    PidController() = default;
-    PidController(double kp, double ki, double kd, double out_limit, double integ_limit)
-        : kp_(kp), ki_(ki), kd_(kd), out_limit_(std::abs(out_limit)), integ_limit_(std::abs(integ_limit)) {}
-
-    void SetGains(double kp, double ki, double kd) { kp_ = kp; ki_ = ki; kd_ = kd; }
-    void SetLimits(double out_limit, double integ_limit) {
-        out_limit_ = std::abs(out_limit);
-        integ_limit_ = std::abs(integ_limit);
-    }
-
-    void Reset() { prev_error_ = 0.0; integral_ = 0.0; initialized_ = false; }
-
-    double Update(double error, double dt_s) {
-        if (dt_s <= 0.0) dt_s = 1.0 / 60.0; // fallback
-        if (!initialized_) { prev_error_ = error; initialized_ = true; }
-
-        // 误差导数
-        double derivative = (error - prev_error_) / dt_s;
-
-        // 积分项
-        integral_ += error * dt_s;
-        // 积分限幅
-        if (integ_limit_ > 0.0) {
-            if (integral_ > integ_limit_) integral_ = integ_limit_;
-            else if (integral_ < -integ_limit_) integral_ = -integ_limit_;
-        }
-
-        double output = kp_ * error + ki_ * integral_ + kd_ * derivative;
-
-        // 输出限幅 + 抗饱和：若饱和则在下次积分前自然恢复（简单策略）
-        if (out_limit_ > 0.0) {
-            if (output > out_limit_) output = out_limit_;
-            else if (output < -out_limit_) output = -out_limit_;
-        }
-
-        prev_error_ = error;
-        return output;
-    }
-
-private:
-    double kp_ = 0.4;
-    double ki_ = 0.0;
-    double kd_ = 0.08;
-    double out_limit_ = 50.0;    // 每帧输出像素限幅
-    double integ_limit_ = 200.0; // 积分项限幅
-
-    double prev_error_ = 0.0;
-    double integral_ = 0.0;
-    bool initialized_ = false;
-};
+// --- PID 控制器 (moved to PidController.hpp/.cpp) ---
 
 
 // --- 2. 鼠标控制器 (MouseController) ---
