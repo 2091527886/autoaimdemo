@@ -64,6 +64,9 @@ void DisableMmcss(HANDLE h);
 #include "MmcssUtil.hpp"
 #include "DxgiTuning.hpp"
 #include "ThreadAffinity.hpp"
+#include "metrics/CaptureReporting.hpp"
+#include "metrics/TrtPerfReporting.hpp"
+#include "metrics/SystemBootReporting.hpp"
 
 // Forward Declarations
 struct Detection;
@@ -102,7 +105,10 @@ struct Detection {
 // --- 3. 屏幕捕捉器 (ScreenCapturer) - 优化版本 ---
 class ScreenCapturer {
 public:
-    ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_height) : cfg(cfg_ref) {
+    // Reporting helper
+    metrics::CaptureReporting capture_reporter_;
+public:
+    ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_height) : cfg(cfg_ref), capture_reporter_(cfg_ref) {
         if (cfg.verbose_init_log) std::cout << "--- Initializing D3D for screen capture... ---" << std::endl;
         if (cfg.verbose_init_log) {
             std::cout << "[CAPTURE] Crop size: " << crop_width << "x" << crop_height << std::endl;
@@ -206,20 +212,7 @@ public:
         std::cout << "--- Screen capture initialized successfully (" << width << "x" << height << ") with " << kStagingCount << " staging buffers ---" << std::endl;
 
         // 捕获链路启动横幅（仅在启用报告时）
-        if (cfg.enable_optimization_report && cfg.enable_capture_opt_report) {
-            std::cout << "[BOOT] Capture pipeline: "
-                      << "dirty-skip=ON"
-                      << " | staging-buffers=" << kStagingCount
-                      << " | event-query=ON"
-                      << " | map=DO_NOT_WAIT"
-                      << " | cache-reuse=ON"
-                      << std::endl;
-            std::cout << "[BOOT] Timing: "
-                      << "step-timing=" << (cfg.enable_capture_step_timing?"ON":"OFF")
-                      << " | interval=" << cfg.capture_timing_interval_frames
-                      << " | success-only=" << (cfg.capture_timing_only_on_success?"ON":"OFF")
-                      << std::endl;
-        }
+        capture_reporter_.BootBanner(kStagingCount);
     }
 
     ~ScreenCapturer() {
@@ -424,75 +417,11 @@ private:
     // 采集计时聚合与打印（平均值），满足频率后输出并清零
     void accumulate_and_maybe_print(double t_acquire_ms, double t_qi_ms, double t_copy_ms,
                                     double t_map_ms, double t_cvt_ms, double t_unmap_ms, double t_total_ms) {
-       // 统计优化触发计数（按周期打印）
-       static size_t opt_counter = 0;
-       static size_t stat_dirty_skips = 0, stat_event_not_ready = 0, stat_map_still_drawing = 0, stat_cache_reused = 0, stat_success = 0;
-       // 将成员级累积并入周期统计
-       stat_dirty_skips += stat_dirty_skips_;
-       stat_event_not_ready += stat_event_not_ready_;
-       stat_map_still_drawing += stat_map_still_drawing_;
-       stat_cache_reused += stat_cache_reused_;
-       stat_success += stat_success_;
-       // 清零成员计数，避免重复累加
-       stat_dirty_skips_ = stat_event_not_ready_ = stat_map_still_drawing_ = stat_cache_reused_ = stat_success_ = 0;
-       // 递增优化统计的帧计数
-       opt_counter++;
-        static size_t counter = 0;
-        static double acc_acq = 0.0, acc_qi = 0.0, acc_copy = 0.0, acc_map = 0.0, acc_cvt = 0.0, acc_unmap = 0.0, acc_total = 0.0;
-        counter++;
-        acc_acq += t_acquire_ms;
-        acc_qi += t_qi_ms;
-        acc_copy += t_copy_ms;
-        acc_map += t_map_ms;
-        acc_cvt += t_cvt_ms;
-        acc_unmap += t_unmap_ms;
-        acc_total += t_total_ms;
-
-        bool should_print = cfg.capture_timing_every_frame;
-        if (!should_print) {
-            int interval = std::max(1, cfg.capture_timing_interval_frames);
-            if (interval <= 1) should_print = true;
-            else if (counter % static_cast<size_t>(interval) == 0) should_print = true;
-        }
-        if (should_print) {
-            double n = static_cast<double>(counter);
-            std::cout << std::fixed << std::setprecision(3)
-                      << "[CAPTURE PERF] over " << counter << " frames"
-                      << " | acquire=" << (acc_acq / n) << " ms"
-                      << " | qi=" << (acc_qi / n) << " ms"
-                      << " | copy=" << (acc_copy / n) << " ms"
-                      << " | map=" << (acc_map / n) << " ms"
-                      << " | cvt=" << (acc_cvt / n) << " ms"
-                      << " | unmap=" << (acc_unmap / n) << " ms"
-                      << " | total=" << (acc_total / n) << " ms"
-                      << std::endl;
-
-            // 按独立周期打印优化触发统计（仅当启用报告开关）
-            if (cfg.enable_optimization_report && cfg.enable_capture_opt_report) {
-                bool should_print_opt = false;
-                int opt_interval = std::max(1, cfg.optimization_report_interval_frames);
-                if (opt_interval <= 1) should_print_opt = true;
-                else if (opt_counter % static_cast<size_t>(opt_interval) == 0) should_print_opt = true;
-                if (should_print_opt) {
-                    size_t total = static_cast<size_t>(opt_counter);
-                    auto pct = [&](size_t v){ return total? (100.0 * double(v) / double(total)) : 0.0; };
-                    std::cout << std::fixed << std::setprecision(1)
-                              << "[CAPTURE OPT] over " << total << " frames"
-                              << " | dirty-skip=" << stat_dirty_skips << " (" << pct(stat_dirty_skips) << "%)"
-                              << " | event-not-ready=" << stat_event_not_ready << " (" << pct(stat_event_not_ready) << "%)"
-                              << " | map-still-drawing=" << stat_map_still_drawing << " (" << pct(stat_map_still_drawing) << "%)"
-                              << " | cache-reused=" << stat_cache_reused << " (" << pct(stat_cache_reused) << "%)"
-                              << " | success=" << stat_success << " (" << pct(stat_success) << "%)"
-                              << std::endl;
-                    // 清零周期统计
-                    opt_counter = 0;
-                    stat_dirty_skips = stat_event_not_ready = stat_map_still_drawing = stat_cache_reused = stat_success = 0;
-                }
-            }
-
-            counter = 0;
-            acc_acq = acc_qi = acc_copy = acc_map = acc_cvt = acc_unmap = acc_total = 0.0;
-        }
+        // Delegate to metrics reporter to preserve behavior and frequency/format
+        capture_reporter_.ReportStepTimings(
+            t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms,
+            stat_dirty_skips_, stat_event_not_ready_, stat_map_still_drawing_, stat_cache_reused_, stat_success_
+        );
     }
 
     // 配置引用
@@ -526,7 +455,7 @@ private:
 // --- 4. 目标检测器 (ObjectDetector) ---
 class ObjectDetector {
 public:
-    explicit ObjectDetector(const Config& cfg) {
+    explicit ObjectDetector(const Config& cfg) : trt_reporter_(cfg) {
         // English logs: load TensorRT-YOLO engine
         const std::string engine_path = cfg.resolve_engine_path();
         std::cout << "[INFO] Loading TensorRT-YOLO engine from " << engine_path << " ..." << std::endl;
@@ -608,33 +537,16 @@ public:
 
         // Query and print TensorRT-YOLO performance report based on frequency settings
         if (cfg.enable_performance_report) {
-            bool should_report = cfg.perf_report_every_frame;
-            if (!should_report) {
-                perf_frame_counter_++;
-                if (cfg.perf_report_interval_frames <= 1) {
-                    should_report = true;
-                } else if (perf_frame_counter_ % static_cast<size_t>(cfg.perf_report_interval_frames) == 0) {
-                    should_report = true;
-                }
-            }
-            if (should_report) {
-                auto report = detector_->performanceReport();
-                const std::string& throughput = std::get<0>(report);
-                if (!throughput.empty()) {
-                    const std::string& cpu_latency = std::get<1>(report);
-                    const std::string& gpu_latency = std::get<2>(report);
-                    std::cout << "[TRT-YOLO PERF] " << throughput << '\n'
-                              << "[TRT-YOLO PERF] " << cpu_latency << '\n'
-                              << "[TRT-YOLO PERF] " << gpu_latency << std::endl;
-                }
+            if (trt_reporter_.ShouldReport()) {
+                trt_reporter_.PrintReport(*detector_);
             }
         }
     }
 
 private:
     std::unique_ptr<trtyolo::DetectModel> detector_;
-    // 性能报告打印计数器
-    size_t perf_frame_counter_ = 0;
+    metrics::TrtPerfReporting trt_reporter_;
+
 };
 
 // --- 5. 核心协调器 (AimAssistant) ---
@@ -908,20 +820,12 @@ int main() {
     // Start tiny overlay animator (forces DWM updates) if enabled
     if (boot_cfg.enable_overlay_animator) {
         overlay.start(boot_cfg);
-        if (boot_cfg.enable_optimization_report && boot_cfg.enable_system_opt_report) {
-            std::cout << "[BOOT] Overlay animator=ON (size=" << boot_cfg.overlay_pixel_size
-                      << ", interval=" << boot_cfg.overlay_update_interval_100ns << "x100ns, spin="
-                      << boot_cfg.overlay_spin_budget_us << "us, pos="
-                      << boot_cfg.overlay_pos_x << "," << boot_cfg.overlay_pos_y << ")" << std::endl;
-        }
-    } else if (boot_cfg.enable_optimization_report && boot_cfg.enable_system_opt_report) {
-        std::cout << "[BOOT] Overlay animator=OFF" << std::endl;
+        metrics::SystemBootReporting::PrintOverlayBanner(boot_cfg, true);
+    } else {
+        metrics::SystemBootReporting::PrintOverlayBanner(boot_cfg, false);
     }
 
-    if (boot_cfg.enable_optimization_report && boot_cfg.enable_system_opt_report) {
-        std::wcout << L"[BOOT] Scheduling: MMCSS=" << (hMmcss?L"ON":L"OFF")
-                   << L" (task=" << boot_cfg.mmcss_task_name << L", prio=" << (int)boot_cfg.mmcss_priority << L")" << std::endl;
-    }
+    metrics::SystemBootReporting::PrintSchedulingBanner(boot_cfg, hMmcss);
 
     try {
         AimAssistant assistant;

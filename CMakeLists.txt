@@ -59,6 +59,9 @@ add_executable(aimassistant
   MmcssUtil.cpp
   DxgiTuning.cpp
   ThreadAffinity.cpp
+  metrics/CaptureReporting.cpp
+  metrics/TrtPerfReporting.cpp
+  metrics/SystemBootReporting.cpp
 )
 
 # 启用 Release 高优化/LTO/AVX
