@@ -78,6 +78,7 @@ endif()
 # 2) 可执行目标
 add_executable(aimassistant
   main.cpp
+  OverlayAnimator.cpp
 )
 
 # 启用 Release 高优化/LTO/AVX
