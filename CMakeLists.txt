@@ -54,6 +54,11 @@ add_executable(aimassistant
   OverlayAnimator.cpp
   MouseController.cpp
   PidController.cpp
+  SystemPriority.cpp
+  PowerThrottling.cpp
+  MmcssUtil.cpp
+  DxgiTuning.cpp
+  ThreadAffinity.cpp
 )
 
 # 启用 Release 高优化/LTO/AVX

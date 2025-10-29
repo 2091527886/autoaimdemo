@@ -26,113 +26,21 @@
 #include <avrt.h>
 #pragma comment(lib, "Avrt.lib")
 
-// --- Priority helpers (process/thread/DXGI) ---
-static inline void RaiseProcessPrioritySafely() {
-    if (!SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS)) {
-        std::cerr << "SetPriorityClass(HIGH) failed: " << GetLastError() << std::endl;
-    }
-}
-
-static inline void RaiseThisThreadPrioritySafely() {
-    if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST)) {
-        std::cerr << "SetThreadPriority(HIGHEST) failed: " << GetLastError() << std::endl;
-    }
-}
-
-static inline void RaiseDxgiGpuPriorityAndLatency(ID3D11Device* d3dDevice, int gpu_thread_priority = 7, int max_frame_latency = 1) {
-    if (!d3dDevice) return;
-    IDXGIDevice1* dxgiDevice1 = nullptr;
-    HRESULT hr = d3dDevice->QueryInterface(__uuidof(IDXGIDevice1), (void**)&dxgiDevice1);
-    if (FAILED(hr) || !dxgiDevice1) {
-        std::cerr << "QueryInterface(IDXGIDevice1) failed: 0x" << std::hex << (unsigned long)hr << std::dec << std::endl;
-        return;
-    }
-    hr = dxgiDevice1->SetGPUThreadPriority(gpu_thread_priority);
-    if (FAILED(hr)) {
-        std::cerr << "SetGPUThreadPriority(7) failed: 0x" << std::hex << (unsigned long)hr << std::dec << std::endl;
-    }
-    hr = dxgiDevice1->SetMaximumFrameLatency(max_frame_latency);
-    if (FAILED(hr)) {
-        std::cerr << "SetMaximumFrameLatency(1) failed: 0x" << std::hex << (unsigned long)hr << std::dec << std::endl;
-    }
-    dxgiDevice1->Release();
-}
-
+// --- Priority helpers moved to separate modules ---
+/* moved */
 
 
 // 将当前线程内存优先级显式设置为 NORMAL（保证不被降级）
-static inline void SetThisThreadMemoryPriorityNormal(bool verbose=true) {
-    MEMORY_PRIORITY_INFORMATION mpi{};
-    mpi.MemoryPriority = MEMORY_PRIORITY_NORMAL;
-    if (!SetThreadInformation(GetCurrentThread(), ThreadMemoryPriority, &mpi, sizeof(mpi))) {
-        if (verbose) std::cerr << "[BOOT] ThreadMemoryPriority=NORMAL failed: " << GetLastError() << std::endl;
-    } else if (verbose) {
-        std::cout << "[BOOT] ThreadMemoryPriority=NORMAL OK" << std::endl;
-    }
-}
-
+/* moved */
 // 禁用进程 PriorityBoost，避免在系统内存压力下被降低优先级
-static inline void DisableProcessPriorityBoost(bool verbose=true) {
-    if (!SetProcessPriorityBoost(GetCurrentProcess(), FALSE)) {
-        if (verbose) std::cerr << "[BOOT] ProcPriorityBoost(FALSE) failed: " << GetLastError() << std::endl;
-    } else if (verbose) {
-        std::cout << "[BOOT] ProcPriorityBoost(FALSE) OK" << std::endl;
-    }
-}
-
+/* moved */
 
 // Forward declare Config for use in OverlayAnimator
 class Config;
-static inline HANDLE EnableMmcssIfConfigured(bool enable, const wchar_t* task_name, AVRT_PRIORITY priority, DWORD* out_task_index=nullptr) {
-    if (!enable) return nullptr;
-    if (!task_name) task_name = L"Games";
-    DWORD task_index = 0;
-    HANDLE h = AvSetMmThreadCharacteristicsW(task_name, &task_index);
-    if (!h) {
-        std::cerr << "[MMCSS] AvSetMmThreadCharacteristicsW failed: " << GetLastError() << std::endl;
-        return nullptr;
-    }
-    if (!AvSetMmThreadPriority(h, priority)) {
-        std::cerr << "[MMCSS] AvSetMmThreadPriority failed: " << GetLastError() << std::endl;
-    }
-    if (out_task_index) *out_task_index = task_index;
-    std::wcout << L"[MMCSS] Enabled for thread. Task=" << task_name << L", priority=" << (int)priority << std::endl;
-    return h;
-}
-static inline void DisableMmcss(HANDLE h) {
-    if (h) AvRevertMmThreadCharacteristics(h);
-}
-static inline void DisablePowerThrottlingForProcessAndThread(bool verbose=true) {
-   // Disable process-wide execution speed throttling
-   PROCESS_POWER_THROTTLING_STATE pstate = {};
-   pstate.Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION;
-   pstate.ControlMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
-   pstate.StateMask = 0; // clear EXECUTION_SPEED -> no throttling
-   if (!SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling, &pstate, sizeof(pstate))) {
-       if (verbose) std::cerr << "[BOOT] ProcPowerThrottling=OFF failed: " << GetLastError() << std::endl;
-   } else if (verbose) {
-       std::cout << "[BOOT] ProcPowerThrottling=OFF OK" << std::endl;
-   }
-
-   // Disable thread execution speed throttling for current thread
-   THREAD_POWER_THROTTLING_STATE tstate = {};
-   tstate.Version = THREAD_POWER_THROTTLING_CURRENT_VERSION;
-   tstate.ControlMask = THREAD_POWER_THROTTLING_EXECUTION_SPEED;
-   tstate.StateMask = 0; // clear EXECUTION_SPEED
-   if (!SetThreadInformation(GetCurrentThread(), ThreadPowerThrottling, &tstate, sizeof(tstate))) {
-       if (verbose) std::cerr << "[BOOT] ThreadPowerThrottling=OFF failed: " << GetLastError() << std::endl;
-   } else if (verbose) {
-       std::cout << "[BOOT] ThreadPowerThrottling=OFF OK" << std::endl;
-   }
-
-   // Prevent Windows from automatically reducing this thread's priority during heavy paging
-   if (!SetThreadPriorityBoost(GetCurrentThread(), FALSE)) {
-       if (verbose) std::cerr << "[BOOT] ThreadPriorityBoost(FALSE) failed: " << GetLastError() << std::endl;
-   } else if (verbose) {
-       std::cout << "[BOOT] ThreadPriorityBoost(FALSE) OK" << std::endl;
-   }
-}
-
+/* moved: MMCSS utilities now in MmcssUtil */
+/* moved */
+void DisableMmcss(HANDLE h);
+/* moved */
 
 // TensorRT-YOLO
 #include <trtyolo.hpp>
@@ -151,6 +59,11 @@ static inline void DisablePowerThrottlingForProcessAndThread(bool verbose=true) 
 #include "Config.hpp"
 #include "Timing.hpp"
 #include "PidController.hpp"
+#include "SystemPriority.hpp"
+#include "PowerThrottling.hpp"
+#include "MmcssUtil.hpp"
+#include "DxgiTuning.hpp"
+#include "ThreadAffinity.hpp"
 
 // Forward Declarations
 struct Detection;
