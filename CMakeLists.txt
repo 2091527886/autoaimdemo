@@ -53,6 +53,7 @@ add_executable(aimassistant
   main.cpp
   OverlayAnimator.cpp
   MouseController.cpp
+  HotkeyManager.cpp
   PidController.cpp
   SystemPriority.cpp
   PowerThrottling.cpp

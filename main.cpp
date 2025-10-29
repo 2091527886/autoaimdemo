@@ -101,6 +101,7 @@ struct Detection {
 // --- 2. 鼠标控制器 (MouseController) ---
 #include "OverlayAnimator.hpp"
 #include "MouseController.hpp"
+#include "HotkeyManager.hpp"
 
 // --- 3. 屏幕捕捉器 (ScreenCapturer) - 优化版本 ---
 class ScreenCapturer {
@@ -557,6 +558,7 @@ public:
         capturer(cfg, cfg.crop_size, cfg.crop_size), // 传递 cfg + crop_size
         detector(cfg),
         mouse(),
+        hotkeys(cfg),
         crop_region((capturer.getWidth() - cfg.crop_size) / 2, (capturer.getHeight() - cfg.crop_size) / 2, cfg.crop_size, cfg.crop_size),
         crop_center(cfg.crop_size / 2, cfg.crop_size / 2),
         is_visualizing(cfg.enable_visualization),
@@ -671,7 +673,7 @@ private:
 
     void handleMouseInput(const Detection* target) {
         // 若无目标或未按住按键：释放 PID 积分，避免历史积分殘留
-        bool smooth_pressed = (GetAsyncKeyState(cfg.smooth_aim_key) & 0x8000) != 0;
+        bool smooth_pressed = hotkeys.SmoothPressed();
         if (!target || !smooth_pressed) {
             pid_x.Reset();
             pid_y.Reset();
@@ -698,10 +700,8 @@ private:
             }
         }
 
-        // 单发模式：仍使用原比例（便于测试 PID 与比例的差异）
-        static bool f8_was_pressed = false;
-        bool f8_is_pressed = (GetAsyncKeyState(cfg.single_shot_key) & 0x8000) != 0;
-        if (f8_is_pressed && !f8_was_pressed) {
+        // 单发模式：保持边沿触发语义
+        if (hotkeys.SingleShotJustPressed()) {
             cv::Point target_point(
                 target->box.x + target->box.width / 2,
                 target->box.y + static_cast<int>(target->box.height * cfg.target_y_ratio)
@@ -716,7 +716,6 @@ private:
                 mouse.MoveRelative(move_x, move_y);
             }
         }
-        f8_was_pressed = f8_is_pressed;
     }
 
     void updateAndPrintStats() {
@@ -770,6 +769,7 @@ private:
     ScreenCapturer capturer;
     ObjectDetector detector;
     MouseController mouse;
+    HotkeyManager hotkeys;
     const cv::Rect crop_region;
     const cv::Point crop_center;
     double mouse_correction_factor = 1.0;
