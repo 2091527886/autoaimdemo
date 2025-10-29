@@ -64,9 +64,7 @@ void DisableMmcss(HANDLE h);
 #include "MmcssUtil.hpp"
 #include "DxgiTuning.hpp"
 #include "ThreadAffinity.hpp"
-#include "metrics/CaptureReporting.hpp"
-#include "metrics/TrtPerfReporting.hpp"
-#include "metrics/SystemBootReporting.hpp"
+#include "metrics/Reporting.hpp"
 #include "ComHelpers.hpp"
 #include "Detection.hpp"
 
@@ -75,7 +73,7 @@ struct TimingDetails;
 class Config;
 class ScreenCapturer;
 class ObjectDetector;
-class MouseController;
+class Mouse;
 class AimAssistant;
 
 // --- 辅助宏 ---
@@ -86,9 +84,9 @@ class AimAssistant;
 // --- PID 控制器 (moved to PidController.hpp/.cpp) ---
 
 
-// --- 2. 鼠标控制器 (MouseController) ---
+// --- 2. 鼠标控制器 (Mouse) ---
 #include "OverlayAnimator.hpp"
-#include "MouseController.hpp"
+#include "Mouse.hpp"
 #include "HotkeyManager.hpp"
 #include "ObjectDetector.hpp"
 #include "ScreenCapturer.hpp"
@@ -104,38 +102,38 @@ class AimAssistant {
 public:
     AimAssistant()
         : cfg(),
-        capturer(cfg, cfg.crop_size, cfg.crop_size), // 传递 cfg + crop_size
-        detector(cfg),
+        cap(cfg, cfg.crop_size_px, cfg.crop_size_px), // 传递 cfg + crop_size
+        det(cfg),
         mouse(),
-        hotkeys(cfg),
-        crop_region((capturer.getWidth() - cfg.crop_size) / 2, (capturer.getHeight() - cfg.crop_size) / 2, cfg.crop_size, cfg.crop_size),
-        crop_center(cfg.crop_size / 2, cfg.crop_size / 2),
-        is_visualizing(cfg.enable_visualization),
-        aggregator_(static_cast<size_t>(std::max(1, cfg.latency_log_interval_frames)))
+        keys(cfg),
+        cropRect((cap.getWidth() - cfg.crop_size_px) / 2, (cap.getHeight() - cfg.crop_size_px) / 2, cfg.crop_size_px, cfg.crop_size_px),
+        center(cfg.crop_size_px / 2, cfg.crop_size_px / 2),
+        overlayOn(cfg.enable_visual),
+        latAgg(static_cast<size_t>(std::max(1, cfg.log_latency_every_n)))
     {
-        if (capturer.getWidth() < cfg.crop_size || capturer.getHeight() < cfg.crop_size) {
-            throw std::runtime_error("Screen resolution is smaller than configured crop_size.");
+        if (cap.getWidth() < cfg.crop_size_px || cap.getHeight() < cfg.crop_size_px) {
+            throw std::runtime_error("Screen resolution is smaller than configured crop_size_px.");
         }
-        mouse_correction_factor = (cfg.horizontal_fov / static_cast<double>(capturer.getWidth()))
-            * (cfg.pixels_for_360_turn / 360.0);
-        if (is_visualizing) {
-            cv::namedWindow(cfg.window_name, cv::WINDOW_AUTOSIZE);
+        mouseFactor = (cfg.hfov_deg / static_cast<double>(cap.getWidth()))
+            * (cfg.px_per_360 / 360.0);
+        if (overlayOn) {
+            cv::namedWindow(cfg.window_title, cv::WINDOW_AUTOSIZE);
         }
-        std::cout << "--- Detection will run on a centered " << cfg.crop_size << "x" << cfg.crop_size << " region. ---" << std::endl;
-        print_instructions();
+        std::cout << "--- Detect on centered " << cfg.crop_size_px << "x" << cfg.crop_size_px << " region. ---" << std::endl;
+        showHelp();
 
         // 初始化 PID 控制器（像素域）。输出再乘以 mouse_correction_factor 转为鼠标单位。
-        pid_x.SetGains(cfg.pid_kp_x, cfg.pid_ki_x, cfg.pid_kd_x);
-        pid_x.SetLimits(cfg.pid_output_limit, cfg.pid_integral_limit);
-        pid_y.SetGains(cfg.pid_kp_y, cfg.pid_ki_y, cfg.pid_kd_y);
-        pid_y.SetLimits(cfg.pid_output_limit, cfg.pid_integral_limit);
+        pidX.SetGains(cfg.pid_kp_x, cfg.pid_ki_x, cfg.pid_kd_x);
+        pidX.SetLimits(cfg.pid_output_limit, cfg.pid_integral_limit);
+        pidY.SetGains(cfg.pid_kp_y, cfg.pid_ki_y, cfg.pid_kd_y);
+        pidY.SetLimits(cfg.pid_output_limit, cfg.pid_integral_limit);
     }
 
     ~AimAssistant() {
-        if (is_visualizing) cv::destroyAllWindows();
+        if (overlayOn) cv::destroyAllWindows();
     }
 
-    void Run() {
+    void run() {
         while (true) {
             auto loop_start_time = std::chrono::high_resolution_clock::now();
 
@@ -143,50 +141,50 @@ public:
 
             // 1) 截屏计时
             auto t_cap_start = std::chrono::high_resolution_clock::now();
-            bool got = capturer.CaptureFrame(captured_frame, crop_region);
+            bool got = cap.CaptureFrame(frame, cropRect);
             auto t_cap_end = std::chrono::high_resolution_clock::now();
             fl.capture_ms = std::chrono::duration<double, std::milli>(t_cap_end - t_cap_start).count();
             if (!got) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 // 仅统计成功截屏帧：直接继续下一帧
-                if (cfg.enable_latency_log && !cfg.latency_only_on_captured) {
+                if (cfg.log_latency && !cfg.latency_on_capture_only) {
                     // 如果也要统计失败帧，则把仅有 capture_ms 的 fl 加入
-                    aggregator_.add(fl);
+                    latAgg.add(fl);
                 }
                 continue;
             }
 
             // 2) 检测计时（外层整体）
             auto t_det_start = std::chrono::high_resolution_clock::now();
-            detector.Detect(captured_frame, detections, cfg, timings);
+            det.Detect(frame, dets, cfg, tm);
             auto t_det_end = std::chrono::high_resolution_clock::now();
             fl.detect_ms = std::chrono::duration<double, std::milli>(t_det_end - t_det_start).count();
 
             // 3) 鼠标控制计时（整体阶段）
             auto t_mouse_start = std::chrono::high_resolution_clock::now();
-            Detection* best_target = findBestTarget();
-            handleMouseInput(best_target);
+            Detection* target = findTarget();
+            handleMouse(target);
             auto t_mouse_end = std::chrono::high_resolution_clock::now();
             fl.mouse_ms = std::chrono::duration<double, std::milli>(t_mouse_end - t_mouse_start).count();
 
             auto loop_end_time = std::chrono::high_resolution_clock::now();
-            timings.total_loop_ms = std::chrono::duration<double, std::milli>(loop_end_time - loop_start_time).count();
-            fl.loop_ms = timings.total_loop_ms;
+            tm.total_loop_ms = std::chrono::duration<double, std::milli>(loop_end_time - loop_start_time).count();
+            fl.loop_ms = tm.total_loop_ms;
 
             // 计算 dt（秒）供 PID 使用
             if (cfg.pid_use_measured_dt) {
-                pid_dt_s = std::max(0.001, timings.total_loop_ms / 1000.0);
+                dt = std::max(0.001, tm.total_loop_ms / 1000.0);
             } else {
-                pid_dt_s = std::max(0.001, cfg.pid_fixed_dt_ms / 1000.0);
+                dt = std::max(0.001, cfg.pid_fixed_dt_ms / 1000.0);
             }
-            updateAndPrintStats();
+            updateStats();
 
-            if (cfg.enable_latency_log) {
-                aggregator_.add(fl);
+            if (cfg.log_latency) {
+                latAgg.add(fl);
             }
 
-            if (is_visualizing) {
-                handleVisualization(best_target);
+            if (overlayOn) {
+                render(target);
             }
             char key = static_cast<char>(cv::waitKey(1));
             if (key == 27) { // ESC
@@ -194,24 +192,24 @@ public:
                 break;
             }
             if (key == 'v' || key == 'V') {
-                toggleVisualization();
+                toggleOverlay();
             }
         }
     }
 
 private:
-    void print_instructions() {
+    void showHelp() {
         std::cout << "\n--- Controls ---" << std::endl;
 
     }
 
-    Detection* findBestTarget() {
+    Detection* findTarget() {
         Detection* target = nullptr;
-        double min_dist_to_center = cfg.max_lock_distance_pixels;
-        for (auto& det : detections) {
-            if (!cfg.is_target_class(det.class_id)) continue; // 过滤非目标类别
+        double min_dist_to_center = cfg.lock_radius_px;
+        for (auto& det : dets) {
+            if (!cfg.is_target(det.class_id)) continue; // 过滤非目标类别
             cv::Point box_center(det.box.x + det.box.width / 2, det.box.y + det.box.height / 2);
-            double dist = std::hypot(box_center.x - crop_center.x, box_center.y - crop_center.y);
+            double dist = std::hypot(box_center.x - center.x, box_center.y - center.y);
             if (dist < min_dist_to_center) {
                 min_dist_to_center = dist;
                 target = &det;
@@ -220,12 +218,12 @@ private:
         return target;
     }
 
-    void handleMouseInput(const Detection* target) {
+    void handleMouse(const Detection* target) {
         // 若无目标或未按住按键：释放 PID 积分，避免历史积分殘留
-        bool smooth_pressed = hotkeys.SmoothPressed();
+        bool smooth_pressed = keys.SmoothPressed();
         if (!target || !smooth_pressed) {
-            pid_x.Reset();
-            pid_y.Reset();
+            pidX.Reset();
+            pidY.Reset();
             // 仍保留单次 F8 逻辑
             if (!target) return;
         }
@@ -233,79 +231,79 @@ private:
         if (smooth_pressed) {
             cv::Point target_point(
                 target->box.x + target->box.width / 2,
-                target->box.y + static_cast<int>(target->box.height * cfg.target_y_ratio)
+                target->box.y + static_cast<int>(target->box.height * cfg.y_anchor_ratio)
             );
-            double err_x = static_cast<double>(target_point.x - crop_center.x);
-            double err_y = static_cast<double>(target_point.y - crop_center.y);
+            double err_x = static_cast<double>(target_point.x - center.x);
+            double err_y = static_cast<double>(target_point.y - center.y);
 
             // PID 在像素域输出，再乘鼠标校正因子转为鼠标单位
-            double out_x_pix = pid_x.Update(err_x, pid_dt_s);
-            double out_y_pix = pid_y.Update(err_y, pid_dt_s);
-            int move_x = static_cast<int>(out_x_pix * mouse_correction_factor);
-            int move_y = static_cast<int>(out_y_pix * mouse_correction_factor);
+            double out_x_pix = pidX.Update(err_x, dt);
+            double out_y_pix = pidY.Update(err_y, dt);
+            int move_x = static_cast<int>(out_x_pix * mouseFactor);
+            int move_y = static_cast<int>(out_y_pix * mouseFactor);
 
             if (move_x != 0 || move_y != 0) {
-                mouse.MoveRelative(move_x, move_y);
+                mouse.Move(move_x, move_y);
             }
         }
 
         // 单发模式：保持边沿触发语义
-        if (hotkeys.SingleShotJustPressed()) {
+        if (keys.SingleShotJustPressed()) {
             cv::Point target_point(
                 target->box.x + target->box.width / 2,
-                target->box.y + static_cast<int>(target->box.height * cfg.target_y_ratio)
+                target->box.y + static_cast<int>(target->box.height * cfg.y_anchor_ratio)
             );
-            double dx_pixels = static_cast<double>(target_point.x - crop_center.x);
-            double dy_pixels = static_cast<double>(target_point.y - crop_center.y);
-            double corrected_dx = dx_pixels * mouse_correction_factor;
-            double corrected_dy = dy_pixels * mouse_correction_factor;
+            double dx_pixels = static_cast<double>(target_point.x - center.x);
+            double dy_pixels = static_cast<double>(target_point.y - center.y);
+            double corrected_dx = dx_pixels * mouseFactor;
+            double corrected_dy = dy_pixels * mouseFactor;
             int move_x = static_cast<int>(corrected_dx);
             int move_y = static_cast<int>(corrected_dy);
             if (move_x != 0 || move_y != 0) {
-                mouse.MoveRelative(move_x, move_y);
+                mouse.Move(move_x, move_y);
             }
         }
     }
 
-    void updateAndPrintStats() {
+    void updateStats() {
         const double smoothing_factor = 0.05;
-        if (is_first_frame) {
-            smoothed_total = timings.total_loop_ms;
-            smoothed_inf = timings.inference_ms;
-            smoothed_post = timings.postprocess_ms;
-            is_first_frame = false;
+        if (firstFrame) {
+            msTotal = tm.total_loop_ms;
+            msInfer = tm.inference_ms;
+            msPost = tm.postprocess_ms;
+            firstFrame = false;
         }
         else {
-            smoothed_total = smoothing_factor * timings.total_loop_ms + (1.0 - smoothing_factor) * smoothed_total;
-            smoothed_inf = smoothing_factor * timings.inference_ms + (1.0 - smoothing_factor) * smoothed_inf;
-            smoothed_post = smoothing_factor * timings.postprocess_ms + (1.0 - smoothing_factor) * smoothed_post;
+            msTotal = smoothing_factor * tm.total_loop_ms + (1.0 - smoothing_factor) * msTotal;
+            msInfer = smoothing_factor * tm.inference_ms + (1.0 - smoothing_factor) * msInfer;
+            msPost = smoothing_factor * tm.postprocess_ms + (1.0 - smoothing_factor) * msPost;
         }
 
     }
 
-    void handleVisualization(const Detection* best_target) {
-        cv::circle(captured_frame, crop_center, static_cast<int>(cfg.max_lock_distance_pixels), cv::Scalar(255, 255, 0), 1);
-        for (const auto& det : detections) {
+    void render(const Detection* best_target) {
+        cv::circle(frame, center, static_cast<int>(cfg.lock_radius_px), cv::Scalar(255, 255, 0), 1);
+        for (const auto& det : dets) {
             // 可视化：所有检测都显示；追踪类加星号，当前目标红框
             cv::Scalar color = (&det == best_target) ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0);
-            cv::rectangle(captured_frame, det.box, color, 2);
-            std::string label = cfg.class_name_or_id(det.class_id) + (cfg.is_target_class(det.class_id) ? "*" : "") +
+            cv::rectangle(frame, det.box, color, 2);
+            std::string label = cfg.name_or_id(det.class_id) + (cfg.is_target(det.class_id) ? "*" : "") +
                                  " " + cv::format("%.2f", det.confidence);
-            cv::putText(captured_frame, label, cv::Point(det.box.x, det.box.y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 1);
+            cv::putText(frame, label, cv::Point(det.box.x, det.box.y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 1);
         }
-        if (smoothed_total > 0) {
-            double smoothed_fps = 1000.0 / smoothed_total;
+        if (msTotal > 0) {
+            double smoothed_fps = 1000.0 / msTotal;
             std::ostringstream stats_stream;
             stats_stream << std::fixed << std::setprecision(1) << "FPS: " << smoothed_fps;
-            cv::putText(captured_frame, stats_stream.str(), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 255), 2);
+            cv::putText(frame, stats_stream.str(), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 255), 2);
         }
-        cv::imshow(cfg.window_name, captured_frame);
+        cv::imshow(cfg.window_title, frame);
     }
 
-    void toggleVisualization() {
-        is_visualizing = !is_visualizing;
-        if (is_visualizing) {
-            cv::namedWindow(cfg.window_name, cv::WINDOW_AUTOSIZE);
+    void toggleOverlay() {
+        overlayOn = !overlayOn;
+        if (overlayOn) {
+            cv::namedWindow(cfg.window_title, cv::WINDOW_AUTOSIZE);
             std::cout << "\n[INFO] Visualization toggled ON." << std::endl;
         }
         else {
@@ -315,59 +313,59 @@ private:
     }
 
     Config cfg;
-    ScreenCapturer capturer;
-    ObjectDetector detector;
-    MouseController mouse;
-    HotkeyManager hotkeys;
-    const cv::Rect crop_region;
-    const cv::Point crop_center;
-    double mouse_correction_factor = 1.0;
-    cv::Mat captured_frame;
-    std::vector<Detection> detections;
-    TimingDetails timings;
-    bool is_visualizing;
-    double smoothed_total = 0.0, smoothed_inf = 0.0, smoothed_post = 0.0;
-    bool is_first_frame = true;
+    ScreenCapturer cap;
+    ObjectDetector det;
+    Mouse mouse;
+    HotkeyManager keys;
+    const cv::Rect cropRect;
+    const cv::Point center;
+    double mouseFactor = 1.0;
+    cv::Mat frame;
+    std::vector<Detection> dets;
+    TimingDetails tm;
+    bool overlayOn;
+    double msTotal = 0.0, msInfer = 0.0, msPost = 0.0;
+    bool firstFrame = true;
     // 延迟统计
-    LatencyAggregator aggregator_;
+    LatencyAggregator latAgg;
 
     // PID 控制
-    PidController pid_x;
-    PidController pid_y;
-    double pid_dt_s = 1.0/60.0;
+    PidController pidX;
+    PidController pidY;
+    double dt = 1.0/60.0;
 };
 
 // --- 主函数 ---
 int main() {
     Config boot_cfg; // KEEP
     // 从环境变量读取可选亲和配置
-    boot_cfg.load_affinity_from_env();
-    if (boot_cfg.enable_thread_affinity && boot_cfg.main_thread_affinity_mask) {
-        ApplyThreadAffinityMask(boot_cfg.main_thread_affinity_mask,
-            boot_cfg.enable_optimization_report && boot_cfg.enable_system_opt_report);
+    boot_cfg.load_affinity_env();
+    if (boot_cfg.enable_affinity && boot_cfg.affinity_main_mask) {
+        ApplyThreadAffinityMask(boot_cfg.affinity_main_mask,
+            boot_cfg.opt_report && boot_cfg.opt_report_system);
     }
 
     OverlayAnimator overlay;
     // Disable process/thread power throttling and background limits as early as possible
     DisablePowerThrottlingForProcessAndThread();
     // Raise process and main thread priority early
-    RaiseProcessPrioritySafely();
-    RaiseThisThreadPrioritySafely();
+    SetProcPrioHigh();
+    SetThreadPrioHighest();
 
     // Enable MMCSS for main loop thread based on default Config values
    
-    HANDLE hMmcss = EnableMmcssIfConfigured(boot_cfg.enable_mmcss_for_main_loop,
-                                            boot_cfg.mmcss_task_name.c_str(),
-                                            boot_cfg.mmcss_priority);
+    HANDLE hMmcss = EnableMmcssIfConfigured(boot_cfg.mmcss_main,
+                                            boot_cfg.mmcss_task.c_str(),
+                                            boot_cfg.mmcss_prio);
 
    // 提升主线程内存优先级 & 禁用进程级 PriorityBoost
-   if (boot_cfg.enable_thread_memory_priority) {
-       SetThisThreadMemoryPriorityNormal();
-       DisableProcessPriorityBoost();
+   if (boot_cfg.enable_thread_mem_prio) {
+       SetThreadMemPrioNormal();
+       SetProcPrioBoostDisabled();
    }
 
     // Start tiny overlay animator (forces DWM updates) if enabled
-    if (boot_cfg.enable_overlay_animator) {
+    if (boot_cfg.overlay_anim) {
         overlay.start(boot_cfg);
         metrics::SystemBootReporting::PrintOverlayBanner(boot_cfg, true);
     } else {
@@ -378,7 +376,7 @@ int main() {
 
     try {
         AimAssistant assistant;
-        assistant.Run();
+        assistant.run();
     }
     catch (const std::exception& e) {
         DisableMmcss(hMmcss);
