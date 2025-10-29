@@ -90,6 +90,7 @@ class AimAssistant;
 #include "OverlayAnimator.hpp"
 #include "MouseController.hpp"
 #include "HotkeyManager.hpp"
+#include "ObjectDetector.hpp"
 
 // --- 3. 屏幕捕捉器 (ScreenCapturer) - 优化版本 ---
 class ScreenCapturer {
@@ -442,101 +443,7 @@ private:
 };
 
 // --- 4. 目标检测器 (ObjectDetector) ---
-class ObjectDetector {
-public:
-    explicit ObjectDetector(const Config& cfg) : trt_reporter_(cfg) {
-        // English logs: load TensorRT-YOLO engine
-        const std::string engine_path = cfg.resolve_engine_path();
-        std::cout << "[INFO] Loading TensorRT-YOLO engine from " << engine_path << " ..." << std::endl;
-        trtyolo::InferOption option;
-        option.enableSwapRB(); // Input is BGR, swap to RGB internally
-        // Input from screen capture is 640x640 by config; fix input dims for performance (optional)
-        option.setInputDimensions(cfg.crop_size, cfg.crop_size);
-        // Enable internal performance report from TensorRT-YOLO if enabled in config
-        if (cfg.enable_performance_report) {
-            option.enablePerformanceReport();
-        }
-
-        // Pre-flight checks and diagnostics
-        {
-            // Print current working directory for path diagnostics
-            char cwd_buffer[MAX_PATH];
-            if (GetCurrentDirectoryA(MAX_PATH, cwd_buffer)) {
-                std::cout << "[DEBUG] Current working directory: " << cwd_buffer << std::endl;
-            }
-            // Check engine file existence
-            DWORD attrs = GetFileAttributesA(engine_path.c_str());
-            if (attrs == INVALID_FILE_ATTRIBUTES) {
-                std::cerr << "[ERROR] Engine file not found: '" << engine_path << "'."
-                          << " Ensure the engine file is present or provide the correct path." << std::endl;
-            } else if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
-                std::cerr << "[ERROR] Engine path is a directory, not a file: '" << engine_path << "'." << std::endl;
-            } else {
-                std::cout << "[DEBUG] Found engine file: '" << engine_path << "'." << std::endl;
-            }
-        }
-
-        try {
-            detector_ = std::make_unique<trtyolo::DetectModel>(engine_path.c_str(), option);
-            std::cout << "[INFO] Engine loaded successfully." << std::endl;
-        } catch (const std::exception& e) {
-            std::ostringstream oss;
-            oss << "[FATAL] Failed to construct DetectModel with engine '" << engine_path << "'.\n"
-                << "Underlying error: " << e.what();
-            throw std::runtime_error(oss.str());
-        }
-    }
-
-    ObjectDetector(const ObjectDetector&) = delete;
-    ObjectDetector& operator=(const ObjectDetector&) = delete;
-
-    void Detect(const cv::Mat& image, std::vector<Detection>& detections, const Config& cfg, TimingDetails& timings) {
-        detections.clear();
-        auto t0 = std::chrono::high_resolution_clock::now();
-
-        // Wrap cv::Mat to trtyolo::Image (with pitch)
-        trtyolo::Image input(const_cast<unsigned char*>(image.data), image.cols, image.rows, static_cast<size_t>(image.step));
-        trtyolo::DetectRes res = detector_->predict(input);
-
-        auto t1 = std::chrono::high_resolution_clock::now();
-        timings.inference_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
-        auto t2 = std::chrono::high_resolution_clock::now();
-
-        // Convert to our Detection structure with threshold filtering
-        if (res.num > 0 && res.boxes.size() == static_cast<size_t>(res.num)) {
-            for (int i = 0; i < res.num; ++i) {
-                float score = (i < (int)res.scores.size() ? res.scores[i] : 0.0f);
-                if (score < cfg.confidence_threshold) continue;
-                int cls = (i < (int)res.classes.size() ? res.classes[i] : -1);
-                const auto& b = res.boxes[i];
-                int x = std::max(0, static_cast<int>(std::floor(b.left)));
-                int y = std::max(0, static_cast<int>(std::floor(b.top)));
-                int w = std::max(0, static_cast<int>(std::round(b.right - b.left)));
-                int h = std::max(0, static_cast<int>(std::round(b.bottom - b.top)));
-                // Clamp to image
-                w = std::min(w, image.cols - x);
-                h = std::min(h, image.rows - y);
-                if (w > 0 && h > 0)
-                    detections.emplace_back(Detection{ cv::Rect(x, y, w, h), score, cls });
-            }
-        }
-
-        auto t3 = std::chrono::high_resolution_clock::now();
-        timings.postprocess_ms = std::chrono::duration<double, std::milli>(t3 - t2).count();
-
-        // Query and print TensorRT-YOLO performance report based on frequency settings
-        if (cfg.enable_performance_report) {
-            if (trt_reporter_.ShouldReport()) {
-                trt_reporter_.PrintReport(*detector_);
-            }
-        }
-    }
-
-private:
-    std::unique_ptr<trtyolo::DetectModel> detector_;
-    metrics::TrtPerfReporting trt_reporter_;
-
-};
+/* moved to ObjectDetector.hpp/.cpp */
 
 // --- 5. 核心协调器 (AimAssistant) ---
 class AimAssistant {

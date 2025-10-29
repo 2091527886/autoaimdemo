@@ -63,6 +63,7 @@ add_executable(aimassistant
   metrics/CaptureReporting.cpp
   metrics/TrtPerfReporting.cpp
   metrics/SystemBootReporting.cpp
+ ObjectDetector.cpp
 )
 
 # 启用 Release 高优化/LTO/AVX
