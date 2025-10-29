@@ -18,6 +18,7 @@
 #include <cstdlib>
 // Windows & DirectX
 #include <windows.h>
+#include <winnt.h> // for MEMORY_PRIORITY_INFORMATION and MEMORY_PRIORITY_* constants
 #include <d3d11.h>
 #include <dxgi1_2.h>
 #pragma comment(lib, "d3d11.lib")
@@ -58,6 +59,27 @@ static inline void RaiseDxgiGpuPriorityAndLatency(ID3D11Device* d3dDevice, int g
 }
 
 // --- Power throttling/background-mode helpers ---
+
+// 将当前线程内存优先级显式设置为 NORMAL（保证不被降级）
+static inline void SetThisThreadMemoryPriorityNormal(bool verbose=true) {
+    MEMORY_PRIORITY_INFORMATION mpi{};
+    mpi.MemoryPriority = MEMORY_PRIORITY_NORMAL;
+    if (!SetThreadInformation(GetCurrentThread(), ThreadMemoryPriority, &mpi, sizeof(mpi))) {
+        if (verbose) std::cerr << "[BOOT] ThreadMemoryPriority=NORMAL failed: " << GetLastError() << std::endl;
+    } else if (verbose) {
+        std::cout << "[BOOT] ThreadMemoryPriority=NORMAL OK" << std::endl;
+    }
+}
+
+// 禁用进程 PriorityBoost，避免在系统内存压力下被降低优先级
+static inline void DisableProcessPriorityBoost(bool verbose=true) {
+    if (!SetProcessPriorityBoost(GetCurrentProcess(), FALSE)) {
+        if (verbose) std::cerr << "[BOOT] ProcPriorityBoost(FALSE) failed: " << GetLastError() << std::endl;
+    } else if (verbose) {
+        std::cout << "[BOOT] ProcPriorityBoost(FALSE) OK" << std::endl;
+    }
+}
+
 
 // Forward declare Config for use in OverlayAnimator
 class Config;
@@ -438,6 +460,9 @@ public:
     bool enable_mmcss_for_main_loop = true;       // 在主循环线程启用 MMCSS
     std::wstring mmcss_task_name = L"Pro Audio"; // 任务类别（"Games"/"Pro Audio"/"Capture"等）
     AVRT_PRIORITY mmcss_priority = AVRT_PRIORITY_HIGH; // MMCSS 线程优先级
+
+    // ========== 9.5) 线程内存优先级 ==========
+    bool enable_thread_memory_priority = true;    // 启用后将主线程 MemoryPriority 显式设为 NORMAL（保证不被降级）
 
     // ========== 10) DXGI 设备优先级/延迟 ==========
     // GPU 线程优先级（范围 -1..7；0=normal；>0 更高）。建议：0~3 常规，5~7 谨慎使用。
@@ -1434,6 +1459,12 @@ int main() {
     HANDLE hMmcss = EnableMmcssIfConfigured(boot_cfg.enable_mmcss_for_main_loop,
                                             boot_cfg.mmcss_task_name.c_str(),
                                             boot_cfg.mmcss_priority);
+
+   // 提升主线程内存优先级 & 禁用进程级 PriorityBoost
+   if (boot_cfg.enable_thread_memory_priority) {
+       SetThisThreadMemoryPriorityNormal();
+       DisableProcessPriorityBoost();
+   }
 
     // Start tiny overlay animator (forces DWM updates) if enabled
     if (boot_cfg.enable_overlay_animator) {
