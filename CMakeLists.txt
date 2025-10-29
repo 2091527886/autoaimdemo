@@ -52,6 +52,7 @@ endif()
 add_executable(aimassistant
   main.cpp
   OverlayAnimator.cpp
+  MouseController.cpp
 )
 
 # 启用 Release 高优化/LTO/AVX
