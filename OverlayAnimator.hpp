@@ -13,9 +13,10 @@ public:
     bool start(const Config& cfg);
     void stop();
 private:
-    static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-    void thread_proc(const Config& cfg);
-    std::atomic<bool> running_{ false };
-    std::thread worker_;
-    HWND hwnd_ = nullptr;
+    static LRESULT CALLBACK WindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+    static constexpr wchar_t kClass[] = L"RovoOverlayAnimatorWnd";
+    void loop(const Config& cfg);
+    std::atomic<bool> running{ false };
+    std::thread thread;
+    HWND hwnd = nullptr;
 };
