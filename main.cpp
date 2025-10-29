@@ -760,11 +760,6 @@ public:
         } catch (const std::exception& e) {
             std::ostringstream oss;
             oss << "[FATAL] Failed to construct DetectModel with engine '" << engine_path << "'.\n"
-                << "Diagnostics: Please check that:\n"
-                << "- The engine file path is correct and accessible.\n"
-                << "- TensorRT runtime version matches engine build version.\n"
-                << "- Required TensorRT plugins are correctly registered.\n"
-                << "- The engine was built for this GPU/driver.\n"
                 << "Underlying error: " << e.what();
             throw std::runtime_error(oss.str());
         }
@@ -940,10 +935,7 @@ public:
 private:
     void print_instructions() {
         std::cout << "\n--- Controls ---" << std::endl;
-        std::cout << "    [Hold Left Mouse Button] to smoothly lock onto a target." << std::endl;
-        std::cout << "    [Press F8] to move mouse to target ONCE (for accuracy test)." << std::endl;
-        std::cout << "    [Press V in visualization window] to toggle visualization ON/OFF." << std::endl;
-        std::cout << "    [Press ESC in visualization window] to quit." << std::endl;
+
     }
 
     Detection* findBestTarget() {
