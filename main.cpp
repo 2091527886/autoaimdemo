@@ -13,6 +13,9 @@
 #include <limits>
 #include <tuple>
 #include <array>
+#include <atomic>
+#include <cstdint>
+#include <cstdlib>
 // Windows & DirectX
 #include <windows.h>
 #include <d3d11.h>
@@ -35,7 +38,7 @@ static inline void RaiseThisThreadPrioritySafely() {
     }
 }
 
-static inline void RaiseDxgiGpuPriorityAndLatency(ID3D11Device* d3dDevice) {
+static inline void RaiseDxgiGpuPriorityAndLatency(ID3D11Device* d3dDevice, int gpu_thread_priority = 7, int max_frame_latency = 1) {
     if (!d3dDevice) return;
     IDXGIDevice1* dxgiDevice1 = nullptr;
     HRESULT hr = d3dDevice->QueryInterface(__uuidof(IDXGIDevice1), (void**)&dxgiDevice1);
@@ -43,11 +46,11 @@ static inline void RaiseDxgiGpuPriorityAndLatency(ID3D11Device* d3dDevice) {
         std::cerr << "QueryInterface(IDXGIDevice1) failed: 0x" << std::hex << (unsigned long)hr << std::dec << std::endl;
         return;
     }
-    hr = dxgiDevice1->SetGPUThreadPriority(7);
+    hr = dxgiDevice1->SetGPUThreadPriority(gpu_thread_priority);
     if (FAILED(hr)) {
         std::cerr << "SetGPUThreadPriority(7) failed: 0x" << std::hex << (unsigned long)hr << std::dec << std::endl;
     }
-    hr = dxgiDevice1->SetMaximumFrameLatency(1);
+    hr = dxgiDevice1->SetMaximumFrameLatency(max_frame_latency);
     if (FAILED(hr)) {
         std::cerr << "SetMaximumFrameLatency(1) failed: 0x" << std::hex << (unsigned long)hr << std::dec << std::endl;
     }
@@ -55,6 +58,24 @@ static inline void RaiseDxgiGpuPriorityAndLatency(ID3D11Device* d3dDevice) {
 }
 
 // --- Power throttling/background-mode helpers ---
+
+// Forward declare Config for use in OverlayAnimator
+class Config;
+
+// Declaration only; definition moved after Config to avoid forward-declare issues
+class OverlayAnimator {
+public:
+    OverlayAnimator();
+    ~OverlayAnimator();
+    bool start(const Config& cfg);
+    void stop();
+private:
+    static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+    void thread_proc(const Config& cfg);
+    std::atomic<bool> running_ { false };
+    std::thread worker_;
+    HWND hwnd_ = nullptr;
+};
 static inline HANDLE EnableMmcssIfConfigured(bool enable, const wchar_t* task_name, AVRT_PRIORITY priority, DWORD* out_task_index=nullptr) {
     if (!enable) return nullptr;
     if (!task_name) task_name = L"Games";
@@ -269,9 +290,78 @@ private:
 };
 
 // --- 1. 配置中心 (Config) ---
+
+// 亲和工具：构建掩码 + 应用到当前线程（与进程亲和取交集）
+static inline uint64_t BuildMaskFromCores(const std::vector<unsigned>& cores) {
+    uint64_t m = 0;
+    for (unsigned c : cores) if (c < 64) m |= (1ull << c);
+    return m;
+}
+static inline bool ApplyThreadAffinityMask(uint64_t desiredMask, bool verbose=true) {
+    if (!desiredMask) return false;
+    DWORD_PTR procMask=0, sysMask=0;
+    if (!GetProcessAffinityMask(GetCurrentProcess(), &procMask, &sysMask)) {
+        if (verbose) std::cerr << "[AFF] GetProcessAffinityMask failed: " << GetLastError() << std::endl;
+        return false;
+    }
+    DWORD_PTR finalMask = (DWORD_PTR)(desiredMask & (uint64_t)procMask);
+    if (!finalMask) {
+        if (verbose) std::cerr << "[AFF] empty after intersect with process mask" << std::endl;
+        return false;
+    }
+    if (!SetThreadAffinityMask(GetCurrentThread(), finalMask)) {
+        if (verbose) std::cerr << "[AFF] SetThreadAffinityMask failed: " << GetLastError() << std::endl;
+        return false;
+    }
+    if (verbose) std::cout << "[AFF] Thread pinned. mask=0x" << std::hex << (uint64_t)finalMask << std::dec << std::endl;
+    return true;
+}
+
 class Config {
 public:
+    // 基础日志控制
+    bool verbose_init_log = true;                // 是否打印初始化阶段的详细日志
+    int  capture_timeout_ms = 16;                // AcquireNextFrame 超时（毫秒）
+
     // ========== 0) 基础与可视化 ==========
+    // 线程亲和与手动核心绑定（单组/SetThreadAffinityMask）
+    bool enable_thread_affinity = false;            // 总开关：是否启用线程亲和
+    uint64_t main_thread_affinity_mask = 0;         // 主线程掩码（bit 对应逻辑CPU）
+    uint64_t overlay_thread_affinity_mask = 0;      // Overlay 线程掩码
+
+    // 从环境变量覆盖（可选）：AIMAFF_MAIN, AIMAFF_OVERLAY
+    void load_affinity_from_env() {
+        if (const char* env = std::getenv("AIMAFF_MAIN")) {
+            // 支持 0x 前缀十六进制，或逗号分隔数字列表
+            parse_affinity_env(env, main_thread_affinity_mask);
+        }
+        if (const char* env = std::getenv("AIMAFF_OVERLAY")) {
+            parse_affinity_env(env, overlay_thread_affinity_mask);
+        }
+    }
+private:
+    static void parse_affinity_env(const char* s, uint64_t& outMask) {
+        outMask = 0;
+        // 去空白
+        while (*s==' '||*s=='\t') ++s;
+        if (s[0]=='0' && (s[1]=='x'||s[1]=='X')) {
+            // 十六进制
+            outMask = strtoull(s, nullptr, 16);
+            return;
+        }
+        // 逗号分隔核心编号
+        uint64_t mask = 0; unsigned v = 0; bool innum=false;
+        for (const char* p=s; ; ++p) {
+            char c = *p;
+            if ((c>='0'&&c<='9')) { v = v*10 + (c-'0'); innum=true; continue; }
+            if (c==',' || c==' ' || c=='\t' || c=='\0') {
+                if (innum) { if (v<64) mask |= (1ull<<v); v=0; innum=false; }
+                if (c=='\0') break; else continue;
+            }
+        }
+        outMask = mask;
+    }
+public:
     // Engine 文件（仅通过 Config 解析路径）
     std::string engine_path = "best.engine";
     std::string resolve_engine_path() const { return engine_path; }
@@ -331,10 +421,29 @@ public:
     bool optimization_report_verbose = true;      // 详细：打印OK/failed等细节
     int  optimization_report_interval_frames = 60;// [CAPTURE OPT] 打印周期（帧）
 
-    // ========== 8) 线程调度（MMCSS） ==========
+    // ========== 8) Overlay 动画（强制 DWM 产帧，诊断/兜底） ==========
+    bool enable_overlay_animator = true;          // 启用极小透明 overlay，周期性更新以产生脏矩形
+    // 更新间隔（单位：100ns；1ms=10,000×100ns）。推荐范围：5ms(50,000) ~ 16.7ms(167,000)。
+    // 默认为 16ms（160,000），避免过高频率占用CPU。
+    long long overlay_update_interval_100ns = 110; 
+    // 自旋补偿预算（单位：微秒），>0 表示在等待定时器后进行短暂自旋以提升精度。推荐 0~200us。
+    long long overlay_spin_budget_us = 2;          
+    // 像素大小（单位：像素）。推荐 1 或 2。
+    int  overlay_pixel_size = 2;                  
+    // 屏幕坐标（单位：像素）。
+    int  overlay_pos_x = 0;                       
+    int  overlay_pos_y = 0;                       
+
+    // ========== 9) 线程调度（MMCSS） ==========
     bool enable_mmcss_for_main_loop = true;       // 在主循环线程启用 MMCSS
     std::wstring mmcss_task_name = L"Pro Audio"; // 任务类别（"Games"/"Pro Audio"/"Capture"等）
     AVRT_PRIORITY mmcss_priority = AVRT_PRIORITY_HIGH; // MMCSS 线程优先级
+
+    // ========== 10) DXGI 设备优先级/延迟 ==========
+    // GPU 线程优先级（范围 -1..7；0=normal；>0 更高）。建议：0~3 常规，5~7 谨慎使用。
+    int dxgi_gpu_thread_priority = 7;
+    // 最大帧延迟（队列的最大帧数），推荐 1~3。1 通常最低延迟但可能影响吞吐。
+    int dxgi_max_frame_latency = 1;
 
     // ========== 辅助 ==========
     bool is_target_class(int cid) const {
@@ -347,6 +456,118 @@ public:
 };
 
 // --- 2. 鼠标控制器 (MouseController) ---
+// === OverlayAnimator definition (after Config) ===
+OverlayAnimator::OverlayAnimator() = default;
+OverlayAnimator::~OverlayAnimator() { stop(); }
+
+bool OverlayAnimator::start(const Config& cfg) {
+    if (running_.load()) return true;
+    if (!cfg.enable_overlay_animator) return false;
+    running_.store(true);
+    worker_ = std::thread([this, &cfg]{ this->thread_proc(cfg); });
+    return true;
+}
+void OverlayAnimator::stop() {
+    if (!running_.load()) return;
+    running_.store(false);
+    if (hwnd_) PostMessage(hwnd_, WM_CLOSE, 0, 0);
+    if (worker_.joinable()) worker_.join();
+    hwnd_ = nullptr;
+}
+LRESULT CALLBACK OverlayAnimator::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (msg == WM_DESTROY) {
+        PostQuitMessage(0);
+        return 0;
+    }
+    return DefWindowProc(hWnd, msg, wParam, lParam);
+}
+void OverlayAnimator::thread_proc(const Config& cfg) {
+    // 线程启动即绑定（如开启）
+    if (cfg.enable_thread_affinity && cfg.overlay_thread_affinity_mask) {
+        ApplyThreadAffinityMask(cfg.overlay_thread_affinity_mask,
+            cfg.enable_optimization_report && cfg.enable_system_opt_report);
+    }
+    HINSTANCE hInst = GetModuleHandle(NULL);
+    const wchar_t* cls = L"RovoOverlayAnimatorWnd";
+    WNDCLASSEXW wc{ sizeof(WNDCLASSEXW) };
+    wc.lpfnWndProc = WndProc;
+    wc.hInstance = hInst;
+    wc.lpszClassName = cls;
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    RegisterClassExW(&wc);
+
+    int sz = std::max(1, cfg.overlay_pixel_size);
+    int x = cfg.overlay_pos_x;
+    int y = cfg.overlay_pos_y;
+    HWND hWnd = CreateWindowExW(WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+                                cls, L"", WS_POPUP, x, y, sz, sz, nullptr, nullptr, hInst, nullptr);
+    if (!hWnd) { running_.store(false); return; }
+    // Don't activate
+    ShowWindow(hWnd, SW_SHOWNA);
+    hwnd_ = hWnd;
+
+    // Prepare a 1x1 or 2x2 DIB section for per-pixel alpha updates
+    HDC screenDC = GetDC(nullptr);
+    HDC memDC = CreateCompatibleDC(screenDC);
+    BITMAPV5HEADER bi{};
+    bi.bV5Size = sizeof(bi);
+    bi.bV5Width = sz; bi.bV5Height = -sz; // top-down
+    bi.bV5Planes = 1; bi.bV5BitCount = 32; bi.bV5Compression = BI_BITFIELDS;
+    bi.bV5RedMask = 0x00FF0000; bi.bV5GreenMask = 0x0000FF00; bi.bV5BlueMask = 0x000000FF; bi.bV5AlphaMask = 0xFF000000;
+    void* bits = nullptr;
+    HBITMAP hbmp = CreateDIBSection(screenDC, (BITMAPINFO*)&bi, DIB_RGB_COLORS, &bits, nullptr, 0);
+    HGDIOBJ old = SelectObject(memDC, hbmp);
+
+    BLENDFUNCTION bf{ AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
+    SIZE wndSize{ sz, sz };
+    POINT srcPos{ 0, 0 };
+
+    // High-frequency timer using waitable timer at 100ns units
+    HANDLE hTimer = CreateWaitableTimerExW(NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+    if (!hTimer) hTimer = CreateWaitableTimerW(NULL, FALSE, NULL);
+
+    // Animation loop: toggle pixel alpha/color every interval
+    uint32_t t = 0;
+    while (running_.load()) {
+        // write pixels
+        uint32_t c1 = 0x01010101u * ((t & 1) ? 0x01 : 0x02); // tiny change in alpha/color
+        for (int i = 0; i < sz * sz; ++i) {
+            ((uint32_t*)bits)[i] = c1;
+        }
+        POINT wndPos{ x, y };
+        UpdateLayeredWindow(hWnd, screenDC, &wndPos, &wndSize, memDC, &srcPos, 0, &bf, ULW_ALPHA);
+        ++t;
+
+        // wait for next tick (waitable timer + optional spin to improve accuracy)
+        LARGE_INTEGER due;
+        due.QuadPart = - (cfg.overlay_update_interval_100ns); // relative, negative, in 100ns units
+        uint64_t spin_us = (uint64_t)std::max<long long>(0, cfg.overlay_spin_budget_us);
+        if (hTimer && SetWaitableTimer(hTimer, &due, 0, nullptr, nullptr, FALSE)) {
+            if (spin_us > 0) {
+                // coarse wait then spin for the last few microseconds
+                WaitForSingleObject(hTimer, INFINITE);
+                auto spin_end = std::chrono::high_resolution_clock::now() + std::chrono::microseconds(spin_us);
+                while (std::chrono::high_resolution_clock::now() < spin_end) {
+                    // optional pause hint
+                    YieldProcessor();
+                }
+            } else {
+                WaitForSingleObject(hTimer, INFINITE);
+            }
+        } else {
+            // Fallback: minimal sleep
+            Sleep(0);
+        }
+    }
+    if (hTimer) CloseHandle(hTimer);
+    // Cleanup
+    SelectObject(memDC, old);
+    DeleteObject(hbmp);
+    DeleteDC(memDC);
+    ReleaseDC(nullptr, screenDC);
+    DestroyWindow(hWnd);
+}
+
 class MouseController {
 public:
     MouseController() {
@@ -410,39 +631,35 @@ private:
 class ScreenCapturer {
 public:
     ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_height) : cfg(cfg_ref) {
-        std::cout << "--- Initializing D3D for screen capture... ---" << std::endl;
-        std::cout << "Crop size: " << crop_width << "x" << crop_height << std::endl;
+        if (cfg.verbose_init_log) std::cout << "--- Initializing D3D for screen capture... ---" << std::endl;
+        if (cfg.verbose_init_log) {
+            std::cout << "[CAPTURE] Crop size: " << crop_width << "x" << crop_height << std::endl;
+        }
         HRESULT hr;
-        std::cout << "Init pointers: m_pStagingTexture=nullptr"
-                  << ", pFactory=" << pFactory
-                  << ", pAdapter=" << pAdapter
-                  << ", pOutput=" << pOutput
-                  << ", pOutput1=" << pOutput1
-                  << ", pDevice=" << pDevice
-                  << ", pContext=" << pContext
-                  << ", pDuplicator=" << pDuplicator
-                  << std::endl;
 
         hr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&pFactory);
-        std::cout << "CreateDXGIFactory1 hr=0x"
-                  << std::hex << std::uppercase << static_cast<unsigned long>(hr)
-                  << std::dec << std::nouppercase << std::endl;
-        std::cout << "pFactory (IDXGIFactory1*)=" << pFactory << std::endl;
+        if (cfg.verbose_init_log) {
+            std::cout << "[CAPTURE] CreateDXGIFactory1 hr=0x"
+                      << std::hex << std::uppercase << static_cast<unsigned long>(hr)
+                      << std::dec << std::nouppercase << std::endl;
+        }
         if (FAILED(hr)) throw std::runtime_error("Failed to create DXGI Factory.");
         {
             HRESULT hr_enum_adapters = pFactory->EnumAdapters1(0, &pAdapter);
-            std::cout << "EnumAdapters1 hr=0x"
-                      << std::hex << std::uppercase << static_cast<unsigned long>(hr_enum_adapters)
-                      << std::dec << std::nouppercase << std::endl;
-            std::cout << "pAdapter (IDXGIAdapter1*)=" << pAdapter << std::endl;
+            if (cfg.verbose_init_log) {
+                std::cout << "[CAPTURE] EnumAdapters1 hr=0x"
+                          << std::hex << std::uppercase << static_cast<unsigned long>(hr_enum_adapters)
+                          << std::dec << std::nouppercase << std::endl;
+            }
             if (FAILED(hr_enum_adapters)) throw std::runtime_error("Failed to enumerate adapters.");
         }
         {
             HRESULT hr_enum_outputs = pAdapter->EnumOutputs(0, &pOutput);
-            std::cout << "EnumOutputs hr=0x"
-                      << std::hex << std::uppercase << static_cast<unsigned long>(hr_enum_outputs)
-                      << std::dec << std::nouppercase << std::endl;
-            std::cout << "pOutput (IDXGIOutput*)=" << pOutput << std::endl;
+            if (cfg.verbose_init_log) {
+                std::cout << "[CAPTURE] EnumOutputs hr=0x"
+                          << std::hex << std::uppercase << static_cast<unsigned long>(hr_enum_outputs)
+                          << std::dec << std::nouppercase << std::endl;
+            }
             if (FAILED(hr_enum_outputs)) throw std::runtime_error("Failed to enumerate outputs.");
         }
 
@@ -450,32 +667,38 @@ public:
         pOutput->GetDesc(&outputDesc);
         width = outputDesc.DesktopCoordinates.right - outputDesc.DesktopCoordinates.left;
         height = outputDesc.DesktopCoordinates.bottom - outputDesc.DesktopCoordinates.top;
-        std::cout << "Output desktop size: " << width << "x" << height << std::endl;
+        if (cfg.verbose_init_log) {
+            std::cout << "[CAPTURE] Output desktop size: " << width << "x" << height << std::endl;
+        }
 
         {
             HRESULT hr_create_device = D3D11CreateDevice(pAdapter, D3D_DRIVER_TYPE_UNKNOWN, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &pDevice, nullptr, &pContext);
-            std::cout << "D3D11CreateDevice hr=0x"
-                      << std::hex << std::uppercase << static_cast<unsigned long>(hr_create_device)
-                      << std::dec << std::nouppercase << std::endl;
-            std::cout << "pDevice (ID3D11Device*)=" << pDevice << ", pContext (ID3D11DeviceContext*)=" << pContext << std::endl;
+            if (cfg.verbose_init_log) {
+                std::cout << "[CAPTURE] D3D11CreateDevice hr=0x"
+                          << std::hex << std::uppercase << static_cast<unsigned long>(hr_create_device)
+                          << std::dec << std::nouppercase << std::endl;
+            }
             if (FAILED(hr_create_device)) {
                 throw std::runtime_error("Failed to create D3D11 device.");
             }
             // Raise DXGI GPU priority and reduce frame latency for this device
-            RaiseDxgiGpuPriorityAndLatency(pDevice);
+            RaiseDxgiGpuPriorityAndLatency(pDevice, cfg.dxgi_gpu_thread_priority, cfg.dxgi_max_frame_latency);
         }
         {
             HRESULT hr_qi_output1 = pOutput->QueryInterface(__uuidof(IDXGIOutput1), (void**)&pOutput1);
-            std::cout << "QueryInterface(IDXGIOutput1) hr=0x"
-                      << std::hex << std::uppercase << static_cast<unsigned long>(hr_qi_output1)
-                      << std::dec << std::nouppercase << std::endl;
-            std::cout << "pOutput1 (IDXGIOutput1*)=" << pOutput1 << std::endl;
+            if (cfg.verbose_init_log) {
+                std::cout << "[CAPTURE] QueryInterface(IDXGIOutput1) hr=0x"
+                          << std::hex << std::uppercase << static_cast<unsigned long>(hr_qi_output1)
+                          << std::dec << std::nouppercase << std::endl;
+            }
             if (FAILED(hr_qi_output1)) {
                 throw std::runtime_error("Failed to query IDXGIOutput1.");
             }
         }
         hr = pOutput1->DuplicateOutput(pDevice, &pDuplicator);
-        std::cout << "pDuplicator (IDXGIOutputDuplication*)=" << pDuplicator << std::endl;
+        if (cfg.verbose_init_log) {
+            std::cout << "[CAPTURE] DuplicateOutput hr=" << (FAILED(hr) ? "FAILED" : "OK") << std::endl;
+        }
         if (FAILED(hr)) {
             std::cerr << "DuplicateOutput failed. HRESULT=0x"
                       << std::hex << std::uppercase << static_cast<unsigned long>(hr)
@@ -554,7 +777,7 @@ public:
         DXGI_OUTDUPL_FRAME_INFO frameInfo;
 
         auto t_acq_s = std::chrono::high_resolution_clock::now();
-        HRESULT hr = pDuplicator->AcquireNextFrame(16, &frameInfo, &pDesktopResource);
+        HRESULT hr = pDuplicator->AcquireNextFrame(cfg.capture_timeout_ms, &frameInfo, &pDesktopResource);
         auto t_acq_e = std::chrono::high_resolution_clock::now();
         t_acquire_ms = std::chrono::duration<double, std::milli>(t_acq_e - t_acq_s).count();
 
@@ -698,8 +921,6 @@ public:
 
         t_total_ms = std::chrono::duration<double, std::milli>(t_unmap_e - t_total_start).count();
         frame_index_++;
-
-        t_total_ms = std::chrono::duration<double, std::milli>(t_unmap_e - t_total_start).count();
 
         if (cfg.enable_capture_step_timing || (cfg.enable_optimization_report && cfg.enable_capture_opt_report)) {
             accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
@@ -1193,6 +1414,15 @@ private:
 
 // --- 主函数 ---
 int main() {
+    Config boot_cfg; // KEEP
+    // 从环境变量读取可选亲和配置
+    boot_cfg.load_affinity_from_env();
+    if (boot_cfg.enable_thread_affinity && boot_cfg.main_thread_affinity_mask) {
+        ApplyThreadAffinityMask(boot_cfg.main_thread_affinity_mask,
+            boot_cfg.enable_optimization_report && boot_cfg.enable_system_opt_report);
+    }
+
+    OverlayAnimator overlay;
     // Disable process/thread power throttling and background limits as early as possible
     DisablePowerThrottlingForProcessAndThread();
     // Raise process and main thread priority early
@@ -1200,21 +1430,29 @@ int main() {
     RaiseThisThreadPrioritySafely();
 
     // Enable MMCSS for main loop thread based on default Config values
-    Config boot_cfg;
+   
     HANDLE hMmcss = EnableMmcssIfConfigured(boot_cfg.enable_mmcss_for_main_loop,
                                             boot_cfg.mmcss_task_name.c_str(),
                                             boot_cfg.mmcss_priority);
+
+    // Start tiny overlay animator (forces DWM updates) if enabled
+    if (boot_cfg.enable_overlay_animator) {
+        overlay.start(boot_cfg);
+        if (boot_cfg.enable_optimization_report && boot_cfg.enable_system_opt_report) {
+            std::cout << "[BOOT] Overlay animator=ON (size=" << boot_cfg.overlay_pixel_size
+                      << ", interval=" << boot_cfg.overlay_update_interval_100ns << "x100ns, spin="
+                      << boot_cfg.overlay_spin_budget_us << "us, pos="
+                      << boot_cfg.overlay_pos_x << "," << boot_cfg.overlay_pos_y << ")" << std::endl;
+        }
+    } else if (boot_cfg.enable_optimization_report && boot_cfg.enable_system_opt_report) {
+        std::cout << "[BOOT] Overlay animator=OFF" << std::endl;
+    }
 
     if (boot_cfg.enable_optimization_report && boot_cfg.enable_system_opt_report) {
         std::wcout << L"[BOOT] Scheduling: MMCSS=" << (hMmcss?L"ON":L"OFF")
                    << L" (task=" << boot_cfg.mmcss_task_name << L", prio=" << (int)boot_cfg.mmcss_priority << L")" << std::endl;
     }
 
-    // Disable process/thread power throttling and background limits as early as possible
-    DisablePowerThrottlingForProcessAndThread(boot_cfg.enable_optimization_report && boot_cfg.enable_system_opt_report);
-    // Raise process and main thread priority early
-    RaiseProcessPrioritySafely();
-    RaiseThisThreadPrioritySafely();
     try {
         AimAssistant assistant;
         assistant.Run();
@@ -1228,6 +1466,7 @@ int main() {
         return -1;
     }
     std::cout << "\nProgram finished successfully." << std::endl;
+    overlay.stop();
     DisableMmcss(hMmcss);
     return 0;
 }
