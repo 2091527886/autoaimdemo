@@ -58,7 +58,7 @@ static inline void RaiseDxgiGpuPriorityAndLatency(ID3D11Device* d3dDevice, int g
     dxgiDevice1->Release();
 }
 
-// --- Power throttling/background-mode helpers ---
+
 
 // 将当前线程内存优先级显式设置为 NORMAL（保证不被降级）
 static inline void SetThisThreadMemoryPriorityNormal(bool verbose=true) {
@@ -178,10 +178,6 @@ struct Detection {
 };
 
 
-
-// 简单的每 N 帧聚合并打印统计（平均/最小/最大），使用 std::chrono 的毫秒单位
-// Moved to Timing.hpp
-
 // --- PID 控制器 ---
 class PidController {
 public:
@@ -236,11 +232,6 @@ private:
     bool initialized_ = false;
 };
 
-// --- 1. 配置中心 (Config) ---
-
-// 亲和工具：构建掩码 + 应用到当前线程（与进程亲和取交集）
-// class Config moved to Config.hpp
-// Only use it via #include "Config.hpp"
 
 // --- 2. 鼠标控制器 (MouseController) ---
 #include "OverlayAnimator.hpp"
