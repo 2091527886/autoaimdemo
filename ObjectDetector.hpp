@@ -4,7 +4,7 @@
 #include <memory>
 #include <opencv2/core.hpp>
 #include "Detection.hpp"
-#include "metrics/TrtPerfReporting.hpp"
+#include "metrics/Reporting.hpp"
 
 // forward declarations
 class Config;

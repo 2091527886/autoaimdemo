@@ -52,7 +52,7 @@ endif()
 add_executable(aimassistant
   main.cpp
   OverlayAnimator.cpp
-  MouseController.cpp
+  Mouse.cpp
   HotkeyManager.cpp
   PidController.cpp
   SystemPriority.cpp
@@ -60,9 +60,9 @@ add_executable(aimassistant
   MmcssUtil.cpp
   DxgiTuning.cpp
   ThreadAffinity.cpp
-  metrics/CaptureReporting.cpp
-  metrics/TrtPerfReporting.cpp
-  metrics/SystemBootReporting.cpp
+  
+  
+  
   ObjectDetector.cpp
   ScreenCapturer.cpp
 )

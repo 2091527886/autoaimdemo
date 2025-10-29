@@ -4,7 +4,15 @@
 #include <iomanip>
 #include <algorithm>
 #include <string>
+#include <tuple>
+
 #include "../Config.hpp"
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+#include <trtyolo.hpp>
 
 namespace metrics {
 
@@ -13,7 +21,7 @@ public:
     explicit CaptureReporting(const Config& cfg) : cfg_(cfg) {}
 
     void BootBanner(size_t stagingCount) const {
-        if (cfg_.enable_optimization_report && cfg_.enable_capture_opt_report) {
+        if (cfg_.opt_report && cfg_.opt_report_capture) {
             std::cout << "[BOOT] Capture pipeline: "
                       << "dirty-skip=ON"
                       << " | staging-buffers=" << stagingCount
@@ -22,9 +30,9 @@ public:
                       << " | cache-reuse=ON"
                       << std::endl;
             std::cout << "[BOOT] Timing: "
-                      << "step-timing=" << (cfg_.enable_capture_step_timing ? "ON" : "OFF")
-                      << " | interval=" << cfg_.capture_timing_interval_frames
-                      << " | success-only=" << (cfg_.capture_timing_only_on_success ? "ON" : "OFF")
+                      << "step-timing=" << (cfg_.capture_timing ? "ON" : "OFF")
+                      << " | interval=" << cfg_.capture_timing_every_n
+                      << " | success-only=" << (cfg_.capture_timing_on_success ? "ON" : "OFF")
                       << std::endl;
         }
     }
@@ -55,9 +63,9 @@ public:
         acc_unmap_ += t_unmap_ms;
         acc_total_ += t_total_ms;
 
-        bool should_print = cfg_.capture_timing_every_frame;
+        bool should_print = cfg_.capture_timing_each_frame;
         if (!should_print) {
-            int interval = std::max(1, cfg_.capture_timing_interval_frames);
+            int interval = std::max(1, cfg_.capture_timing_every_n);
             if (interval <= 1) should_print = true;
             else if (counter_ % static_cast<size_t>(interval) == 0) should_print = true;
         }
@@ -74,9 +82,9 @@ public:
                       << " | total="   << (acc_total_/n) << " ms"
                       << std::endl;
 
-            if (cfg_.enable_optimization_report && cfg_.enable_capture_opt_report) {
+            if (cfg_.opt_report && cfg_.opt_report_capture) {
                 bool should_print_opt = false;
-                int opt_interval = std::max(1, cfg_.optimization_report_interval_frames);
+                int opt_interval = std::max(1, cfg_.opt_report_every_n);
                 if (opt_interval <= 1) should_print_opt = true;
                 else if (opt_counter_ % static_cast<size_t>(opt_interval) == 0) should_print_opt = true;
                 if (should_print_opt) {
@@ -110,4 +118,57 @@ private:
     double acc_acq_ = 0.0, acc_qi_ = 0.0, acc_copy_ = 0.0, acc_map_ = 0.0, acc_cvt_ = 0.0, acc_unmap_ = 0.0, acc_total_ = 0.0;
 };
 
-} // namespace metrics
+struct SystemBootReporting {
+    static void PrintOverlayBanner(const Config& cfg, bool started) {
+        if (!cfg.opt_report || !cfg.opt_report_system) return;
+        if (started) {
+            std::cout << "[BOOT] Overlay animator=ON (size=" << cfg.overlay_px
+                      << ", interval=" << cfg.overlay_interval_100ns << "x100ns, spin="
+                      << cfg.overlay_spin_us << "us, pos="
+                      << cfg.overlay_x << "," << cfg.overlay_y << ")" << std::endl;
+        } else {
+            std::cout << "[BOOT] Overlay animator=OFF" << std::endl;
+        }
+    }
+
+#ifdef _WIN32
+    static void PrintSchedulingBanner(const Config& cfg, HANDLE hMmcss) {
+        if (!cfg.opt_report || !cfg.opt_report_system) return;
+        std::wcout << L"[BOOT] Scheduling: MMCSS=" << (hMmcss?L"ON":L"OFF")
+                   << L" (task=" << cfg.mmcss_task << L", prio=" << (int)cfg.mmcss_prio << L")" << std::endl;
+    }
+#endif
+};
+
+class TrtPerfReporting {
+public:
+    explicit TrtPerfReporting(const Config& cfg) : cfg_(cfg) {}
+
+    bool ShouldReport() {
+        if (cfg_.perf_report) {
+            if (cfg_.perf_each_frame) return true;
+            perf_frame_counter_++;
+            if (cfg_.perf_report_every_n <= 1) return true;
+            if (perf_frame_counter_ % static_cast<size_t>(cfg_.perf_report_every_n) == 0) return true;
+        }
+        return false;
+    }
+
+    void PrintReport(trtyolo::DetectModel& model) {
+        auto report = model.performanceReport();
+        const std::string& throughput = std::get<0>(report);
+        if (!throughput.empty()) {
+            const std::string& cpu_latency = std::get<1>(report);
+            const std::string& gpu_latency = std::get<2>(report);
+            std::cout << "[TRT-YOLO PERF] " << throughput << '\n'
+                      << "[TRT-YOLO PERF] " << cpu_latency << '\n'
+                      << "[TRT-YOLO PERF] " << gpu_latency << std::endl;
+        }
+    }
+
+private:
+    const Config& cfg_;
+    size_t perf_frame_counter_ = 0;
+};
+
+} 

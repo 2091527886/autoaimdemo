@@ -2,7 +2,7 @@
 #include "Config.hpp"
 #include "DxgiTuning.hpp"
 #include "ComHelpers.hpp"
-#include "metrics/CaptureReporting.hpp"
+#include "metrics/Reporting.hpp"
 
 #include <array>
 #include <chrono>
@@ -19,14 +19,14 @@
 
 ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_height)
     : cfg(cfg_ref), capture_reporter_(cfg_ref) {
-    if (cfg.verbose_init_log) std::cout << "--- Initializing D3D for screen capture... ---" << std::endl;
-    if (cfg.verbose_init_log) {
+    if (cfg.log_init_verbose) std::cout << "--- Initializing D3D for screen capture... ---" << std::endl;
+    if (cfg.log_init_verbose) {
         std::cout << "[CAPTURE] Crop size: " << crop_width << "x" << crop_height << std::endl;
     }
     HRESULT hr;
 
     hr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&pFactory);
-    if (cfg.verbose_init_log) {
+    if (cfg.log_init_verbose) {
         std::cout << "[CAPTURE] CreateDXGIFactory1 hr=0x"
                   << std::hex << std::uppercase << static_cast<unsigned long>(hr)
                   << std::dec << std::nouppercase << std::endl;
@@ -34,7 +34,7 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
     if (FAILED(hr)) throw std::runtime_error("Failed to create DXGI Factory.");
     {
         HRESULT hr_enum_adapters = pFactory->EnumAdapters1(0, &pAdapter);
-        if (cfg.verbose_init_log) {
+        if (cfg.log_init_verbose) {
             std::cout << "[CAPTURE] EnumAdapters1 hr=0x"
                       << std::hex << std::uppercase << static_cast<unsigned long>(hr_enum_adapters)
                       << std::dec << std::nouppercase << std::endl;
@@ -43,7 +43,7 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
     }
     {
         HRESULT hr_enum_outputs = pAdapter->EnumOutputs(0, &pOutput);
-        if (cfg.verbose_init_log) {
+        if (cfg.log_init_verbose) {
             std::cout << "[CAPTURE] EnumOutputs hr=0x"
                       << std::hex << std::uppercase << static_cast<unsigned long>(hr_enum_outputs)
                       << std::dec << std::nouppercase << std::endl;
@@ -55,13 +55,13 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
     pOutput->GetDesc(&outputDesc);
     width = outputDesc.DesktopCoordinates.right - outputDesc.DesktopCoordinates.left;
     height = outputDesc.DesktopCoordinates.bottom - outputDesc.DesktopCoordinates.top;
-    if (cfg.verbose_init_log) {
+    if (cfg.log_init_verbose) {
         std::cout << "[CAPTURE] Output desktop size: " << width << "x" << height << std::endl;
     }
 
     {
         HRESULT hr_create_device = D3D11CreateDevice(pAdapter, D3D_DRIVER_TYPE_UNKNOWN, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &pDevice, nullptr, &pContext);
-        if (cfg.verbose_init_log) {
+        if (cfg.log_init_verbose) {
             std::cout << "[CAPTURE] D3D11CreateDevice hr=0x"
                       << std::hex << std::uppercase << static_cast<unsigned long>(hr_create_device)
                       << std::dec << std::nouppercase << std::endl;
@@ -70,11 +70,11 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
             throw std::runtime_error("Failed to create D3D11 device.");
         }
         // Raise DXGI GPU priority and reduce frame latency for this device
-        RaiseDxgiGpuPriorityAndLatency(pDevice, cfg.dxgi_gpu_thread_priority, cfg.dxgi_max_frame_latency);
+        RaiseDxgiGpuPriorityAndLatency(pDevice, cfg.dxgi_gpu_prio, cfg.dxgi_max_latency);
     }
     {
         HRESULT hr_qi_output1 = pOutput->QueryInterface(__uuidof(IDXGIOutput1), (void**)&pOutput1);
-        if (cfg.verbose_init_log) {
+        if (cfg.log_init_verbose) {
             std::cout << "[CAPTURE] QueryInterface(IDXGIOutput1) hr=0x"
                       << std::hex << std::uppercase << static_cast<unsigned long>(hr_qi_output1)
                       << std::dec << std::nouppercase << std::endl;
@@ -84,7 +84,7 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
         }
     }
     hr = pOutput1->DuplicateOutput(pDevice, &pDuplicator);
-    if (cfg.verbose_init_log) {
+    if (cfg.log_init_verbose) {
         std::cout << "[CAPTURE] DuplicateOutput hr=" << (FAILED(hr) ? "FAILED" : "OK") << std::endl;
     }
     if (FAILED(hr)) {
@@ -158,7 +158,7 @@ bool ScreenCapturer::CaptureFrame(cv::Mat& frame, const cv::Rect& crop_region) {
             ++stat_cache_reused_;
             return true;
         }
-        if (cfg.enable_capture_step_timing && !cfg.capture_timing_only_on_success) {
+    if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
             t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
             accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
         }
@@ -166,7 +166,7 @@ bool ScreenCapturer::CaptureFrame(cv::Mat& frame, const cv::Rect& crop_region) {
     }
     if (FAILED(hr)) {
         std::cerr << "AcquireNextFrame failed. HRESULT: 0x" << std::hex << hr << std::endl;
-        if (cfg.enable_capture_step_timing && !cfg.capture_timing_only_on_success) {
+    if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
             t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
             accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
         }
@@ -180,7 +180,7 @@ bool ScreenCapturer::CaptureFrame(cv::Mat& frame, const cv::Rect& crop_region) {
     t_qi_ms = std::chrono::duration<double, std::milli>(t_qi_e - t_qi_s).count();
     SafeRelease(&pDesktopResource);
     if (FAILED(hr)) {
-        if (cfg.enable_capture_step_timing && !cfg.capture_timing_only_on_success) {
+    if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
             t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
             accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
         }
@@ -200,7 +200,7 @@ bool ScreenCapturer::CaptureFrame(cv::Mat& frame, const cv::Rect& crop_region) {
             return true;
         }
         t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
-        if (cfg.enable_capture_step_timing && !cfg.capture_timing_only_on_success) {
+    if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
             accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
         }
         return false;
@@ -234,7 +234,7 @@ bool ScreenCapturer::CaptureFrame(cv::Mat& frame, const cv::Rect& crop_region) {
         bool served = try_serve_cache(frame);
         if (served) ++stat_cache_reused_;
         t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
-        if (cfg.enable_capture_step_timing && !cfg.capture_timing_only_on_success) {
+    if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
             accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
         }
         frame_index_++;
@@ -251,7 +251,7 @@ bool ScreenCapturer::CaptureFrame(cv::Mat& frame, const cv::Rect& crop_region) {
         bool served = try_serve_cache(frame);
         if (served) ++stat_cache_reused_;
         t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
-        if (cfg.enable_capture_step_timing && !cfg.capture_timing_only_on_success) {
+    if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
             accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
         }
         frame_index_++;
@@ -259,7 +259,7 @@ bool ScreenCapturer::CaptureFrame(cv::Mat& frame, const cv::Rect& crop_region) {
     }
     if (FAILED(hr)) {
         t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
-        if (cfg.enable_capture_step_timing && !cfg.capture_timing_only_on_success) {
+    if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
             accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
         }
         frame_index_++;
@@ -280,8 +280,7 @@ bool ScreenCapturer::CaptureFrame(cv::Mat& frame, const cv::Rect& crop_region) {
 
     t_total_ms = std::chrono::duration<double, std::milli>(t_unmap_e - t_total_start).count();
     frame_index_++;
-
-    if (cfg.enable_capture_step_timing || (cfg.enable_optimization_report && cfg.enable_capture_opt_report)) {
+    if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
         accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
     }
     ++stat_success_;

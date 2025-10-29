@@ -21,8 +21,8 @@ ObjectDetector::ObjectDetector(const Config& cfg)
 
     trtyolo::InferOption option;
     option.enableSwapRB();
-    option.setInputDimensions(cfg.crop_size, cfg.crop_size);
-    if (cfg.enable_performance_report) {
+    option.setInputDimensions(cfg.crop_size_px, cfg.crop_size_px);
+    if (cfg.perf_report) {
         option.enablePerformanceReport();
     }
 
@@ -74,7 +74,7 @@ void ObjectDetector::Detect(const cv::Mat& image,
     if (res.num > 0 && res.boxes.size() == static_cast<size_t>(res.num)) {
         for (int i = 0; i < res.num; ++i) {
             float score = (i < (int)res.scores.size() ? res.scores[i] : 0.0f);
-            if (score < cfg.confidence_threshold) continue;
+            if (score < cfg.conf_thresh) continue;
             int cls = (i < (int)res.classes.size() ? res.classes[i] : -1);
             const auto& b = res.boxes[i];
             int x = std::max(0, static_cast<int>(std::floor(b.left)));
@@ -91,7 +91,7 @@ void ObjectDetector::Detect(const cv::Mat& image,
     auto t3 = std::chrono::high_resolution_clock::now();
     timings.postprocess_ms = std::chrono::duration<double, std::milli>(t3 - t2).count();
 
-    if (cfg.enable_performance_report) {
+    if (cfg.perf_report) {
         if (trt_reporter_.ShouldReport()) {
             trt_reporter_.PrintReport(*detector_);
         }
