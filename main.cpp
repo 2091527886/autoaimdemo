@@ -67,9 +67,10 @@ void DisableMmcss(HANDLE h);
 #include "metrics/CaptureReporting.hpp"
 #include "metrics/TrtPerfReporting.hpp"
 #include "metrics/SystemBootReporting.hpp"
+#include "ComHelpers.hpp"
+#include "Detection.hpp"
 
 // Forward Declarations
-struct Detection;
 struct TimingDetails;
 class Config;
 class ScreenCapturer;
@@ -78,21 +79,8 @@ class MouseController;
 class AimAssistant;
 
 // --- 辅助宏 ---
-template<class T>
-void SafeRelease(T** ppT) {
-    if (*ppT) {
-        (*ppT)->Release();
-        *ppT = nullptr;
-    }
-}
-
 // --- 数据结构定义 ---
 
-struct Detection {
-    cv::Rect box;
-    float confidence;
-    int class_id;
-};
 
 
 // --- PID 控制器 (moved to PidController.hpp/.cpp) ---
