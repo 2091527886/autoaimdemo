@@ -347,7 +347,7 @@ int main() {
 
     OverlayAnim overlay;
     // Disable process/thread power throttling and background limits as early as possible
-    DisablePowerThrottlingForProcessAndThread();
+    disablePowerThrottle();
     // Raise process and main thread priority early
     SetProcPrioHigh();
     SetThreadPrioHighest();

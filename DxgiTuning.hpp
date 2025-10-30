@@ -4,4 +4,4 @@
 #include <iostream>
 
 // Raise DXGI GPU thread priority and set frame latency (migrated)
-void RaiseDxgiGpuPriorityAndLatency(ID3D11Device* d3dDevice, int gpu_thread_priority = 7, int max_frame_latency = 1);
+void TuneDxgi(ID3D11Device* dev, int gpu_prio = 7, int max_latency = 1);

@@ -3,4 +3,4 @@
 #include <iostream>
 
 // Disable power throttling for process and current thread (migrated)
-void DisablePowerThrottlingForProcessAndThread(bool log=true);
+void disablePowerThrottle(bool log=true);

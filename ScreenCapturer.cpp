@@ -70,7 +70,7 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
             throw std::runtime_error("Failed to create D3D11 device.");
         }
         // Raise DXGI GPU priority and reduce frame latency for this device
-        RaiseDxgiGpuPriorityAndLatency(dev, cfg.dxgi_gpu_prio, cfg.dxgi_max_latency);
+        TuneDxgi(dev, cfg.dxgi_gpu_prio, cfg.dxgi_max_latency);
     }
     {
         HRESULT hr_qi_output1 = out->QueryInterface(__uuidof(IDXGIOutput1), (void**)&out1);
