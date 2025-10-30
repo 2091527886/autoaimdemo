@@ -25,6 +25,11 @@ public:
     uint64_t affinity_main_mask = 0;         // 主线程掩码（bit 对应逻辑CPU）
     uint64_t affinity_overlay_mask = 0;      // Overlay 线程掩码
 
+    // 帧率锁定（处理完成后补足到目标间隔）
+    bool fps_lock = true;                    // 启用帧率锁
+    int  fps = 120;                          // 目标 FPS
+    long long fps_spin_us = 0;               // 微自旋补偿（us），0 表示不自旋
+
     // 从环境变量覆盖（可选）：AIMAFF_MAIN, AIMAFF_OVERLAY
     void load_affinity_env() {
         const std::string main_env = get_env_str("AIMAFF_MAIN");

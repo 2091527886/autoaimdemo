@@ -106,7 +106,25 @@ public:
             fl.mou_ms = std::chrono::duration<double, std::milli>(t_mouse_end - t_mouse_start).count();
 
             auto loop_end_time = std::chrono::high_resolution_clock::now();
-            tm.loop_ms = std::chrono::duration<double, std::milli>(loop_end_time - loop_start_time).count();
+            double proc_ms = std::chrono::duration<double, std::milli>(loop_end_time - loop_start_time).count();
+            if (c.fps_lock) {
+                double tgt_ms = 1000.0 / std::max(1, c.fps);
+                double remain = tgt_ms - proc_ms;
+                if (remain > 0.0) {
+                    // 预留微自旋预算
+                    double sleep_ms = remain - (double)c.fps_spin_us / 1000.0;
+                    if (sleep_ms > 0.0) {
+                        std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(sleep_ms));
+                    }
+                    if (c.fps_spin_us > 0) {
+                        auto spin_end = std::chrono::high_resolution_clock::now() + std::chrono::microseconds((long long)c.fps_spin_us);
+                        while (std::chrono::high_resolution_clock::now() < spin_end) { /* spin */ }
+                    }
+                }
+                tm.loop_ms = std::max(proc_ms, tgt_ms);
+            } else {
+                tm.loop_ms = proc_ms;
+            }
             fl.loop_ms = tm.loop_ms;
 
             // 计算 dt（秒）供 PID 使用
