@@ -9,71 +9,71 @@
 #include <algorithm>
 
 // Timing details for detection pipeline
-struct TimingDetails {
-    double inference_ms = 0;
-    double postprocess_ms = 0;
-    double total_loop_ms = 0;
+struct Timing {
+    double infer_ms = 0;
+    double post_ms = 0;
+    double loop_ms = 0;
 };
 
 // Per-frame latency breakdown
-struct FrameLatency {
-    double capture_ms = 0.0;
-    double detect_ms  = 0.0;
-    double mouse_ms   = 0.0;
+struct FrameLat {
+    double cap_ms = 0.0;
+    double det_ms  = 0.0;
+    double mou_ms   = 0.0;
     double loop_ms    = 0.0;
 };
 
 // Aggregate and print latency stats over a fixed window
-class LatencyAggregator {
+class LatAgg {
 public:
-    explicit LatencyAggregator(size_t window) : window_(window ? window : 30) {
-        buffer_.reserve(window_);
+    explicit LatAgg(size_t window) : wnd(window ? window : 30) {
+        buf.reserve(wnd);
     }
 
-    void add(const FrameLatency& f) {
-        buffer_.push_back(f);
-        if (buffer_.size() >= window_) {
+    void push(const FrameLat& f) {
+        buf.push_back(f);
+        if (buf.size() >= wnd) {
             print_and_clear();
         }
     }
 
-    void force_print() {
-        if (!buffer_.empty()) print_and_clear();
+    void flush() {
+        if (!buf.empty()) printClear();
     }
 
 private:
-    void print_and_clear() {
-        auto [cap_avg, cap_min, cap_max] = stats([](const FrameLatency& f){ return f.capture_ms; });
-        auto [det_avg, det_min, det_max] = stats([](const FrameLatency& f){ return f.detect_ms;  });
-        auto [mou_avg, mou_min, mou_max] = stats([](const FrameLatency& f){ return f.mouse_ms;   });
-        auto [loo_avg, loo_min, loo_max] = stats([](const FrameLatency& f){ return f.loop_ms;    });
+    void printClear() {
+        auto [cap_avg, cap_min, cap_max] = stat([](const FrameLat& f){ return f.cap_ms; });
+        auto [det_avg, det_min, det_max] = stat([](const FrameLat& f){ return f.det_ms;  });
+        auto [mou_avg, mou_min, mou_max] = stat([](const FrameLat& f){ return f.mou_ms;   });
+        auto [loo_avg, loo_min, loo_max] = stat([](const FrameLat& f){ return f.loop_ms;    });
 
         std::cout << std::fixed << std::setprecision(2)
-                  << "[LAT] over " << buffer_.size() << " frames"
+                  << "[LAT] over " << buf.size() << " frames"
                   << " | capture ms avg/min/max: " << cap_avg << "/" << cap_min << "/" << cap_max
                   << " | detect: " << det_avg << "/" << det_min << "/" << det_max
                   << " | mouse: "  << mou_avg << "/" << mou_min << "/" << mou_max
                   << " | loop: "   << loo_avg << "/" << loo_min << "/" << loo_max
                   << std::endl;
 
-        buffer_.clear();
+        buf.clear();
     }
 
     template<typename Getter>
-    std::tuple<double,double,double> stats(Getter g) const {
-        if (buffer_.empty()) return {0.0, 0.0, 0.0};
+    std::tuple<double,double,double> stat(Getter g) const {
+        if (buf.empty()) return {0.0, 0.0, 0.0};
         double sum = 0.0, mn = std::numeric_limits<double>::infinity(), mx = 0.0;
-        for (const auto& f : buffer_) {
+        for (const auto& f : buf) {
             const double v = g(f);
             sum += v;
             mn = std::min(mn, v);
             mx = std::max(mx, v);
         }
-        return { sum / static_cast<double>(buffer_.size()), (std::isinf(mn)?0.0:mn), mx };
+        return { sum / static_cast<double>(buf.size()), (std::isinf(mn)?0.0:mn), mx };
     }
 
-    size_t window_;
-    std::vector<FrameLatency> buffer_;
+    size_t wnd;
+    std::vector<FrameLat> buf;
 };
 
 #endif // TIMING_HPP

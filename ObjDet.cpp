@@ -59,7 +59,7 @@ ObjDet::~ObjDet() = default;
 void ObjDet::detect(const cv::Mat& img,
                             std::vector<Detection>& out,
                             const Config& cfg,
-                            TimingDetails& tms)
+                            Timing& tm)
 {
     out.clear();
     auto t0 = std::chrono::high_resolution_clock::now();
@@ -68,7 +68,7 @@ void ObjDet::detect(const cv::Mat& img,
     trtyolo::DetectRes res = model_->predict(input);
 
     auto t1 = std::chrono::high_resolution_clock::now();
-    tms.inference_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+    tm.infer_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
     auto t2 = std::chrono::high_resolution_clock::now();
 
     if (res.num > 0 && res.boxes.size() == static_cast<size_t>(res.num)) {
@@ -89,7 +89,7 @@ void ObjDet::detect(const cv::Mat& img,
     }
 
     auto t3 = std::chrono::high_resolution_clock::now();
-    tms.postprocess_ms = std::chrono::duration<double, std::milli>(t3 - t2).count();
+    tm.post_ms = std::chrono::duration<double, std::milli>(t3 - t2).count();
 
     if (cfg.perf_report) {
         if (perf_.ShouldReport()) {

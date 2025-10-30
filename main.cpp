@@ -69,7 +69,7 @@ void DisableMmcss(HANDLE h);
 #include "Detection.hpp"
 
 // Forward Declarations
-struct TimingDetails;
+struct Timing;
 class Config;
 class ScreenCapturer;
 class ObjDet;
@@ -137,19 +137,19 @@ public:
         while (true) {
             auto loop_start_time = std::chrono::high_resolution_clock::now();
 
-            FrameLatency fl; // 本帧延迟统计
+            FrameLat fl; // 本帧延迟统计
 
             // 1) 截屏计时
             auto t_cap_start = std::chrono::high_resolution_clock::now();
             bool got = cap.capture(frame, cropRect);
             auto t_cap_end = std::chrono::high_resolution_clock::now();
-            fl.capture_ms = std::chrono::duration<double, std::milli>(t_cap_end - t_cap_start).count();
+            fl.cap_ms = std::chrono::duration<double, std::milli>(t_cap_end - t_cap_start).count();
             if (!got) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 // 仅统计成功截屏帧：直接继续下一帧
                 if (cfg.log_latency && !cfg.latency_on_capture_only) {
                     // 如果也要统计失败帧，则把仅有 capture_ms 的 fl 加入
-                    latAgg.add(fl);
+                    latAgg.push(fl);
                 }
                 continue;
             }
@@ -158,29 +158,29 @@ public:
             auto t_det_start = std::chrono::high_resolution_clock::now();
             od.detect(frame, dets, cfg, tm);
             auto t_det_end = std::chrono::high_resolution_clock::now();
-            fl.detect_ms = std::chrono::duration<double, std::milli>(t_det_end - t_det_start).count();
+            fl.det_ms = std::chrono::duration<double, std::milli>(t_det_end - t_det_start).count();
 
             // 3) 鼠标控制计时（整体阶段）
             auto t_mouse_start = std::chrono::high_resolution_clock::now();
             Detection* target = findTarget();
             handleMouse(target);
             auto t_mouse_end = std::chrono::high_resolution_clock::now();
-            fl.mouse_ms = std::chrono::duration<double, std::milli>(t_mouse_end - t_mouse_start).count();
+            fl.mou_ms = std::chrono::duration<double, std::milli>(t_mouse_end - t_mouse_start).count();
 
             auto loop_end_time = std::chrono::high_resolution_clock::now();
-            tm.total_loop_ms = std::chrono::duration<double, std::milli>(loop_end_time - loop_start_time).count();
-            fl.loop_ms = tm.total_loop_ms;
+            tm.loop_ms = std::chrono::duration<double, std::milli>(loop_end_time - loop_start_time).count();
+            fl.loop_ms = tm.loop_ms;
 
             // 计算 dt（秒）供 PID 使用
             if (cfg.pid_use_measured_dt) {
-                dt = std::max(0.001, tm.total_loop_ms / 1000.0);
+                dt = std::max(0.001, tm.loop_ms / 1000.0);
             } else {
                 dt = std::max(0.001, cfg.pid_fixed_dt_ms / 1000.0);
             }
             updateStats();
 
             if (cfg.log_latency) {
-                latAgg.add(fl);
+                latAgg.push(fl);
             }
 
             if (overlayOn) {
@@ -268,15 +268,15 @@ private:
     void updateStats() {
         const double smoothing_factor = 0.05;
         if (firstFrame) {
-            msTotal = tm.total_loop_ms;
-            msInfer = tm.inference_ms;
-            msPost = tm.postprocess_ms;
+            msTotal = tm.loop_ms;
+            msInfer = tm.infer_ms;
+            msPost = tm.post_ms;
             firstFrame = false;
         }
         else {
-            msTotal = smoothing_factor * tm.total_loop_ms + (1.0 - smoothing_factor) * msTotal;
-            msInfer = smoothing_factor * tm.inference_ms + (1.0 - smoothing_factor) * msInfer;
-            msPost = smoothing_factor * tm.postprocess_ms + (1.0 - smoothing_factor) * msPost;
+            msTotal = smoothing_factor * tm.loop_ms + (1.0 - smoothing_factor) * msTotal;
+            msInfer = smoothing_factor * tm.infer_ms + (1.0 - smoothing_factor) * msInfer;
+            msPost = smoothing_factor * tm.post_ms + (1.0 - smoothing_factor) * msPost;
         }
 
     }
@@ -322,12 +322,12 @@ private:
     double mouseFactor = 1.0;
     cv::Mat frame;
     std::vector<Detection> dets;
-    TimingDetails tm;
+    Timing tm;
     bool overlayOn;
     double msTotal = 0.0, msInfer = 0.0, msPost = 0.0;
     bool firstFrame = true;
     // 延迟统计
-    LatencyAggregator latAgg;
+    LatAgg latAgg;
 
     // PID 控制
     PidController pidX;

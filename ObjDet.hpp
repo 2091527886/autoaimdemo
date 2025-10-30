@@ -8,7 +8,7 @@
 
 // forward declarations
 class Config;
-struct TimingDetails;
+struct Timing;
 namespace trtyolo { class DetectModel; }
 
 class ObjDet {
@@ -21,7 +21,7 @@ public:
     void detect(const cv::Mat& img,
                 std::vector<Detection>& out,
                 const Config& cfg,
-                TimingDetails& tms);
+                Timing& tm);
 
 private:
     std::unique_ptr<trtyolo::DetectModel> model_;
