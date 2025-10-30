@@ -1,10 +1,10 @@
 #include "PidController.hpp"
 #include <cmath>
 
-PidController::PidController(double kp, double ki, double kd, double out_limit, double integ_limit)
-    : kp(kp), ki(ki), kd(kd), out_lim(std::abs(out_limit)), i_lim(std::abs(integ_limit)) {}
+PidController::PidController(double kp_in, double ki_in, double kd_in, double out_limit, double integ_limit)
+    : kp(kp_in), ki(ki_in), kd(kd_in), out_lim(std::abs(out_limit)), i_lim(std::abs(integ_limit)) {}
 
-void PidController::setK(double kp, double ki, double kd) { this->kp = kp; this->ki = ki; this->kd = kd; }
+void PidController::setK(double kp_in, double ki_in, double kd_in) { this->kp = kp_in; this->ki = ki_in; this->kd = kd_in; }
 
 void PidController::setLim(double out_limit, double integ_limit) {
     out_lim = std::abs(out_limit);

@@ -267,13 +267,13 @@ bool ScreenCapturer::capture(cv::Mat& frame, const cv::Rect& crop_region) {
     return true;
 }
 
-bool ScreenCapturer::serveCache(cv::Mat& out) {
+bool ScreenCapturer::serveCache(cv::Mat& dst) {
     if (!cache.empty()) {
-        if (cache.rows == out.rows && cache.cols == out.cols && cache.type() == out.type()) {
-            cache.copyTo(out);
+        if (cache.rows == dst.rows && cache.cols == dst.cols && cache.type() == dst.type()) {
+            cache.copyTo(dst);
             return true;
         } else {
-            out = cache.clone();
+            dst = cache.clone();
             return true;
         }
     }

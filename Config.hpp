@@ -28,15 +28,28 @@ public:
 
     // 从环境变量覆盖（可选）：AIMAFF_MAIN, AIMAFF_OVERLAY
     void load_affinity_env() {
-        if (const char* env = std::getenv("AIMAFF_MAIN")) {
-            // 支持 0x 前缀十六进制，或逗号分隔数字列表
-            parse_aff_env(env, affinity_main_mask);
+        const std::string main_env = get_env_str("AIMAFF_MAIN");
+        if (!main_env.empty()) {
+            parse_aff_env(main_env.c_str(), affinity_main_mask);
         }
-        if (const char* env = std::getenv("AIMAFF_OVERLAY")) {
-            parse_aff_env(env, affinity_overlay_mask);
+        const std::string overlay_env = get_env_str("AIMAFF_OVERLAY");
+        if (!overlay_env.empty()) {
+            parse_aff_env(overlay_env.c_str(), affinity_overlay_mask);
         }
     }
 private:
+    static std::string get_env_str(const char* name) {
+#ifdef _WIN32
+        char* buf = nullptr; size_t len = 0;
+        if (_dupenv_s(&buf, &len, name) == 0 && buf) {
+            std::string v(buf); free(buf); return v;
+        }
+        return std::string();
+#else
+        const char* v = std::getenv(name);
+        return v ? std::string(v) : std::string();
+#endif
+    }
     static void parse_aff_env(const char* s, uint64_t& outMask) {
         outMask = 0;
         // 去空白

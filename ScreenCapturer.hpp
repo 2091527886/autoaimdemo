@@ -23,7 +23,7 @@ public:
     int h() const { return height; }
 
 private:
-    bool serveCache(cv::Mat& out);
+    bool serveCache(cv::Mat& dst);
     void reportTimes(double t_acquire_ms, double t_qi_ms, double t_copy_ms,
                                     double t_map_ms, double t_cvt_ms, double t_unmap_ms, double t_total_ms);
     void dbgTick();
