@@ -50,7 +50,7 @@ private:
         auto [loo_avg, loo_min, loo_max] = stat([](const FrameLat& f){ return f.loop_ms;    });
 
         lg::o() << std::fixed << std::setprecision(2)
-                  << "[LAT] over " << buf.size() << " frames"
+                  << P_L "over " << buf.size() << " frames"
                   << " | capture ms avg/min/max: " << cap_avg << "/" << cap_min << "/" << cap_max
                   << " | detect: " << det_avg << "/" << det_min << "/" << det_max
                   << " | mouse: "  << mou_avg << "/" << mou_min << "/" << mou_max

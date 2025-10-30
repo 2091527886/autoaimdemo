@@ -97,6 +97,9 @@ public:
     std::vector<int> target_ids = {0};
 
     // ========== 6) 运行时日志/统计 ==========
+    // 6.0 捕获链路调试节流
+    bool capture_debug = false;           // 启用后输出精简的调试统计（节流）
+    int  capture_debug_every_n = 300;     // 每 N 帧输出一次调试统计
     // 6.1 延迟统计（粗粒度：capture/detect/mouse/loop）
     bool log_latency = true;               // 打印延迟统计
     int  log_latency_every_n = 60;        // 每 N 帧打印一次

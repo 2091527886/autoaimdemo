@@ -9,7 +9,6 @@
 #include <d3d11.h>
 #include <dxgi1_2.h>
 #include <cstdint>
-#include <vector>
 #include "Log.hpp"
 
 // ---- Process/Thread Priority (from SystemPriority) ----

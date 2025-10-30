@@ -1,59 +1,14 @@
 #include <iostream>
 #include "Log.hpp"
-#include <vector>
-#include <string>
 #include <chrono>
 #include <stdexcept>
-#include <numeric>
 #include <algorithm>
 #include <iomanip>
 #include <cmath>
-#include <memory>
-#include <sstream> // For std::ostringstream
-#include <thread>  // For std::this_thread
-#include <limits>
-#include <tuple>
-#include <array>
-#include <atomic>
-#include <cstdint>
-#include <cstdlib>
-// Windows & DirectX
-#include <windows.h>
-#include <winnt.h> // for MEMORY_PRIORITY_INFORMATION and MEMORY_PRIORITY_* constants
-#include <d3d11.h>
-#include <dxgi1_2.h>
-#pragma comment(lib, "d3d11.lib")
-#pragma comment(lib, "dxgi.lib")
-#include <avrt.h>
-#pragma comment(lib, "Avrt.lib")
-
-// --- Priority helpers moved to separate modules ---
-/* moved */
-
-
-// 将当前线程内存优先级显式设置为 NORMAL（保证不被降级）
-/* moved */
-// 禁用进程 PriorityBoost，避免在系统内存压力下被降低优先级
-/* moved */
-
-// Forward declare Config for use in OverlayAnim
-class Config;
-/* moved: MMCSS utilities now in MmcssUtil */
-/* moved */
-/* moved */
-
-// TensorRT-YOLO
-#include <trtyolo.hpp>
-#pragma comment(lib, "trtyolo.lib")
-
+#include <sstream>
+#include <thread>
 // OpenCV
 #include <opencv2/opencv.hpp>
-#ifdef _DEBUG
-#pragma comment(lib, "opencv_world4110d.lib") // 请根据你的OpenCV版本修改
-#else
-#pragma comment(lib, "opencv_world4110.lib") // 请根据你的OpenCV版本修改
-#endif
-
 // Input Simulator (确保头文件在项目路径中)
 #include "Config.hpp"
 #include "Timing.hpp"
@@ -61,14 +16,6 @@ class Config;
 #include "SystemTuner.hpp"
 #include "Reporting.hpp"
 #include "Detection.hpp"
-
-// Forward Declarations
-struct Timing;
-class Config;
-class ScreenCapturer;
-class ObjDet;
-class Mouse;
-class Aim;
 
 // --- 辅助宏 ---
 // --- 数据结构定义 ---

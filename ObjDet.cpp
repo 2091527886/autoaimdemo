@@ -18,7 +18,7 @@ ObjDet::ObjDet(const Config& cfg)
     : perf_(cfg)
 {
     const std::string engine = cfg.resolve_engine_path();
-    lg::o() << "[INFO] Loading TensorRT-YOLO engine from " << engine << " ..." << std::endl;
+    lg::o() << P_I "Loading TensorRT-YOLO engine from " << engine << " ..." << std::endl;
 
     trtyolo::InferOption opt;
     opt.enableSwapRB();
@@ -31,25 +31,25 @@ ObjDet::ObjDet(const Config& cfg)
     {
         char cwd_buffer[MAX_PATH];
         if (GetCurrentDirectoryA(MAX_PATH, cwd_buffer)) {
-            lg::o() << "[DEBUG] Current working directory: " << cwd_buffer << std::endl;
+            lg::o() << P_D "Current working directory: " << cwd_buffer << std::endl;
         }
         DWORD attrs = GetFileAttributesA(engine.c_str());
         if (attrs == INVALID_FILE_ATTRIBUTES) {
-            lg::e() << "[ERROR] Engine file not found: '" << engine << "'."
+            lg::e() << P_E "Engine file not found: '" << engine << "'."
                       << " Ensure the engine file is present or provide the correct path." << std::endl;
         } else if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
-            lg::e() << "[ERROR] Engine path is a directory, not a file: '" << engine << "'." << std::endl;
+            lg::e() << P_E "Engine path is a directory, not a file: '" << engine << "'." << std::endl;
         } else {
-            lg::o() << "[DEBUG] Found engine file: '" << engine << "'." << std::endl;
+            lg::o() << P_D "Found engine file: '" << engine << "'." << std::endl;
         }
     }
 
     try {
         model_ = std::make_unique<trtyolo::DetectModel>(engine.c_str(), opt);
-        lg::o() << "[INFO] Engine loaded successfully." << std::endl;
+        lg::o() << P_I "Engine loaded successfully." << std::endl;
     } catch (const std::exception& e) {
         std::ostringstream oss;
-        oss << "[FATAL] Failed to construct DetectModel with engine '" << engine << "'.\n"
+        oss << P_F "Failed to construct DetectModel with engine '" << engine << "'.\n"
             << "Underlying error: " << e.what();
         throw std::runtime_error(oss.str());
     }

@@ -21,17 +21,17 @@ void SetThreadMemPrioNormal(bool log) {
     MEMORY_PRIORITY_INFORMATION memPri{};
     memPri.MemoryPriority = MEMORY_PRIORITY_NORMAL;
     if (!SetThreadInformation(GetCurrentThread(), ThreadMemoryPriority, &memPri, sizeof(memPri))) {
-        LOG_IF(log, lg::e() << LOGP_BOOT "ThreadMemoryPriority=NORMAL failed: " << lg::winerr() << std::endl);
+        LOG_IF(log, lg::e() << P_B "ThreadMemoryPriority=NORMAL failed: " << lg::winerr() << std::endl);
     } else if (log) {
-        lg::o() << "[BOOT] ThreadMemoryPriority=NORMAL OK" << std::endl;
+        lg::o() << P_B "ThreadMemoryPriority=NORMAL OK" << std::endl;
     }
 }
 
 void SetProcPrioBoost(bool enable, bool log) {
     if (!SetProcessPriorityBoost(GetCurrentProcess(), enable ? TRUE : FALSE)) {
-        LOG_IF(log, lg::e() << (enable ? "[BOOT] ProcPriorityBoost(TRUE) failed: " : "[BOOT] ProcPriorityBoost(FALSE) failed: ") << lg::winerr() << std::endl);
+        LOG_IF(log, lg::e() << (enable ? P_B "ProcPriorityBoost(TRUE) failed: " : P_B "ProcPriorityBoost(FALSE) failed: ") << lg::winerr() << std::endl);
     } else if (log) {
-        lg::o() << (enable ? "[BOOT] ProcPriorityBoost(TRUE) OK" : "[BOOT] ProcPriorityBoost(FALSE) OK") << std::endl;
+        lg::o() << (enable ? P_B "ProcPriorityBoost(TRUE) OK" : P_B "ProcPriorityBoost(FALSE) OK") << std::endl;
     }
 }
 
@@ -44,19 +44,19 @@ bool setAffinity(uint64_t mask, bool log) {
     if (!mask) return false;
     DWORD_PTR pMask=0, sMask=0;
     if (!GetProcessAffinityMask(GetCurrentProcess(), &pMask, &sMask)) {
-        LOG_IF(log, lg::e() << LOGP_AFF "GetProcessAffinityMask failed: " << lg::winerr() << std::endl);
+        LOG_IF(log, lg::e() << P_A "GetProcessAffinityMask failed: " << lg::winerr() << std::endl);
         return false;
     }
     DWORD_PTR fMask = (DWORD_PTR)(mask & (uint64_t)pMask);
     if (!fMask) {
-        LOG_IF(log, lg::e() << LOGP_AFF "empty after intersect with process mask" << std::endl);
+        LOG_IF(log, lg::e() << P_A "empty after intersect with process mask" << std::endl);
         return false;
     }
     if (!SetThreadAffinityMask(GetCurrentThread(), fMask)) {
-        LOG_IF(log, lg::e() << LOGP_AFF "SetThreadAffinityMask failed: " << lg::winerr() << std::endl);
+        LOG_IF(log, lg::e() << P_A "SetThreadAffinityMask failed: " << lg::winerr() << std::endl);
         return false;
     }
-    LOG_IF(log, lg::o() << "[AFF] Thread pinned. mask=0x" << lg::hexu << (uint64_t)fMask << lg::deff << std::endl);
+    LOG_IF(log, lg::o() << P_A "Thread pinned. mask=0x" << lg::hexu << (uint64_t)fMask << lg::deff << std::endl);
     return true;
 }
 
@@ -67,9 +67,9 @@ void disablePowerThrottle(bool log) {
    pState.ControlMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
    pState.StateMask = 0;
    if (!SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling, &pState, sizeof(pState))) {
-       LOG_IF(log, lg::e() << LOGP_BOOT "ProcPowerThrottling=OFF failed: " << lg::winerr() << std::endl);
+       LOG_IF(log, lg::e() << P_B "ProcPowerThrottling=OFF failed: " << lg::winerr() << std::endl);
    } else if (log) {
-       lg::o() << "[BOOT] ProcPowerThrottling=OFF OK" << std::endl;
+       lg::o() << P_B "ProcPowerThrottling=OFF OK" << std::endl;
    }
 
    THREAD_POWER_THROTTLING_STATE tState = {};
@@ -77,16 +77,16 @@ void disablePowerThrottle(bool log) {
    tState.ControlMask = THREAD_POWER_THROTTLING_EXECUTION_SPEED;
    tState.StateMask = 0;
    if (!SetThreadInformation(GetCurrentThread(), ThreadPowerThrottling, &tState, sizeof(tState))) {
-       LOG_IF(log, lg::e() << LOGP_BOOT "ThreadPowerThrottling=OFF failed: " << lg::winerr() << std::endl);
+       LOG_IF(log, lg::e() << P_B "ThreadPowerThrottling=OFF failed: " << lg::winerr() << std::endl);
    } else if (log) {
-       lg::o() << "[BOOT] ThreadPowerThrottling=OFF OK" << std::endl;
+       lg::o() << P_B "ThreadPowerThrottling=OFF OK" << std::endl;
    }
 
    if (!SetThreadPriorityBoost(GetCurrentThread(), FALSE)) {
-       LOG_IF(log, lg::e() << LOGP_BOOT "ThreadPriorityBoost(FALSE) failed: " << lg::winerr() << std::endl);
+       LOG_IF(log, lg::e() << P_B "ThreadPriorityBoost(FALSE) failed: " << lg::winerr() << std::endl);
    } else if (log) {
-       lg::o() << "[BOOT] ThreadPriorityBoost(FALSE) OK" << std::endl;
-   }
+       lg::o() << P_B "ThreadPriorityBoost(FALSE) OK" << std::endl;
+  }
 }
 
 // ---- MmcssUtil.cpp ----
@@ -96,14 +96,14 @@ HANDLE MmcssEnable(bool enable, const wchar_t* task, AVRT_PRIORITY prio, DWORD* 
     DWORD idx = 0;
     HANDLE h = AvSetMmThreadCharacteristicsW(task, &idx);
     if (!h) {
-        lg::e() << "[MMCSS] AvSetMmThreadCharacteristicsW failed: " << lg::winerr() << std::endl;
+        lg::e() << P_MS "AvSetMmThreadCharacteristicsW failed: " << lg::winerr() << std::endl;
         return nullptr;
     }
     if (!AvSetMmThreadPriority(h, prio)) {
-        lg::e() << "[MMCSS] AvSetMmThreadPriority failed: " << lg::winerr() << std::endl;
+        lg::e() << P_MS "AvSetMmThreadPriority failed: " << lg::winerr() << std::endl;
     }
     if (outIdx) *outIdx = idx;
-    lg::wo() << L"[MMCSS] Enabled for thread. Task=" << task << L", priority=" << (int)prio << std::endl;
+    lg::wo() << WP_MS L"Enabled for thread. Task=" << task << L", priority=" << (int)prio << std::endl;
     return h;
 }
 
