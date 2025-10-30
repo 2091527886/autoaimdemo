@@ -18,14 +18,14 @@
 #pragma comment(lib, "dxgi.lib")
 
 ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_height)
-    : cfg(cfg_ref), capture_reporter_(cfg_ref) {
+    : cfg(cfg_ref), reporter(cfg_ref) {
     if (cfg.log_init_verbose) std::cout << "--- Initializing D3D for screen capture... ---" << std::endl;
     if (cfg.log_init_verbose) {
         std::cout << "[CAPTURE] Crop size: " << crop_width << "x" << crop_height << std::endl;
     }
     HRESULT hr;
 
-    hr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&pFactory);
+    hr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&fac);
     if (cfg.log_init_verbose) {
         std::cout << "[CAPTURE] CreateDXGIFactory1 hr=0x"
                   << std::hex << std::uppercase << static_cast<unsigned long>(hr)
@@ -33,7 +33,7 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
     }
     if (FAILED(hr)) throw std::runtime_error("Failed to create DXGI Factory.");
     {
-        HRESULT hr_enum_adapters = pFactory->EnumAdapters1(0, &pAdapter);
+        HRESULT hr_enum_adapters = fac->EnumAdapters1(0, &adp);
         if (cfg.log_init_verbose) {
             std::cout << "[CAPTURE] EnumAdapters1 hr=0x"
                       << std::hex << std::uppercase << static_cast<unsigned long>(hr_enum_adapters)
@@ -42,7 +42,7 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
         if (FAILED(hr_enum_adapters)) throw std::runtime_error("Failed to enumerate adapters.");
     }
     {
-        HRESULT hr_enum_outputs = pAdapter->EnumOutputs(0, &pOutput);
+        HRESULT hr_enum_outputs = adp->EnumOutputs(0, &out);
         if (cfg.log_init_verbose) {
             std::cout << "[CAPTURE] EnumOutputs hr=0x"
                       << std::hex << std::uppercase << static_cast<unsigned long>(hr_enum_outputs)
@@ -52,7 +52,7 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
     }
 
     DXGI_OUTPUT_DESC outputDesc;
-    pOutput->GetDesc(&outputDesc);
+    out->GetDesc(&outputDesc);
     width = outputDesc.DesktopCoordinates.right - outputDesc.DesktopCoordinates.left;
     height = outputDesc.DesktopCoordinates.bottom - outputDesc.DesktopCoordinates.top;
     if (cfg.log_init_verbose) {
@@ -60,7 +60,7 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
     }
 
     {
-        HRESULT hr_create_device = D3D11CreateDevice(pAdapter, D3D_DRIVER_TYPE_UNKNOWN, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &pDevice, nullptr, &pContext);
+        HRESULT hr_create_device = D3D11CreateDevice(adp, D3D_DRIVER_TYPE_UNKNOWN, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &dev, nullptr, &ctx);
         if (cfg.log_init_verbose) {
             std::cout << "[CAPTURE] D3D11CreateDevice hr=0x"
                       << std::hex << std::uppercase << static_cast<unsigned long>(hr_create_device)
@@ -70,10 +70,10 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
             throw std::runtime_error("Failed to create D3D11 device.");
         }
         // Raise DXGI GPU priority and reduce frame latency for this device
-        RaiseDxgiGpuPriorityAndLatency(pDevice, cfg.dxgi_gpu_prio, cfg.dxgi_max_latency);
+        RaiseDxgiGpuPriorityAndLatency(dev, cfg.dxgi_gpu_prio, cfg.dxgi_max_latency);
     }
     {
-        HRESULT hr_qi_output1 = pOutput->QueryInterface(__uuidof(IDXGIOutput1), (void**)&pOutput1);
+        HRESULT hr_qi_output1 = out->QueryInterface(__uuidof(IDXGIOutput1), (void**)&out1);
         if (cfg.log_init_verbose) {
             std::cout << "[CAPTURE] QueryInterface(IDXGIOutput1) hr=0x"
                       << std::hex << std::uppercase << static_cast<unsigned long>(hr_qi_output1)
@@ -83,7 +83,7 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
             throw std::runtime_error("Failed to query IDXGIOutput1.");
         }
     }
-    hr = pOutput1->DuplicateOutput(pDevice, &pDuplicator);
+    hr = out1->DuplicateOutput(dev, &dup);
     if (cfg.log_init_verbose) {
         std::cout << "[CAPTURE] DuplicateOutput hr=" << (FAILED(hr) ? "FAILED" : "OK") << std::endl;
     }
@@ -109,39 +109,39 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
     desc.MiscFlags = 0;
 
     HRESULT hr_local;
-    for (size_t i = 0; i < kStagingCount; ++i) {
-        hr_local = pDevice->CreateTexture2D(&desc, NULL, &staging_[i]);
+    for (size_t i = 0; i < kStageN; ++i) {
+        hr_local = dev->CreateTexture2D(&desc, NULL, &stage[i]);
         if (FAILED(hr_local)) {
             throw std::runtime_error("Failed to create staging texture[" + std::to_string(i) + "]");
         }
         D3D11_QUERY_DESC qd{}; qd.Query = D3D11_QUERY_EVENT; qd.MiscFlags = 0;
-        hr_local = pDevice->CreateQuery(&qd, &copy_done_queries_[i]);
+        hr_local = dev->CreateQuery(&qd, &copyQ[i]);
         if (FAILED(hr_local)) {
             throw std::runtime_error("Failed to create EVENT query for staging[" + std::to_string(i) + "]");
         }
     }
-    std::cout << "--- Screen capture initialized successfully (" << width << "x" << height << ") with " << kStagingCount << " staging buffers ---" << std::endl;
+    std::cout << "--- Screen capture initialized successfully (" << width << "x" << height << ") with " << kStageN << " staging buffers ---" << std::endl;
 
     // 捕获链路启动横幅（仅在启用报告时）
-    capture_reporter_.BootBanner(kStagingCount);
+    reporter.BootBanner(kStageN);
 }
 
 ScreenCapturer::~ScreenCapturer() {
     std::cout << "--- Cleaning up D3D resources... ---" << std::endl;
-    for (size_t i = 0; i < kStagingCount; ++i) {
-        SafeRelease(&staging_[i]);
-        SafeRelease(&copy_done_queries_[i]);
+    for (size_t i = 0; i < kStageN; ++i) {
+        SafeRelease(&stage[i]);
+        SafeRelease(&copyQ[i]);
     }
-    SafeRelease(&pDuplicator);
-    SafeRelease(&pOutput1);
-    SafeRelease(&pOutput);
-    SafeRelease(&pAdapter);
-    SafeRelease(&pFactory);
-    SafeRelease(&pContext);
-    SafeRelease(&pDevice);
+    SafeRelease(&dup);
+    SafeRelease(&out1);
+    SafeRelease(&out);
+    SafeRelease(&adp);
+    SafeRelease(&fac);
+    SafeRelease(&ctx);
+    SafeRelease(&dev);
 }
 
-bool ScreenCapturer::CaptureFrame(cv::Mat& frame, const cv::Rect& crop_region) {
+bool ScreenCapturer::capture(cv::Mat& frame, const cv::Rect& crop_region) {
     auto t_total_start = std::chrono::high_resolution_clock::now();
     double t_acquire_ms = 0.0, t_qi_ms = 0.0, t_copy_ms = 0.0, t_map_ms = 0.0, t_cvt_ms = 0.0, t_unmap_ms = 0.0, t_total_ms = 0.0;
 
@@ -149,18 +149,18 @@ bool ScreenCapturer::CaptureFrame(cv::Mat& frame, const cv::Rect& crop_region) {
     DXGI_OUTDUPL_FRAME_INFO frameInfo;
 
     auto t_acq_s = std::chrono::high_resolution_clock::now();
-    HRESULT hr = pDuplicator->AcquireNextFrame(cfg.capture_timeout_ms, &frameInfo, &pDesktopResource);
+    HRESULT hr = dup->AcquireNextFrame(cfg.capture_timeout_ms, &frameInfo, &pDesktopResource);
     auto t_acq_e = std::chrono::high_resolution_clock::now();
     t_acquire_ms = std::chrono::duration<double, std::milli>(t_acq_e - t_acq_s).count();
 
     if (hr == DXGI_ERROR_WAIT_TIMEOUT) {
-        if (try_serve_cache(frame)) {
-            ++stat_cache_reused_;
+        if (serveCache(frame)) {
+            ++statCacheRe;
             return true;
         }
     if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
             t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
-            accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
         }
         return false;
     }
@@ -168,7 +168,7 @@ bool ScreenCapturer::CaptureFrame(cv::Mat& frame, const cv::Rect& crop_region) {
         std::cerr << "AcquireNextFrame failed. HRESULT: 0x" << std::hex << hr << std::endl;
     if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
             t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
-            accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
         }
         return false;
     }
@@ -182,26 +182,26 @@ bool ScreenCapturer::CaptureFrame(cv::Mat& frame, const cv::Rect& crop_region) {
     if (FAILED(hr)) {
     if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
             t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
-            accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
         }
         return false;
     }
 
     UINT dirty_size = 0;
-    HRESULT hr_dirty = pDuplicator->GetFrameDirtyRects(0, nullptr, &dirty_size);
+    HRESULT hr_dirty = dup->GetFrameDirtyRects(0, nullptr, &dirty_size);
     if (SUCCEEDED(hr_dirty) && dirty_size == 0) {
-        bool served = try_serve_cache(frame);
+        bool served = serveCache(frame);
         SafeRelease(&pDesktopResource);
         SafeRelease(&pAcquiredDesktopImage);
-        pDuplicator->ReleaseFrame();
+        dup->ReleaseFrame();
         if (served) {
-            ++stat_dirty_skips_;
-            ++stat_cache_reused_;
+            ++statSkipDirty;
+            ++statCacheRe;
             return true;
         }
         t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
     if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
-            accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
         }
         return false;
     }
@@ -214,96 +214,96 @@ bool ScreenCapturer::CaptureFrame(cv::Mat& frame, const cv::Rect& crop_region) {
     sourceRegion.front = 0;
     sourceRegion.back = 1;
 
-    const size_t curr = frame_index_ % kStagingCount;
-    const size_t prev = (frame_index_ + kStagingCount - 1) % kStagingCount;
+    const size_t curr = idx % kStageN;
+    const size_t prev = (idx + kStageN - 1) % kStageN;
 
     auto t_copy_s = std::chrono::high_resolution_clock::now();
-    pContext->CopySubresourceRegion(staging_[curr], 0, 0, 0, 0, pAcquiredDesktopImage, 0, &sourceRegion);
+    ctx->CopySubresourceRegion(stage[curr], 0, 0, 0, 0, pAcquiredDesktopImage, 0, &sourceRegion);
     auto t_copy_e = std::chrono::high_resolution_clock::now();
     t_copy_ms = std::chrono::duration<double, std::milli>(t_copy_e - t_copy_s).count();
 
-    pContext->End(copy_done_queries_[curr]);
+    ctx->End(copyQ[curr]);
 
     SafeRelease(&pAcquiredDesktopImage);
-    pDuplicator->ReleaseFrame();
+    dup->ReleaseFrame();
 
     BOOL copy_done = FALSE;
-    HRESULT qhr = pContext->GetData(copy_done_queries_[prev], &copy_done, sizeof(copy_done), 0);
+    HRESULT qhr = ctx->GetData(copyQ[prev], &copy_done, sizeof(copy_done), 0);
     if (qhr != S_OK || !copy_done) {
-        ++stat_event_not_ready_;
-        bool served = try_serve_cache(frame);
-        if (served) ++stat_cache_reused_;
+        ++statEvtWait;
+        bool served = serveCache(frame);
+        if (served) ++statCacheRe;
         t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
     if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
-            accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
         }
-        frame_index_++;
+        idx++;
         return served;
     }
 
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     auto t_map_s = std::chrono::high_resolution_clock::now();
-    hr = pContext->Map(staging_[prev], 0, D3D11_MAP_READ, D3D11_MAP_FLAG_DO_NOT_WAIT, &mappedResource);
+    hr = ctx->Map(stage[prev], 0, D3D11_MAP_READ, D3D11_MAP_FLAG_DO_NOT_WAIT, &mappedResource);
     auto t_map_e = std::chrono::high_resolution_clock::now();
     t_map_ms = std::chrono::duration<double, std::milli>(t_map_e - t_map_s).count();
     if (hr == DXGI_ERROR_WAS_STILL_DRAWING) {
-        ++stat_map_still_drawing_;
-        bool served = try_serve_cache(frame);
-        if (served) ++stat_cache_reused_;
+        ++statStillDraw;
+        bool served = serveCache(frame);
+        if (served) ++statCacheRe;
         t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
     if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
-            accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
         }
-        frame_index_++;
+        idx++;
         return served;
     }
     if (FAILED(hr)) {
         t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
     if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
-            accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
         }
-        frame_index_++;
+        idx++;
         return false;
     }
 
     cv::Mat bgra_frame(crop_region.height, crop_region.width, CV_8UC4, mappedResource.pData, mappedResource.RowPitch);
     auto t_cvt_s = std::chrono::high_resolution_clock::now();
     cv::cvtColor(bgra_frame, frame, cv::COLOR_BGRA2BGR);
-    frame.copyTo(last_bgr_cache_);
+    frame.copyTo(cache);
     auto t_cvt_e = std::chrono::high_resolution_clock::now();
     t_cvt_ms = std::chrono::duration<double, std::milli>(t_cvt_e - t_cvt_s).count();
 
     auto t_unmap_s = std::chrono::high_resolution_clock::now();
-    pContext->Unmap(staging_[prev], 0);
+    ctx->Unmap(stage[prev], 0);
     auto t_unmap_e = std::chrono::high_resolution_clock::now();
     t_unmap_ms = std::chrono::duration<double, std::milli>(t_unmap_e - t_unmap_s).count();
 
     t_total_ms = std::chrono::duration<double, std::milli>(t_unmap_e - t_total_start).count();
-    frame_index_++;
+    idx++;
     if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
-        accumulate_and_maybe_print(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+        reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
     }
-    ++stat_success_;
+    ++statOk;
     return true;
 }
 
-bool ScreenCapturer::try_serve_cache(cv::Mat& out) {
-    if (!last_bgr_cache_.empty()) {
-        if (last_bgr_cache_.rows == out.rows && last_bgr_cache_.cols == out.cols && last_bgr_cache_.type() == out.type()) {
-            last_bgr_cache_.copyTo(out);
+bool ScreenCapturer::serveCache(cv::Mat& out) {
+    if (!cache.empty()) {
+        if (cache.rows == out.rows && cache.cols == out.cols && cache.type() == out.type()) {
+            cache.copyTo(out);
             return true;
         } else {
-            out = last_bgr_cache_.clone();
+            out = cache.clone();
             return true;
         }
     }
     return false;
 }
 
-void ScreenCapturer::accumulate_and_maybe_print(double t_acquire_ms, double t_qi_ms, double t_copy_ms,
+void ScreenCapturer::reportTimes(double t_acquire_ms, double t_qi_ms, double t_copy_ms,
                                     double t_map_ms, double t_cvt_ms, double t_unmap_ms, double t_total_ms) {
-    capture_reporter_.ReportStepTimings(
+    reporter.ReportStepTimings(
         t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms,
-        stat_dirty_skips_, stat_event_not_ready_, stat_map_still_drawing_, stat_cache_reused_, stat_success_
+        statSkipDirty, statEvtWait, statStillDraw, statCacheRe, statOk
     );
 }

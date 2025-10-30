@@ -35,7 +35,7 @@
 // 禁用进程 PriorityBoost，避免在系统内存压力下被降低优先级
 /* moved */
 
-// Forward declare Config for use in OverlayAnimator
+// Forward declare Config for use in OverlayAnim
 class Config;
 /* moved: MMCSS utilities now in MmcssUtil */
 /* moved */
@@ -106,15 +106,15 @@ public:
         od(cfg),
         mouse(),
         keys(cfg),
-        cropRect((cap.getWidth() - cfg.crop_size_px) / 2, (cap.getHeight() - cfg.crop_size_px) / 2, cfg.crop_size_px, cfg.crop_size_px),
+        cropRect((cap.w() - cfg.crop_size_px) / 2, (cap.h() - cfg.crop_size_px) / 2, cfg.crop_size_px, cfg.crop_size_px),
         center(cfg.crop_size_px / 2, cfg.crop_size_px / 2),
         overlayOn(cfg.enable_visual),
         latAgg(static_cast<size_t>(std::max(1, cfg.log_latency_every_n)))
     {
-        if (cap.getWidth() < cfg.crop_size_px || cap.getHeight() < cfg.crop_size_px) {
+        if (cap.w() < cfg.crop_size_px || cap.h() < cfg.crop_size_px) {
             throw std::runtime_error("Screen resolution is smaller than configured crop_size_px.");
         }
-        mouseFactor = (cfg.hfov_deg / static_cast<double>(cap.getWidth()))
+        mouseFactor = (cfg.hfov_deg / static_cast<double>(cap.w()))
             * (cfg.px_per_360 / 360.0);
         if (overlayOn) {
             cv::namedWindow(cfg.window_title, cv::WINDOW_AUTOSIZE);
@@ -141,7 +141,7 @@ public:
 
             // 1) 截屏计时
             auto t_cap_start = std::chrono::high_resolution_clock::now();
-            bool got = cap.CaptureFrame(frame, cropRect);
+            bool got = cap.capture(frame, cropRect);
             auto t_cap_end = std::chrono::high_resolution_clock::now();
             fl.capture_ms = std::chrono::duration<double, std::milli>(t_cap_end - t_cap_start).count();
             if (!got) {
@@ -345,7 +345,7 @@ int main() {
             boot_cfg.opt_report && boot_cfg.opt_report_system);
     }
 
-    OverlayAnimator overlay;
+    OverlayAnim overlay;
     // Disable process/thread power throttling and background limits as early as possible
     DisablePowerThrottlingForProcessAndThread();
     // Raise process and main thread priority early

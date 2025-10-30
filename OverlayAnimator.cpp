@@ -6,40 +6,40 @@
 #include <algorithm>
 #include <chrono>
 
-OverlayAnimator::OverlayAnimator() = default;
-OverlayAnimator::~OverlayAnimator() { stop(); }
+OverlayAnim::OverlayAnim() = default;
+OverlayAnim::~OverlayAnim() { stop(); }
 
-bool OverlayAnimator::start(const Config& cfg) {
-    if (running.load()) return true;
+bool OverlayAnim::start(const Config& cfg) {
+    if (alive.load()) return true;
     if (!cfg.overlay_anim) return false;
-    running.store(true);
-    thread = std::thread([this, &cfg]{ this->loop(cfg); });
+    alive.store(true);
+    th = std::thread([this, &cfg]{ this->run(cfg); });
     return true;
 }
-void OverlayAnimator::stop() {
-    if (!running.load()) return;
-    running.store(false);
-    if (hwnd) PostMessage(hwnd, WM_CLOSE, 0, 0);
-    if (thread.joinable()) thread.join();
-    hwnd = nullptr;
+void OverlayAnim::stop() {
+    if (!alive.load()) return;
+    alive.store(false);
+    if (wnd) PostMessage(wnd, WM_CLOSE, 0, 0);
+    if (th.joinable()) th.join();
+    wnd = nullptr;
 }
-LRESULT CALLBACK OverlayAnimator::WindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+LRESULT CALLBACK OverlayAnim::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (msg == WM_DESTROY) {
         PostQuitMessage(0);
         return 0;
     }
     return DefWindowProc(hWnd, msg, wParam, lParam);
 }
-void OverlayAnimator::loop(const Config& cfg) {
+void OverlayAnim::run(const Config& cfg) {
     // 线程启动即绑定（如开启）
     if (cfg.enable_affinity && cfg.affinity_overlay_mask) {
         ApplyThreadAffinityMask(cfg.affinity_overlay_mask,
             cfg.opt_report && cfg.opt_report_system);
     }
     HINSTANCE hInst = GetModuleHandle(NULL);
-    const wchar_t* cls = kClass;
+    const wchar_t* cls = kCls;
     WNDCLASSEXW wc{ sizeof(WNDCLASSEXW) };
-    wc.lpfnWndProc = WindowProc;
+    wc.lpfnWndProc = WndProc;
     wc.hInstance = hInst;
     wc.lpszClassName = cls;
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
@@ -50,10 +50,10 @@ void OverlayAnimator::loop(const Config& cfg) {
     int y = cfg.overlay_y;
     HWND hWnd = CreateWindowExW(WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
                                 cls, L"", WS_POPUP, x, y, size, size, nullptr, nullptr, hInst, nullptr);
-    if (!hWnd) { running.store(false); return; }
+    if (!hWnd) { alive.store(false); return; }
     // Don't activate
     ShowWindow(hWnd, SW_SHOWNA);
-    hwnd = hWnd;
+    wnd = hWnd;
 
     // Prepare a 1x1 or 2x2 DIB section for per-pixel alpha updates
     HDC sdc = GetDC(nullptr);
@@ -77,7 +77,7 @@ void OverlayAnimator::loop(const Config& cfg) {
 
     // Animation loop: toggle pixel alpha/color every interval
     uint32_t tick = 0;
-    while (running.load()) {
+    while (alive.load()) {
         // write pixels
         uint32_t c1 = 0x01010101u * ((tick & 1) ? 0x01 : 0x02); // tiny change in alpha/color
         for (int i = 0; i < size * size; ++i) {

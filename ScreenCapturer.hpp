@@ -9,7 +9,7 @@ class Config;
 class ScreenCapturer {
 public:
     // Reporting helper
-    metrics::CaptureReporting capture_reporter_;
+    metrics::CaptureReporting reporter;
 public:
     ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_height);
     ~ScreenCapturer();
@@ -17,38 +17,38 @@ public:
     ScreenCapturer(const ScreenCapturer&) = delete;
     ScreenCapturer& operator=(const ScreenCapturer&) = delete;
 
-    bool CaptureFrame(cv::Mat& frame, const cv::Rect& crop_region);
+    bool capture(cv::Mat& frame, const cv::Rect& crop_region);
 
-    int getWidth() const { return width; }
-    int getHeight() const { return height; }
+    int w() const { return width; }
+    int h() const { return height; }
 
 private:
-    bool try_serve_cache(cv::Mat& out);
-    void accumulate_and_maybe_print(double t_acquire_ms, double t_qi_ms, double t_copy_ms,
+    bool serveCache(cv::Mat& out);
+    void reportTimes(double t_acquire_ms, double t_qi_ms, double t_copy_ms,
                                     double t_map_ms, double t_cvt_ms, double t_unmap_ms, double t_total_ms);
 
 private:
     const Config& cfg;
 
-    static constexpr size_t kStagingCount = 2;
-    std::array<struct ID3D11Texture2D*, kStagingCount> staging_{};
-    std::array<struct ID3D11Query*,     kStagingCount> copy_done_queries_{};
-    size_t frame_index_ = 0;
-    cv::Mat last_bgr_cache_;
+    static constexpr size_t kStageN = 2;
+    std::array<struct ID3D11Texture2D*, kStageN> stage{};
+    std::array<struct ID3D11Query*,     kStageN> copyQ{};
+    size_t idx = 0;
+    cv::Mat cache;
 
-    size_t stat_dirty_skips_ = 0;
-    size_t stat_event_not_ready_ = 0;
-    size_t stat_map_still_drawing_ = 0;
-    size_t stat_cache_reused_ = 0;
-    size_t stat_success_ = 0;
+    size_t statSkipDirty = 0;
+    size_t statEvtWait = 0;
+    size_t statStillDraw = 0;
+    size_t statCacheRe = 0;
+    size_t statOk = 0;
 
-    struct IDXGIFactory1* pFactory = nullptr;
-    struct IDXGIAdapter1* pAdapter = nullptr;
-    struct IDXGIOutput* pOutput = nullptr;
-    struct IDXGIOutput1* pOutput1 = nullptr;
-    struct ID3D11Device* pDevice = nullptr;
-    struct ID3D11DeviceContext* pContext = nullptr;
-    struct IDXGIOutputDuplication* pDuplicator = nullptr;
+    struct IDXGIFactory1* fac = nullptr;
+    struct IDXGIAdapter1* adp = nullptr;
+    struct IDXGIOutput* out = nullptr;
+    struct IDXGIOutput1* out1 = nullptr;
+    struct ID3D11Device* dev = nullptr;
+    struct ID3D11DeviceContext* ctx = nullptr;
+    struct IDXGIOutputDuplication* dup = nullptr;
     int width = 0;
     int height = 0;
 };
