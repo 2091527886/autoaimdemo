@@ -55,7 +55,7 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
     }
     hr = out1->DuplicateOutput(dev, &dup);
     if (FAILED(hr)) {
-        lg::e() << "DuplicateOutput failed. HRESULT=" << lg::hrx(hr) << '\n';
+        lg::ok_or_hrfail_if(true, P_C, "DuplicateOutput", hr, SUCCEEDED(hr));
         throw std::runtime_error("Failed to create output duplication.");
     }
 
@@ -85,7 +85,7 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
             throw std::runtime_error("Failed to create EVENT query for staging[" + std::to_string(i) + "]");
         }
     }
-    LOG_IF(cfg.log_init_verbose, lg::o() << P_C "Ready " << width << "x" << height << ", staging=" << kStageN << '\n');
+    LOG_IF(cfg.log_init_verbose, lg::o() << P_C "Ready " << width << "x" << height << ", staging=" << kStageN << lg::endl);
 
     // 捕获链路启动横幅（仅在启用报告时）
     reporter.BootBanner(kStageN);
@@ -111,11 +111,11 @@ void ScreenCapturer::dbgTick() {
     n++;
     int m = std::max(1, cfg.capture_debug_every_n);
     if (n % static_cast<size_t>(m) == 0) {
-        lg::o() << P_C "dbg: dirtySkip=" << statSkipDirty
-                << " evtWait=" << statEvtWait
-                << " stillDraw=" << statStillDraw
-                << " cacheRe=" << statCacheRe
-                << " ok=" << statOk << '\n';
+        lg::o() << P_C "dbg ds=" << statSkipDirty
+                << " ew=" << statEvtWait
+                << " sd=" << statStillDraw
+                << " cr=" << statCacheRe
+                << " ok=" << statOk << lg::endl;
         // 不清零，保持累计视角
     }
 }
@@ -144,7 +144,7 @@ bool ScreenCapturer::capture(cv::Mat& frame, const cv::Rect& crop_region) {
         return false;
     }
     if (FAILED(hr)) {
-        lg::e() << "AcquireNextFrame failed. HRESULT: " << lg::hrx(hr) << '\n';
+        lg::ok_or_hrfail_if(true, P_C, "AcquireNextFrame", hr, SUCCEEDED(hr));
     if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
             t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
             reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);

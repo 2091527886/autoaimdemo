@@ -30,18 +30,18 @@ public:
 
     void BootBanner(size_t stagingCount) const {
         if (cfg_.opt_report && cfg_.opt_report_capture) {
-            lg::o() << P_B "Capture pipeline: "
-                      << "dirty-skip=ON"
-                      << " | staging-buffers=" << stagingCount
-                      << " | event-query=ON"
-                      << " | map=DO_NOT_WAIT"
-                      << " | cache-reuse=ON"
-                      << std::endl;
+            lg::o() << P_B "Capture: "
+                      << "ds=ON"
+                      << " | stg=" << stagingCount
+                      << " | evt=ON"
+                      << " | map=DNW"
+                      << " | cr=ON"
+                      << lg::endl;
             lg::o() << P_B "Timing: "
-                      << "step-timing=" << (cfg_.capture_timing ? "ON" : "OFF")
-                      << " | interval=" << cfg_.capture_timing_every_n
-                      << " | success-only=" << (cfg_.capture_timing_on_success ? "ON" : "OFF")
-                      << std::endl;
+                      << "step=" << (cfg_.capture_timing ? "ON" : "OFF")
+                      << " | int=" << cfg_.capture_timing_every_n
+                      << " | succ-only=" << (cfg_.capture_timing_on_success ? "ON" : "OFF")
+                      << lg::endl;
         }
     }
 
@@ -79,16 +79,16 @@ public:
         }
         if (should_print) {
             double n = static_cast<double>(counter_);
-            lg::o() << std::fixed << std::setprecision(3)
-                      << P_CP "over " << counter_ << " frames"
-                      << " | acquire=" << (acc_acq_ / n) << " ms"
-                      << " | qi="      << (acc_qi_  / n) << " ms"
-                      << " | copy="    << (acc_copy_/ n) << " ms"
-                      << " | map="     << (acc_map_ / n) << " ms"
-                      << " | cvt="     << (acc_cvt_ / n) << " ms"
-                      << " | unmap="   << (acc_unmap_/n) << " ms"
-                      << " | total="   << (acc_total_/n) << " ms"
-                      << std::endl;
+            lg::o() << lg::fx3
+                      << lg::ovr(P_CP, counter_)
+                      << lg::fld("acq",  (acc_acq_ / n),  "ms")
+                      << lg::fld("qi",   (acc_qi_  / n),  "ms")
+                      << lg::fld("cpy",  (acc_copy_/ n),  "ms")
+                      << lg::fld("map",  (acc_map_ / n),  "ms")
+                      << lg::fld("cvt",  (acc_cvt_ / n),  "ms")
+                      << lg::fld("unm",  (acc_unmap_/n),  "ms")
+                      << lg::fld("tot",  (acc_total_/n),  "ms")
+                      << lg::endl << lg::df;
 
             if (cfg_.opt_report && cfg_.opt_report_capture) {
                 bool should_print_opt = false;
@@ -98,14 +98,14 @@ public:
                 if (should_print_opt) {
                     size_t total = static_cast<size_t>(opt_counter_);
                     auto pct = [&](size_t v){ return total ? (100.0 * double(v) / double(total)) : 0.0; };
-                    lg::o() << std::fixed << std::setprecision(1)
-                              << P_CO "over " << total << " frames"
-                              << " | dirty-skip="        << stat_dirty_skips_        << " (" << pct(stat_dirty_skips_)        << "%)"
-                              << " | event-not-ready="   << stat_event_not_ready_    << " (" << pct(stat_event_not_ready_)    << "%)"
-                              << " | map-still-drawing=" << stat_map_still_drawing_  << " (" << pct(stat_map_still_drawing_)  << "%)"
-                              << " | cache-reused="      << stat_cache_reused_       << " (" << pct(stat_cache_reused_)       << "%)"
-                              << " | success="           << stat_success_            << " (" << pct(stat_success_)            << "%)"
-                              << std::endl;
+                    lg::o() << lg::fx1
+                              << lg::ovr(P_CO, total)
+                              << " | ds="  << stat_dirty_skips_       << " (" << pct(stat_dirty_skips_)       << "%)"
+                              << " | evt=" << stat_event_not_ready_   << " (" << pct(stat_event_not_ready_)   << "%)"
+                              << " | sd="  << stat_map_still_drawing_ << " (" << pct(stat_map_still_drawing_) << "%)"
+                              << " | cr="  << stat_cache_reused_      << " (" << pct(stat_cache_reused_)      << "%)"
+                              << " | ok="  << stat_success_           << " (" << pct(stat_success_)           << "%)"
+                              << lg::endl << lg::df;
                     opt_counter_ = 0;
                     stat_dirty_skips_ = stat_event_not_ready_ = stat_map_still_drawing_ = stat_cache_reused_ = stat_success_ = 0;
                 }
@@ -130,12 +130,12 @@ struct SystemBootReporting {
     static void PrintOverlayBanner(const Config& cfg, bool started) {
         if (!cfg.opt_report || !cfg.opt_report_system) return;
         if (started) {
-            lg::o() << P_B "Overlay animator=ON (size=" << cfg.overlay_px
-                      << ", interval=" << cfg.overlay_interval_100ns << "x100ns, spin="
+            lg::o() << P_B "Overlay=ON (px=" << cfg.overlay_px
+                      << ", int=" << cfg.overlay_interval_100ns << "x100ns, spin="
                       << cfg.overlay_spin_us << "us, pos="
-                      << cfg.overlay_x << "," << cfg.overlay_y << ")" << std::endl;
+                      << cfg.overlay_x << "," << cfg.overlay_y << ")" << lg::endl;
         } else {
-            lg::o() << P_B "Overlay animator=OFF" << std::endl;
+            lg::o() << P_B "Overlay=OFF" << lg::endl;
         }
     }
 
@@ -143,7 +143,7 @@ struct SystemBootReporting {
     static void PrintSchedulingBanner(const Config& cfg, HANDLE hMmcss) {
         if (!cfg.opt_report || !cfg.opt_report_system) return;
         lg::wo() << WP_B L"Scheduling: MMCSS=" << (hMmcss?L"ON":L"OFF")
-                   << L" (task=" << cfg.mmcss_task << L", prio=" << (int)cfg.mmcss_prio << L")" << std::endl;
+                   << L" (task=" << cfg.mmcss_task << L", prio=" << (int)cfg.mmcss_prio << L")" << lg::wendl;
     }
 #endif
 };
@@ -168,9 +168,7 @@ public:
         if (!throughput.empty()) {
             const std::string& cpu_latency = std::get<1>(report);
             const std::string& gpu_latency = std::get<2>(report);
-            lg::o() << P_T << throughput << '\n'
-                      << P_T << cpu_latency << '\n'
-                      << P_T << gpu_latency << std::endl;
+            lg::ml(P_T, throughput, cpu_latency, gpu_latency);
         }
     }
 

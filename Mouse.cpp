@@ -4,7 +4,7 @@
 
 // 仅迁移，不改变逻辑/实现细节
 Mouse::Mouse() {
-    lg::o() << P_M "Initializing driver..." << std::endl;
+    lg::o() << P_M "Init driver" << lg::endl;
     dll_ = LoadLibrary(L"IbInputSimulator.dll");
     if (!dll_) {
         throw std::runtime_error(P_M "Load IbInputSimulator.dll failed");
@@ -26,22 +26,20 @@ Mouse::Mouse() {
         dll_ = nullptr;
         throw std::runtime_error(P_M "Init failed: " + std::to_string(static_cast<int>(error)));
     }
-    lg::o() << P_M "Driver ready" << std::endl;
+    lg::o() << P_M "Driver OK" << lg::endl;
 }
 
 Mouse::~Mouse() {
     if (dll_) {
         if (destroy_) destroy_();
         FreeLibrary(dll_);
-        lg::o() << P_M "Driver cleaned" << std::endl;
+        lg::o() << P_M "Driver bye" << lg::endl;
     }
 }
 
 void Mouse::Move(int dx, int dy) {
     if (move_) {
         bool ok = move_(dx, dy, Send::MoveMode::Relative);
-        if (!ok) {
-            lg::e() << P_M "Move failed dx=" << dx << " dy=" << dy << std::endl;
-        }
+        lg::ok_or_werr_msg(true, P_M, std::string("mv dx=") + std::to_string(dx) + " dy=" + std::to_string(dy), ok);
     }
 }

@@ -60,7 +60,7 @@ public:
         if (vis) {
             cv::namedWindow(c.window_title, cv::WINDOW_AUTOSIZE);
         }
-        lg::o() << "--- Detect on centered " << c.crop_size_px << "x" << c.crop_size_px << " region. ---" << std::endl;
+        lg::o() << "Detect center " << c.crop_size_px << "x" << c.crop_size_px << lg::endl;
         help();
 
         // 初始化 PID 控制器（像素域）。输出再乘以 mouse_correction_factor 转为鼠标单位。
@@ -129,7 +129,7 @@ public:
             }
             char key = static_cast<char>(cv::waitKey(1));
             if (key == 27) { // ESC
-                lg::o() << "\nESC pressed. Exiting..." << std::endl;
+                lg::o() << lg::nl << P_I "ESC, exit" << lg::endl;
                 break;
             }
             if (key == 'v' || key == 'V') {
@@ -140,7 +140,7 @@ public:
 
 private:
     void help() {
-        lg::o() << "\n--- Controls ---" << std::endl;
+        lg::o() << lg::nl << "--- Controls ---" << lg::endl;
 
     }
 
@@ -235,7 +235,7 @@ private:
         if (tTot > 0) {
             double smoothed_fps = 1000.0 / tTot;
             std::ostringstream stats_stream;
-            stats_stream << std::fixed << std::setprecision(1) << "FPS: " << smoothed_fps;
+            stats_stream << lg::fx1 << "FPS: " << smoothed_fps << lg::df;
             cv::putText(img, stats_stream.str(), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 255), 2);
         }
         cv::imshow(c.window_title, img);
@@ -245,11 +245,11 @@ private:
         vis = !vis;
         if (vis) {
             cv::namedWindow(c.window_title, cv::WINDOW_AUTOSIZE);
-            lg::o() << "\n[INFO] Visualization toggled ON." << std::endl;
+            lg::o() << lg::nl << P_I "Vis ON" << lg::endl;
         }
         else {
             cv::destroyAllWindows();
-            lg::o() << "\n[INFO] Visualization toggled OFF. Console stats will continue." << std::endl;
+            lg::o() << lg::nl << P_I "Vis OFF" << lg::endl;
         }
     }
 
@@ -321,13 +321,11 @@ int main() {
     }
     catch (const std::exception& e) {
         MmcssDisable(hMmcss);
-        lg::e() << "\n\n[FATAL ERROR] An unrecoverable error occurred: " << e.what() << std::endl;
-        lg::e() << "Please check the following:\n"
-            << "Press Enter to exit." << std::endl;
+        lg::ml(P_F, std::string("Fatal: ") + e.what(), "Check issues.", "Press Enter to exit.");
         std::cin.get();
         return -1;
     }
-    lg::o() << "\nProgram finished successfully." << std::endl;
+    lg::o() << lg::nl << P_I "Done" << lg::endl;
     overlay.stop();
     MmcssDisable(hMmcss);
     return 0;

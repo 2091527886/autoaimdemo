@@ -49,13 +49,13 @@ private:
         auto [mou_avg, mou_min, mou_max] = stat([](const FrameLat& f){ return f.mou_ms;   });
         auto [loo_avg, loo_min, loo_max] = stat([](const FrameLat& f){ return f.loop_ms;    });
 
-        lg::o() << std::fixed << std::setprecision(2)
-                  << P_L "over " << buf.size() << " frames"
-                  << " | capture ms avg/min/max: " << cap_avg << "/" << cap_min << "/" << cap_max
-                  << " | detect: " << det_avg << "/" << det_min << "/" << det_max
-                  << " | mouse: "  << mou_avg << "/" << mou_min << "/" << mou_max
-                  << " | loop: "   << loo_avg << "/" << loo_min << "/" << loo_max
-                  << std::endl;
+        lg::o() << lg::fx2
+                  << lg::ovr(P_L, buf.size())
+                  << " | cap " << cap_avg << "/" << cap_min << "/" << cap_max
+                  << " | det " << det_avg << "/" << det_min << "/" << det_max
+                  << " | mou " << mou_avg << "/" << mou_min << "/" << mou_max
+                  << " | loop " << loo_avg << "/" << loo_min << "/" << loo_max
+                  << lg::endl << lg::df;
 
         buf.clear();
     }
