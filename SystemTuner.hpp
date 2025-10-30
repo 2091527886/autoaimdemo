@@ -10,8 +10,6 @@
 #include <dxgi1_2.h>
 #include <cstdint>
 #include <vector>
-#include <iostream>
-
 #include "Log.hpp"
 
 // ---- Process/Thread Priority (from SystemPriority) ----
@@ -22,7 +20,6 @@ void SetProcPrioBoost(bool enable, bool log = true);
 void SetProcPrioBoostDisabled(bool log = true);
 
 // ---- Thread Affinity (from ThreadAffinity) ----
-uint64_t coreMask(const std::vector<unsigned>& cores);
 bool setAffinity(uint64_t mask, bool log = true);
 
 // ---- Power Throttling (from PowerThrottling) ----

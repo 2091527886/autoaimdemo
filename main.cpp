@@ -55,13 +55,11 @@ class Config;
 #endif
 
 // Input Simulator (确保头文件在项目路径中)
-#include "InputSimulator.hpp"
 #include "Config.hpp"
 #include "Timing.hpp"
 #include "PidController.hpp"
 #include "SystemTuner.hpp"
 #include "Reporting.hpp"
-#include "ComHelpers.hpp"
 #include "Detection.hpp"
 
 // Forward Declarations

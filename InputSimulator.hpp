@@ -21,30 +21,3 @@ namespace Send {
     };
 }
 
-// 仅改名，不改变逻辑/实现；该类当前未在外部使用
-class ISim {
-public:
-    ISim();
-    ~ISim();
-
-    Send::Error init(Send::SendType type);
-    // 相对移动
-    void move(int dx, int dy);
-    // 绝对移动接口暂不提供（原注释保留意图）
-    // void moveAbs(int x, int y);
-
-private:
-    HMODULE dll_;
-
-    // 函数指针类型（简洁命名）
-    using SendInitFn = Send::Error(__stdcall*)(Send::SendType, Send::InitFlags, void*);
-    using SendDestroyFn = void(__stdcall*)();
-    using SendMouseMoveFn = bool(__stdcall*)(int, int, Send::MoveMode);
-
-    // 函数指针成员
-    SendInitFn init_;
-    SendDestroyFn destroy_;
-    SendMouseMoveFn move_;
-
-    bool ready_;
-};

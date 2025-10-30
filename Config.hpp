@@ -8,8 +8,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
-#include "SystemTuner.hpp"
-
 // Legacy alias macros removed
 // Fields
 
