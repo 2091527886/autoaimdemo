@@ -341,7 +341,7 @@ int main() {
     // 从环境变量读取可选亲和配置
     boot_cfg.load_affinity_env();
     if (boot_cfg.enable_affinity && boot_cfg.affinity_main_mask) {
-        ApplyThreadAffinityMask(boot_cfg.affinity_main_mask,
+        setAffinity(boot_cfg.affinity_main_mask,
             boot_cfg.opt_report && boot_cfg.opt_report_system);
     }
 

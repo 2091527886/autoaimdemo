@@ -5,5 +5,5 @@
 #include <iostream>
 
 // Affinity helpers (migrated from Config.hpp)
-uint64_t BuildMaskFromCores(const std::vector<unsigned>& cores);
-bool ApplyThreadAffinityMask(uint64_t desiredMask, bool log=true);
+uint64_t coreMask(const std::vector<unsigned>& cores);
+bool setAffinity(uint64_t mask, bool log=true);
