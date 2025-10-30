@@ -6,7 +6,7 @@
 #include <string>
 #include <tuple>
 
-#include "../Config.hpp"
+#include "Config.hpp"
 
 #ifdef _WIN32
 #include <windows.h>

@@ -2,7 +2,7 @@
 #include "Config.hpp"
 #include "DxgiTuning.hpp"
 #include "ComHelpers.hpp"
-#include "metrics/Reporting.hpp"
+#include "Reporting.hpp"
 
 #include <array>
 #include <chrono>

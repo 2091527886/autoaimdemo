@@ -64,7 +64,7 @@ void DisableMmcss(HANDLE h);
 #include "MmcssUtil.hpp"
 #include "DxgiTuning.hpp"
 #include "ThreadAffinity.hpp"
-#include "metrics/Reporting.hpp"
+#include "Reporting.hpp"
 #include "ComHelpers.hpp"
 #include "Detection.hpp"
 
@@ -72,7 +72,7 @@ void DisableMmcss(HANDLE h);
 struct TimingDetails;
 class Config;
 class ScreenCapturer;
-class ObjectDetector;
+class ObjDet;
 class Mouse;
 class AimAssistant;
 
@@ -88,14 +88,14 @@ class AimAssistant;
 #include "OverlayAnimator.hpp"
 #include "Mouse.hpp"
 #include "HotkeyManager.hpp"
-#include "ObjectDetector.hpp"
+#include "ObjDet.hpp"
 #include "ScreenCapturer.hpp"
 
 // --- 3. 屏幕捕捉器 (ScreenCapturer) - 优化版本 ---
 // (moved to ScreenCapturer.hpp/.cpp)
 
-// --- 4. 目标检测器 (ObjectDetector) ---
-/* moved to ObjectDetector.hpp/.cpp */
+// --- 4. 目标检测器 (ObjDet) ---
+/* moved to ObjDet.hpp/.cpp */
 
 // --- 5. 核心协调器 (AimAssistant) ---
 class AimAssistant {
@@ -103,7 +103,7 @@ public:
     AimAssistant()
         : cfg(),
         cap(cfg, cfg.crop_size_px, cfg.crop_size_px), // 传递 cfg + crop_size
-        det(cfg),
+        od(cfg),
         mouse(),
         keys(cfg),
         cropRect((cap.getWidth() - cfg.crop_size_px) / 2, (cap.getHeight() - cfg.crop_size_px) / 2, cfg.crop_size_px, cfg.crop_size_px),
@@ -156,7 +156,7 @@ public:
 
             // 2) 检测计时（外层整体）
             auto t_det_start = std::chrono::high_resolution_clock::now();
-            det.Detect(frame, dets, cfg, tm);
+            od.detect(frame, dets, cfg, tm);
             auto t_det_end = std::chrono::high_resolution_clock::now();
             fl.detect_ms = std::chrono::duration<double, std::milli>(t_det_end - t_det_start).count();
 
@@ -314,7 +314,7 @@ private:
 
     Config cfg;
     ScreenCapturer cap;
-    ObjectDetector det;
+    ObjDet od;
     Mouse mouse;
     HotkeyManager keys;
     const cv::Rect cropRect;

@@ -2,7 +2,7 @@
 
 #include <array>
 #include <opencv2/opencv.hpp>
-#include "metrics/Reporting.hpp"
+#include "Reporting.hpp"
 
 class Config;
 

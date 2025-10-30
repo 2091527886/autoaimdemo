@@ -63,7 +63,7 @@ add_executable(aimassistant
   
   
   
-  ObjectDetector.cpp
+  ObjDet.cpp
   ScreenCapturer.cpp
 )
 
