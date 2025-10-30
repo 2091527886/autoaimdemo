@@ -123,10 +123,10 @@ public:
         showHelp();
 
         // 初始化 PID 控制器（像素域）。输出再乘以 mouse_correction_factor 转为鼠标单位。
-        pidX.SetGains(cfg.pid_kp_x, cfg.pid_ki_x, cfg.pid_kd_x);
-        pidX.SetLimits(cfg.pid_output_limit, cfg.pid_integral_limit);
-        pidY.SetGains(cfg.pid_kp_y, cfg.pid_ki_y, cfg.pid_kd_y);
-        pidY.SetLimits(cfg.pid_output_limit, cfg.pid_integral_limit);
+        pidX.setK(cfg.pid_kp_x, cfg.pid_ki_x, cfg.pid_kd_x);
+        pidX.setLim(cfg.pid_output_limit, cfg.pid_integral_limit);
+        pidY.setK(cfg.pid_kp_y, cfg.pid_ki_y, cfg.pid_kd_y);
+        pidY.setLim(cfg.pid_output_limit, cfg.pid_integral_limit);
     }
 
     ~AimAssistant() {
@@ -222,8 +222,8 @@ private:
         // 若无目标或未按住按键：释放 PID 积分，避免历史积分殘留
         bool smooth_pressed = keys.SmoothPressed();
         if (!target || !smooth_pressed) {
-            pidX.Reset();
-            pidY.Reset();
+            pidX.reset();
+            pidY.reset();
             // 仍保留单次 F8 逻辑
             if (!target) return;
         }
@@ -237,8 +237,8 @@ private:
             double err_y = static_cast<double>(target_point.y - center.y);
 
             // PID 在像素域输出，再乘鼠标校正因子转为鼠标单位
-            double out_x_pix = pidX.Update(err_x, dt);
-            double out_y_pix = pidY.Update(err_y, dt);
+            double out_x_pix = pidX.step(err_x, dt);
+            double out_y_pix = pidY.step(err_y, dt);
             int move_x = static_cast<int>(out_x_pix * mouseFactor);
             int move_y = static_cast<int>(out_y_pix * mouseFactor);
 
