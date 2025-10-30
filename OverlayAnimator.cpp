@@ -1,6 +1,6 @@
 #include "OverlayAnimator.hpp"
 #include "Config.hpp"
-#include "ThreadAffinity.hpp"
+#include "SystemTuner.hpp"
 
 #include <iostream>
 #include <algorithm>

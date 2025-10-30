@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
-#include "ThreadAffinity.hpp"
+#include "SystemTuner.hpp"
 
 // Legacy alias macros removed
 // Fields

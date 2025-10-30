@@ -40,7 +40,6 @@
 class Config;
 /* moved: MMCSS utilities now in MmcssUtil */
 /* moved */
-void MmcssDisable(HANDLE h);
 /* moved */
 
 // TensorRT-YOLO
@@ -60,11 +59,7 @@ void MmcssDisable(HANDLE h);
 #include "Config.hpp"
 #include "Timing.hpp"
 #include "PidController.hpp"
-#include "SystemPriority.hpp"
-#include "PowerThrottling.hpp"
-#include "MmcssUtil.hpp"
-#include "DxgiTuning.hpp"
-#include "ThreadAffinity.hpp"
+#include "SystemTuner.hpp"
 #include "Reporting.hpp"
 #include "ComHelpers.hpp"
 #include "Detection.hpp"

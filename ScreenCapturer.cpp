@@ -1,6 +1,6 @@
 #include "ScreenCapturer.hpp"
 #include "Config.hpp"
-#include "DxgiTuning.hpp"
+#include "SystemTuner.hpp"
 #include "ComHelpers.hpp"
 #include "Reporting.hpp"
 
