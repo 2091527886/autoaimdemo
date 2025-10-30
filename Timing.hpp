@@ -33,7 +33,7 @@ public:
     void push(const FrameLat& f) {
         buf.push_back(f);
         if (buf.size() >= wnd) {
-            print_and_clear();
+            printClear();
         }
     }
 
