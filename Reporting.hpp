@@ -1,6 +1,7 @@
 #pragma once
 #include <cstddef>
 #include <iostream>
+#include "Log.hpp"
 #include <iomanip>
 #include <algorithm>
 #include <string>
@@ -22,14 +23,14 @@ public:
 
     void BootBanner(size_t stagingCount) const {
         if (cfg_.opt_report && cfg_.opt_report_capture) {
-            std::cout << "[BOOT] Capture pipeline: "
+            lg::o() << "[BOOT] Capture pipeline: "
                       << "dirty-skip=ON"
                       << " | staging-buffers=" << stagingCount
                       << " | event-query=ON"
                       << " | map=DO_NOT_WAIT"
                       << " | cache-reuse=ON"
                       << std::endl;
-            std::cout << "[BOOT] Timing: "
+            lg::o() << "[BOOT] Timing: "
                       << "step-timing=" << (cfg_.capture_timing ? "ON" : "OFF")
                       << " | interval=" << cfg_.capture_timing_every_n
                       << " | success-only=" << (cfg_.capture_timing_on_success ? "ON" : "OFF")
@@ -71,7 +72,7 @@ public:
         }
         if (should_print) {
             double n = static_cast<double>(counter_);
-            std::cout << std::fixed << std::setprecision(3)
+            lg::o() << std::fixed << std::setprecision(3)
                       << "[CAPTURE PERF] over " << counter_ << " frames"
                       << " | acquire=" << (acc_acq_ / n) << " ms"
                       << " | qi="      << (acc_qi_  / n) << " ms"
@@ -90,7 +91,7 @@ public:
                 if (should_print_opt) {
                     size_t total = static_cast<size_t>(opt_counter_);
                     auto pct = [&](size_t v){ return total ? (100.0 * double(v) / double(total)) : 0.0; };
-                    std::cout << std::fixed << std::setprecision(1)
+                    lg::o() << std::fixed << std::setprecision(1)
                               << "[CAPTURE OPT] over " << total << " frames"
                               << " | dirty-skip="        << stat_dirty_skips_        << " (" << pct(stat_dirty_skips_)        << "%)"
                               << " | event-not-ready="   << stat_event_not_ready_    << " (" << pct(stat_event_not_ready_)    << "%)"
@@ -122,19 +123,19 @@ struct SystemBootReporting {
     static void PrintOverlayBanner(const Config& cfg, bool started) {
         if (!cfg.opt_report || !cfg.opt_report_system) return;
         if (started) {
-            std::cout << "[BOOT] Overlay animator=ON (size=" << cfg.overlay_px
+            lg::o() << "[BOOT] Overlay animator=ON (size=" << cfg.overlay_px
                       << ", interval=" << cfg.overlay_interval_100ns << "x100ns, spin="
                       << cfg.overlay_spin_us << "us, pos="
                       << cfg.overlay_x << "," << cfg.overlay_y << ")" << std::endl;
         } else {
-            std::cout << "[BOOT] Overlay animator=OFF" << std::endl;
+            lg::o() << "[BOOT] Overlay animator=OFF" << std::endl;
         }
     }
 
 #ifdef _WIN32
     static void PrintSchedulingBanner(const Config& cfg, HANDLE hMmcss) {
         if (!cfg.opt_report || !cfg.opt_report_system) return;
-        std::wcout << L"[BOOT] Scheduling: MMCSS=" << (hMmcss?L"ON":L"OFF")
+        lg::wo() << L"[BOOT] Scheduling: MMCSS=" << (hMmcss?L"ON":L"OFF")
                    << L" (task=" << cfg.mmcss_task << L", prio=" << (int)cfg.mmcss_prio << L")" << std::endl;
     }
 #endif
@@ -160,7 +161,7 @@ public:
         if (!throughput.empty()) {
             const std::string& cpu_latency = std::get<1>(report);
             const std::string& gpu_latency = std::get<2>(report);
-            std::cout << "[TRT-YOLO PERF] " << throughput << '\n'
+            lg::o() << "[TRT-YOLO PERF] " << throughput << '\n'
                       << "[TRT-YOLO PERF] " << cpu_latency << '\n'
                       << "[TRT-YOLO PERF] " << gpu_latency << std::endl;
         }

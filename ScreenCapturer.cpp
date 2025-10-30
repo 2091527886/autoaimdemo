@@ -8,6 +8,7 @@
 #include <chrono>
 #include <stdexcept>
 #include <iostream>
+#include "Log.hpp"
 
 // Windows & DirectX
 #include <windows.h>
@@ -19,15 +20,15 @@
 
 ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_height)
     : cfg(cfg_ref), reporter(cfg_ref) {
-    if (cfg.log_init_verbose) std::cout << "--- Initializing D3D for screen capture... ---" << std::endl;
+    if (cfg.log_init_verbose) lg::o() << "--- Initializing D3D for screen capture... ---" << std::endl;
     if (cfg.log_init_verbose) {
-        std::cout << "[CAPTURE] Crop size: " << crop_width << "x" << crop_height << std::endl;
+        lg::o() << "[CAPTURE] Crop size: " << crop_width << "x" << crop_height << std::endl;
     }
     HRESULT hr;
 
     hr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&fac);
     if (cfg.log_init_verbose) {
-        std::cout << "[CAPTURE] CreateDXGIFactory1 hr=0x"
+        lg::o() << "[CAPTURE] CreateDXGIFactory1 hr=0x"
                   << std::hex << std::uppercase << static_cast<unsigned long>(hr)
                   << std::dec << std::nouppercase << std::endl;
     }
@@ -35,7 +36,7 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
     {
         HRESULT hr_enum_adapters = fac->EnumAdapters1(0, &adp);
         if (cfg.log_init_verbose) {
-            std::cout << "[CAPTURE] EnumAdapters1 hr=0x"
+            lg::o() << "[CAPTURE] EnumAdapters1 hr=0x"
                       << std::hex << std::uppercase << static_cast<unsigned long>(hr_enum_adapters)
                       << std::dec << std::nouppercase << std::endl;
         }
@@ -44,7 +45,7 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
     {
         HRESULT hr_enum_outputs = adp->EnumOutputs(0, &out);
         if (cfg.log_init_verbose) {
-            std::cout << "[CAPTURE] EnumOutputs hr=0x"
+            lg::o() << "[CAPTURE] EnumOutputs hr=0x"
                       << std::hex << std::uppercase << static_cast<unsigned long>(hr_enum_outputs)
                       << std::dec << std::nouppercase << std::endl;
         }
@@ -56,13 +57,13 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
     width = outputDesc.DesktopCoordinates.right - outputDesc.DesktopCoordinates.left;
     height = outputDesc.DesktopCoordinates.bottom - outputDesc.DesktopCoordinates.top;
     if (cfg.log_init_verbose) {
-        std::cout << "[CAPTURE] Output desktop size: " << width << "x" << height << std::endl;
+        lg::o() << "[CAPTURE] Output desktop size: " << width << "x" << height << std::endl;
     }
 
     {
         HRESULT hr_create_device = D3D11CreateDevice(adp, D3D_DRIVER_TYPE_UNKNOWN, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &dev, nullptr, &ctx);
         if (cfg.log_init_verbose) {
-            std::cout << "[CAPTURE] D3D11CreateDevice hr=0x"
+            lg::o() << "[CAPTURE] D3D11CreateDevice hr=0x"
                       << std::hex << std::uppercase << static_cast<unsigned long>(hr_create_device)
                       << std::dec << std::nouppercase << std::endl;
         }
@@ -75,7 +76,7 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
     {
         HRESULT hr_qi_output1 = out->QueryInterface(__uuidof(IDXGIOutput1), (void**)&out1);
         if (cfg.log_init_verbose) {
-            std::cout << "[CAPTURE] QueryInterface(IDXGIOutput1) hr=0x"
+            lg::o() << "[CAPTURE] QueryInterface(IDXGIOutput1) hr=0x"
                       << std::hex << std::uppercase << static_cast<unsigned long>(hr_qi_output1)
                       << std::dec << std::nouppercase << std::endl;
         }
@@ -85,10 +86,10 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
     }
     hr = out1->DuplicateOutput(dev, &dup);
     if (cfg.log_init_verbose) {
-        std::cout << "[CAPTURE] DuplicateOutput hr=" << (FAILED(hr) ? "FAILED" : "OK") << std::endl;
+        lg::o() << "[CAPTURE] DuplicateOutput hr=" << (FAILED(hr) ? "FAILED" : "OK") << std::endl;
     }
     if (FAILED(hr)) {
-        std::cerr << "DuplicateOutput failed. HRESULT=0x"
+        lg::e() << "DuplicateOutput failed. HRESULT=0x"
                   << std::hex << std::uppercase << static_cast<unsigned long>(hr)
                   << std::dec << std::nouppercase << std::endl;
         throw std::runtime_error("Failed to create output duplication.");
@@ -120,14 +121,14 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
             throw std::runtime_error("Failed to create EVENT query for staging[" + std::to_string(i) + "]");
         }
     }
-    std::cout << "--- Screen capture initialized successfully (" << width << "x" << height << ") with " << kStageN << " staging buffers ---" << std::endl;
+    lg::o() << "--- Screen capture initialized successfully (" << width << "x" << height << ") with " << kStageN << " staging buffers ---" << std::endl;
 
     // 捕获链路启动横幅（仅在启用报告时）
     reporter.BootBanner(kStageN);
 }
 
 ScreenCapturer::~ScreenCapturer() {
-    std::cout << "--- Cleaning up D3D resources... ---" << std::endl;
+    lg::o() << "--- Cleaning up D3D resources... ---" << std::endl;
     for (size_t i = 0; i < kStageN; ++i) {
         SafeRelease(&stage[i]);
         SafeRelease(&copyQ[i]);
@@ -165,7 +166,7 @@ bool ScreenCapturer::capture(cv::Mat& frame, const cv::Rect& crop_region) {
         return false;
     }
     if (FAILED(hr)) {
-        std::cerr << "AcquireNextFrame failed. HRESULT: 0x" << std::hex << hr << std::endl;
+        lg::e() << "AcquireNextFrame failed. HRESULT: 0x" << std::hex << hr << std::endl;
     if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
             t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
             reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);

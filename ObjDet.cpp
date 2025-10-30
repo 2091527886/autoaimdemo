@@ -1,6 +1,7 @@
 #include "ObjDet.hpp"
 
 #include <iostream>
+#include "Log.hpp"
 #include <sstream>
 #include <stdexcept>
 #include <chrono>
@@ -17,7 +18,7 @@ ObjDet::ObjDet(const Config& cfg)
     : perf_(cfg)
 {
     const std::string engine = cfg.resolve_engine_path();
-    std::cout << "[INFO] Loading TensorRT-YOLO engine from " << engine << " ..." << std::endl;
+    lg::o() << "[INFO] Loading TensorRT-YOLO engine from " << engine << " ..." << std::endl;
 
     trtyolo::InferOption opt;
     opt.enableSwapRB();
@@ -30,22 +31,22 @@ ObjDet::ObjDet(const Config& cfg)
     {
         char cwd_buffer[MAX_PATH];
         if (GetCurrentDirectoryA(MAX_PATH, cwd_buffer)) {
-            std::cout << "[DEBUG] Current working directory: " << cwd_buffer << std::endl;
+            lg::o() << "[DEBUG] Current working directory: " << cwd_buffer << std::endl;
         }
         DWORD attrs = GetFileAttributesA(engine.c_str());
         if (attrs == INVALID_FILE_ATTRIBUTES) {
-            std::cerr << "[ERROR] Engine file not found: '" << engine << "'."
+            lg::e() << "[ERROR] Engine file not found: '" << engine << "'."
                       << " Ensure the engine file is present or provide the correct path." << std::endl;
         } else if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
-            std::cerr << "[ERROR] Engine path is a directory, not a file: '" << engine << "'." << std::endl;
+            lg::e() << "[ERROR] Engine path is a directory, not a file: '" << engine << "'." << std::endl;
         } else {
-            std::cout << "[DEBUG] Found engine file: '" << engine << "'." << std::endl;
+            lg::o() << "[DEBUG] Found engine file: '" << engine << "'." << std::endl;
         }
     }
 
     try {
         model_ = std::make_unique<trtyolo::DetectModel>(engine.c_str(), opt);
-        std::cout << "[INFO] Engine loaded successfully." << std::endl;
+        lg::o() << "[INFO] Engine loaded successfully." << std::endl;
     } catch (const std::exception& e) {
         std::ostringstream oss;
         oss << "[FATAL] Failed to construct DetectModel with engine '" << engine << "'.\n"

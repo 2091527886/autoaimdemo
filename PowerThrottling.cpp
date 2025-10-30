@@ -1,4 +1,5 @@
 #include "PowerThrottling.hpp"
+#include "Log.hpp"
 
 void disablePowerThrottle(bool log) {
    PROCESS_POWER_THROTTLING_STATE pState = {};
@@ -6,9 +7,9 @@ void disablePowerThrottle(bool log) {
    pState.ControlMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
    pState.StateMask = 0;
    if (!SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling, &pState, sizeof(pState))) {
-       if (log) std::cerr << "[BOOT] ProcPowerThrottling=OFF failed: " << GetLastError() << std::endl;
+       if (log) lg::e() << "[BOOT] ProcPowerThrottling=OFF failed: " << GetLastError() << std::endl;
    } else if (log) {
-       std::cout << "[BOOT] ProcPowerThrottling=OFF OK" << std::endl;
+       lg::o() << "[BOOT] ProcPowerThrottling=OFF OK" << std::endl;
    }
 
    THREAD_POWER_THROTTLING_STATE tState = {};
@@ -16,14 +17,14 @@ void disablePowerThrottle(bool log) {
    tState.ControlMask = THREAD_POWER_THROTTLING_EXECUTION_SPEED;
    tState.StateMask = 0;
    if (!SetThreadInformation(GetCurrentThread(), ThreadPowerThrottling, &tState, sizeof(tState))) {
-       if (log) std::cerr << "[BOOT] ThreadPowerThrottling=OFF failed: " << GetLastError() << std::endl;
+       if (log) lg::e() << "[BOOT] ThreadPowerThrottling=OFF failed: " << GetLastError() << std::endl;
    } else if (log) {
-       std::cout << "[BOOT] ThreadPowerThrottling=OFF OK" << std::endl;
+       lg::o() << "[BOOT] ThreadPowerThrottling=OFF OK" << std::endl;
    }
 
    if (!SetThreadPriorityBoost(GetCurrentThread(), FALSE)) {
-       if (log) std::cerr << "[BOOT] ThreadPriorityBoost(FALSE) failed: " << GetLastError() << std::endl;
+       if (log) lg::e() << "[BOOT] ThreadPriorityBoost(FALSE) failed: " << GetLastError() << std::endl;
    } else if (log) {
-       std::cout << "[BOOT] ThreadPriorityBoost(FALSE) OK" << std::endl;
+       lg::o() << "[BOOT] ThreadPriorityBoost(FALSE) OK" << std::endl;
    }
 }

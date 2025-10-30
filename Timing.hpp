@@ -6,6 +6,7 @@
 #include <limits>
 #include <iomanip>
 #include <iostream>
+#include "Log.hpp"
 #include <algorithm>
 
 // Timing details for detection pipeline
@@ -48,7 +49,7 @@ private:
         auto [mou_avg, mou_min, mou_max] = stat([](const FrameLat& f){ return f.mou_ms;   });
         auto [loo_avg, loo_min, loo_max] = stat([](const FrameLat& f){ return f.loop_ms;    });
 
-        std::cout << std::fixed << std::setprecision(2)
+        lg::o() << std::fixed << std::setprecision(2)
                   << "[LAT] over " << buf.size() << " frames"
                   << " | capture ms avg/min/max: " << cap_avg << "/" << cap_min << "/" << cap_max
                   << " | detect: " << det_avg << "/" << det_min << "/" << det_max

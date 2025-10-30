@@ -1,4 +1,5 @@
 #include <iostream>
+#include "Log.hpp"
 #include <vector>
 #include <string>
 #include <chrono>
@@ -119,7 +120,7 @@ public:
         if (vis) {
             cv::namedWindow(c.window_title, cv::WINDOW_AUTOSIZE);
         }
-        std::cout << "--- Detect on centered " << c.crop_size_px << "x" << c.crop_size_px << " region. ---" << std::endl;
+        lg::o() << "--- Detect on centered " << c.crop_size_px << "x" << c.crop_size_px << " region. ---" << std::endl;
         help();
 
         // 初始化 PID 控制器（像素域）。输出再乘以 mouse_correction_factor 转为鼠标单位。
@@ -188,7 +189,7 @@ public:
             }
             char key = static_cast<char>(cv::waitKey(1));
             if (key == 27) { // ESC
-                std::cout << "\nESC pressed. Exiting..." << std::endl;
+                lg::o() << "\nESC pressed. Exiting..." << std::endl;
                 break;
             }
             if (key == 'v' || key == 'V') {
@@ -199,7 +200,7 @@ public:
 
 private:
     void help() {
-        std::cout << "\n--- Controls ---" << std::endl;
+        lg::o() << "\n--- Controls ---" << std::endl;
 
     }
 
@@ -304,11 +305,11 @@ private:
         vis = !vis;
         if (vis) {
             cv::namedWindow(c.window_title, cv::WINDOW_AUTOSIZE);
-            std::cout << "\n[INFO] Visualization toggled ON." << std::endl;
+            lg::o() << "\n[INFO] Visualization toggled ON." << std::endl;
         }
         else {
             cv::destroyAllWindows();
-            std::cout << "\n[INFO] Visualization toggled OFF. Console stats will continue." << std::endl;
+            lg::o() << "\n[INFO] Visualization toggled OFF. Console stats will continue." << std::endl;
         }
     }
 
@@ -380,13 +381,13 @@ int main() {
     }
     catch (const std::exception& e) {
         MmcssDisable(hMmcss);
-        std::cerr << "\n\n[FATAL ERROR] An unrecoverable error occurred: " << e.what() << std::endl;
-        std::cerr << "Please check the following:\n"
+        lg::e() << "\n\n[FATAL ERROR] An unrecoverable error occurred: " << e.what() << std::endl;
+        lg::e() << "Please check the following:\n"
             << "Press Enter to exit." << std::endl;
         std::cin.get();
         return -1;
     }
-    std::cout << "\nProgram finished successfully." << std::endl;
+    lg::o() << "\nProgram finished successfully." << std::endl;
     overlay.stop();
     MmcssDisable(hMmcss);
     return 0;

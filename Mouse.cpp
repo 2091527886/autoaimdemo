@@ -1,9 +1,10 @@
 #include <string>
 #include "Mouse.hpp"
+#include "Log.hpp"
 
 // 仅迁移，不改变逻辑/实现细节
 Mouse::Mouse() {
-    std::cout << "[Mouse] Initializing driver..." << std::endl;
+    lg::o() << "[Mouse] Initializing driver..." << std::endl;
     dll_ = LoadLibrary(L"IbInputSimulator.dll");
     if (!dll_) {
         throw std::runtime_error("[Mouse] Load IbInputSimulator.dll failed");
@@ -25,14 +26,14 @@ Mouse::Mouse() {
         dll_ = nullptr;
         throw std::runtime_error("[Mouse] Init failed: " + std::to_string(static_cast<int>(error)));
     }
-    std::cout << "[Mouse] Driver ready" << std::endl;
+    lg::o() << "[Mouse] Driver ready" << std::endl;
 }
 
 Mouse::~Mouse() {
     if (dll_) {
         if (destroy_) destroy_();
         FreeLibrary(dll_);
-        std::cout << "[Mouse] Driver cleaned" << std::endl;
+        lg::o() << "[Mouse] Driver cleaned" << std::endl;
     }
 }
 
@@ -40,7 +41,7 @@ void Mouse::Move(int dx, int dy) {
     if (move_) {
         bool ok = move_(dx, dy, Send::MoveMode::Relative);
         if (!ok) {
-            std::cerr << "[Mouse] Move failed dx=" << dx << " dy=" << dy << std::endl;
+            lg::e() << "[Mouse] Move failed dx=" << dx << " dy=" << dy << std::endl;
         }
     }
 }
