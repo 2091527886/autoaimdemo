@@ -39,7 +39,7 @@
 class Config;
 /* moved: MMCSS utilities now in MmcssUtil */
 /* moved */
-void DisableMmcss(HANDLE h);
+void MmcssDisable(HANDLE h);
 /* moved */
 
 // TensorRT-YOLO
@@ -74,7 +74,7 @@ class Config;
 class ScreenCapturer;
 class ObjDet;
 class Mouse;
-class AimAssistant;
+class Aim;
 
 // --- 辅助宏 ---
 // --- 数据结构定义 ---
@@ -97,43 +97,43 @@ class AimAssistant;
 // --- 4. 目标检测器 (ObjDet) ---
 /* moved to ObjDet.hpp/.cpp */
 
-// --- 5. 核心协调器 (AimAssistant) ---
-class AimAssistant {
+// --- 5. 核心协调器 (Aim) ---
+class Aim {
 public:
-    AimAssistant()
-        : cfg(),
-        cap(cfg, cfg.crop_size_px, cfg.crop_size_px), // 传递 cfg + crop_size
-        od(cfg),
-        mouse(),
-        keys(cfg),
-        cropRect((cap.w() - cfg.crop_size_px) / 2, (cap.h() - cfg.crop_size_px) / 2, cfg.crop_size_px, cfg.crop_size_px),
-        center(cfg.crop_size_px / 2, cfg.crop_size_px / 2),
-        overlayOn(cfg.enable_visual),
-        latAgg(static_cast<size_t>(std::max(1, cfg.log_latency_every_n)))
+    Aim()
+        : c(),
+        cap(c, c.crop_size_px, c.crop_size_px), // 传递 cfg + crop_size
+        od(c),
+        m(),
+        hk(c),
+        crop((cap.w() - c.crop_size_px) / 2, (cap.h() - c.crop_size_px) / 2, c.crop_size_px, c.crop_size_px),
+        ctr(c.crop_size_px / 2, c.crop_size_px / 2),
+        vis(c.enable_visual),
+        lat(static_cast<size_t>(std::max(1, c.log_latency_every_n)))
     {
-        if (cap.w() < cfg.crop_size_px || cap.h() < cfg.crop_size_px) {
+        if (cap.w() < c.crop_size_px || cap.h() < c.crop_size_px) {
             throw std::runtime_error("Screen resolution is smaller than configured crop_size_px.");
         }
-        mouseFactor = (cfg.hfov_deg / static_cast<double>(cap.w()))
-            * (cfg.px_per_360 / 360.0);
-        if (overlayOn) {
-            cv::namedWindow(cfg.window_title, cv::WINDOW_AUTOSIZE);
+        mfac = (c.hfov_deg / static_cast<double>(cap.w()))
+            * (c.px_per_360 / 360.0);
+        if (vis) {
+            cv::namedWindow(c.window_title, cv::WINDOW_AUTOSIZE);
         }
-        std::cout << "--- Detect on centered " << cfg.crop_size_px << "x" << cfg.crop_size_px << " region. ---" << std::endl;
-        showHelp();
+        std::cout << "--- Detect on centered " << c.crop_size_px << "x" << c.crop_size_px << " region. ---" << std::endl;
+        help();
 
         // 初始化 PID 控制器（像素域）。输出再乘以 mouse_correction_factor 转为鼠标单位。
-        pidX.setK(cfg.pid_kp_x, cfg.pid_ki_x, cfg.pid_kd_x);
-        pidX.setLim(cfg.pid_output_limit, cfg.pid_integral_limit);
-        pidY.setK(cfg.pid_kp_y, cfg.pid_ki_y, cfg.pid_kd_y);
-        pidY.setLim(cfg.pid_output_limit, cfg.pid_integral_limit);
+        px.setK(c.pid_kp_x, c.pid_ki_x, c.pid_kd_x);
+        px.setLim(c.pid_output_limit, c.pid_integral_limit);
+        py.setK(c.pid_kp_y, c.pid_ki_y, c.pid_kd_y);
+        py.setLim(c.pid_output_limit, c.pid_integral_limit);
     }
 
-    ~AimAssistant() {
-        if (overlayOn) cv::destroyAllWindows();
+    ~Aim() {
+        if (vis) cv::destroyAllWindows();
     }
 
-    void run() {
+    void loop() {
         while (true) {
             auto loop_start_time = std::chrono::high_resolution_clock::now();
 
@@ -141,29 +141,29 @@ public:
 
             // 1) 截屏计时
             auto t_cap_start = std::chrono::high_resolution_clock::now();
-            bool got = cap.capture(frame, cropRect);
+            bool got = cap.capture(img, crop);
             auto t_cap_end = std::chrono::high_resolution_clock::now();
             fl.cap_ms = std::chrono::duration<double, std::milli>(t_cap_end - t_cap_start).count();
             if (!got) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 // 仅统计成功截屏帧：直接继续下一帧
-                if (cfg.log_latency && !cfg.latency_on_capture_only) {
+                if (c.log_latency && !c.latency_on_capture_only) {
                     // 如果也要统计失败帧，则把仅有 capture_ms 的 fl 加入
-                    latAgg.push(fl);
+                    lat.push(fl);
                 }
                 continue;
             }
 
             // 2) 检测计时（外层整体）
             auto t_det_start = std::chrono::high_resolution_clock::now();
-            od.detect(frame, dets, cfg, tm);
+            od.detect(img, ds, c, tm);
             auto t_det_end = std::chrono::high_resolution_clock::now();
             fl.det_ms = std::chrono::duration<double, std::milli>(t_det_end - t_det_start).count();
 
             // 3) 鼠标控制计时（整体阶段）
             auto t_mouse_start = std::chrono::high_resolution_clock::now();
-            Detection* target = findTarget();
-            handleMouse(target);
+            Detection* target = pick();
+            move(target);
             auto t_mouse_end = std::chrono::high_resolution_clock::now();
             fl.mou_ms = std::chrono::duration<double, std::milli>(t_mouse_end - t_mouse_start).count();
 
@@ -172,19 +172,19 @@ public:
             fl.loop_ms = tm.loop_ms;
 
             // 计算 dt（秒）供 PID 使用
-            if (cfg.pid_use_measured_dt) {
+            if (c.pid_use_measured_dt) {
                 dt = std::max(0.001, tm.loop_ms / 1000.0);
             } else {
-                dt = std::max(0.001, cfg.pid_fixed_dt_ms / 1000.0);
+                dt = std::max(0.001, c.pid_fixed_dt_ms / 1000.0);
             }
-            updateStats();
+            stats();
 
-            if (cfg.log_latency) {
-                latAgg.push(fl);
+            if (c.log_latency) {
+                lat.push(fl);
             }
 
-            if (overlayOn) {
-                render(target);
+            if (vis) {
+                draw(target);
             }
             char key = static_cast<char>(cv::waitKey(1));
             if (key == 27) { // ESC
@@ -192,24 +192,24 @@ public:
                 break;
             }
             if (key == 'v' || key == 'V') {
-                toggleOverlay();
+                toggle();
             }
         }
     }
 
 private:
-    void showHelp() {
+    void help() {
         std::cout << "\n--- Controls ---" << std::endl;
 
     }
 
-    Detection* findTarget() {
+    Detection* pick() {
         Detection* target = nullptr;
-        double min_dist_to_center = cfg.lock_radius_px;
-        for (auto& det : dets) {
-            if (!cfg.is_target(det.class_id)) continue; // 过滤非目标类别
+        double min_dist_to_center = c.lock_radius_px;
+        for (auto& det : ds) {
+            if (!c.is_target(det.class_id)) continue; // 过滤非目标类别
             cv::Point box_center(det.box.x + det.box.width / 2, det.box.y + det.box.height / 2);
-            double dist = std::hypot(box_center.x - center.x, box_center.y - center.y);
+            double dist = std::hypot(box_center.x - ctr.x, box_center.y - ctr.y);
             if (dist < min_dist_to_center) {
                 min_dist_to_center = dist;
                 target = &det;
@@ -218,12 +218,12 @@ private:
         return target;
     }
 
-    void handleMouse(const Detection* target) {
+    void move(const Detection* target) {
         // 若无目标或未按住按键：释放 PID 积分，避免历史积分殘留
-        bool smooth_pressed = keys.SmoothPressed();
+        bool smooth_pressed = hk.SmoothPressed();
         if (!target || !smooth_pressed) {
-            pidX.reset();
-            pidY.reset();
+            px.reset();
+            py.reset();
             // 仍保留单次 F8 逻辑
             if (!target) return;
         }
@@ -231,79 +231,79 @@ private:
         if (smooth_pressed) {
             cv::Point target_point(
                 target->box.x + target->box.width / 2,
-                target->box.y + static_cast<int>(target->box.height * cfg.y_anchor_ratio)
+                target->box.y + static_cast<int>(target->box.height * c.y_anchor_ratio)
             );
-            double err_x = static_cast<double>(target_point.x - center.x);
-            double err_y = static_cast<double>(target_point.y - center.y);
+            double err_x = static_cast<double>(target_point.x - ctr.x);
+            double err_y = static_cast<double>(target_point.y - ctr.y);
 
             // PID 在像素域输出，再乘鼠标校正因子转为鼠标单位
-            double out_x_pix = pidX.step(err_x, dt);
-            double out_y_pix = pidY.step(err_y, dt);
-            int move_x = static_cast<int>(out_x_pix * mouseFactor);
-            int move_y = static_cast<int>(out_y_pix * mouseFactor);
+            double out_x_pix = px.step(err_x, dt);
+            double out_y_pix = py.step(err_y, dt);
+            int move_x = static_cast<int>(out_x_pix * mfac);
+            int move_y = static_cast<int>(out_y_pix * mfac);
 
             if (move_x != 0 || move_y != 0) {
-                mouse.Move(move_x, move_y);
+                m.Move(move_x, move_y);
             }
         }
 
         // 单发模式：保持边沿触发语义
-        if (keys.SingleShotJustPressed()) {
+        if (hk.SingleShotJustPressed()) {
             cv::Point target_point(
                 target->box.x + target->box.width / 2,
-                target->box.y + static_cast<int>(target->box.height * cfg.y_anchor_ratio)
+                target->box.y + static_cast<int>(target->box.height * c.y_anchor_ratio)
             );
-            double dx_pixels = static_cast<double>(target_point.x - center.x);
-            double dy_pixels = static_cast<double>(target_point.y - center.y);
-            double corrected_dx = dx_pixels * mouseFactor;
-            double corrected_dy = dy_pixels * mouseFactor;
+            double dx_pixels = static_cast<double>(target_point.x - ctr.x);
+            double dy_pixels = static_cast<double>(target_point.y - ctr.y);
+            double corrected_dx = dx_pixels * mfac;
+            double corrected_dy = dy_pixels * mfac;
             int move_x = static_cast<int>(corrected_dx);
             int move_y = static_cast<int>(corrected_dy);
             if (move_x != 0 || move_y != 0) {
-                mouse.Move(move_x, move_y);
+                m.Move(move_x, move_y);
             }
         }
     }
 
-    void updateStats() {
+    void stats() {
         const double smoothing_factor = 0.05;
-        if (firstFrame) {
-            msTotal = tm.loop_ms;
-            msInfer = tm.infer_ms;
-            msPost = tm.post_ms;
-            firstFrame = false;
+        if (first) {
+            tTot = tm.loop_ms;
+            tInf = tm.infer_ms;
+            tPost = tm.post_ms;
+            first = false;
         }
         else {
-            msTotal = smoothing_factor * tm.loop_ms + (1.0 - smoothing_factor) * msTotal;
-            msInfer = smoothing_factor * tm.infer_ms + (1.0 - smoothing_factor) * msInfer;
-            msPost = smoothing_factor * tm.post_ms + (1.0 - smoothing_factor) * msPost;
+            tTot = smoothing_factor * tm.loop_ms + (1.0 - smoothing_factor) * tTot;
+            tInf = smoothing_factor * tm.infer_ms + (1.0 - smoothing_factor) * tInf;
+            tPost = smoothing_factor * tm.post_ms + (1.0 - smoothing_factor) * tPost;
         }
 
     }
 
-    void render(const Detection* best_target) {
-        cv::circle(frame, center, static_cast<int>(cfg.lock_radius_px), cv::Scalar(255, 255, 0), 1);
-        for (const auto& det : dets) {
+    void draw(const Detection* tgtBest) {
+        cv::circle(img, ctr, static_cast<int>(c.lock_radius_px), cv::Scalar(255, 255, 0), 1);
+        for (const auto& det : ds) {
             // 可视化：所有检测都显示；追踪类加星号，当前目标红框
-            cv::Scalar color = (&det == best_target) ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0);
-            cv::rectangle(frame, det.box, color, 2);
-            std::string label = cfg.name_or_id(det.class_id) + (cfg.is_target(det.class_id) ? "*" : "") +
+            cv::Scalar color = (&det == tgtBest) ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0);
+            cv::rectangle(img, det.box, color, 2);
+            std::string label = c.name_or_id(det.class_id) + (c.is_target(det.class_id) ? "*" : "") +
                                  " " + cv::format("%.2f", det.confidence);
-            cv::putText(frame, label, cv::Point(det.box.x, det.box.y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 1);
+            cv::putText(img, label, cv::Point(det.box.x, det.box.y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 1);
         }
-        if (msTotal > 0) {
-            double smoothed_fps = 1000.0 / msTotal;
+        if (tTot > 0) {
+            double smoothed_fps = 1000.0 / tTot;
             std::ostringstream stats_stream;
             stats_stream << std::fixed << std::setprecision(1) << "FPS: " << smoothed_fps;
-            cv::putText(frame, stats_stream.str(), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 255), 2);
+            cv::putText(img, stats_stream.str(), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 255), 2);
         }
-        cv::imshow(cfg.window_title, frame);
+        cv::imshow(c.window_title, img);
     }
 
-    void toggleOverlay() {
-        overlayOn = !overlayOn;
-        if (overlayOn) {
-            cv::namedWindow(cfg.window_title, cv::WINDOW_AUTOSIZE);
+    void toggle() {
+        vis = !vis;
+        if (vis) {
+            cv::namedWindow(c.window_title, cv::WINDOW_AUTOSIZE);
             std::cout << "\n[INFO] Visualization toggled ON." << std::endl;
         }
         else {
@@ -312,26 +312,26 @@ private:
         }
     }
 
-    Config cfg;
+    Config c;
     ScreenCapturer cap;
     ObjDet od;
-    Mouse mouse;
-    HotkeyManager keys;
-    const cv::Rect cropRect;
-    const cv::Point center;
-    double mouseFactor = 1.0;
-    cv::Mat frame;
-    std::vector<Detection> dets;
+    Mouse m;
+    HotkeyManager hk;
+    const cv::Rect crop;
+    const cv::Point ctr;
+    double mfac = 1.0;
+    cv::Mat img;
+    std::vector<Detection> ds;
     Timing tm;
-    bool overlayOn;
-    double msTotal = 0.0, msInfer = 0.0, msPost = 0.0;
-    bool firstFrame = true;
+    bool vis;
+    double tTot = 0.0, tInf = 0.0, tPost = 0.0;
+    bool first = true;
     // 延迟统计
-    LatAgg latAgg;
+    LatAgg lat;
 
     // PID 控制
-    PidController pidX;
-    PidController pidY;
+    PidController px;
+    PidController py;
     double dt = 1.0/60.0;
 };
 
@@ -354,7 +354,7 @@ int main() {
 
     // Enable MMCSS for main loop thread based on default Config values
    
-    HANDLE hMmcss = EnableMmcssIfConfigured(boot_cfg.mmcss_main,
+    HANDLE hMmcss = MmcssEnable(boot_cfg.mmcss_main,
                                             boot_cfg.mmcss_task.c_str(),
                                             boot_cfg.mmcss_prio);
 
@@ -375,11 +375,11 @@ int main() {
     metrics::SystemBootReporting::PrintSchedulingBanner(boot_cfg, hMmcss);
 
     try {
-        AimAssistant assistant;
-        assistant.run();
+        Aim assistant;
+        assistant.loop();
     }
     catch (const std::exception& e) {
-        DisableMmcss(hMmcss);
+        MmcssDisable(hMmcss);
         std::cerr << "\n\n[FATAL ERROR] An unrecoverable error occurred: " << e.what() << std::endl;
         std::cerr << "Please check the following:\n"
             << "Press Enter to exit." << std::endl;
@@ -388,6 +388,6 @@ int main() {
     }
     std::cout << "\nProgram finished successfully." << std::endl;
     overlay.stop();
-    DisableMmcss(hMmcss);
+    MmcssDisable(hMmcss);
     return 0;
 }

@@ -4,7 +4,7 @@
 #include <cstdint> // 包含这个头文件以使用 uint32_t
 
 // 声明我们将要使用的枚举
-// 注意：根据您的新代码，我已将枚举放在了 Send 命名空间下
+// 注意：保持命名空间与枚举不变，避免影响外部调用
 namespace Send {
     enum class Error {
         Success = 0, InvalidArgument = 1, DeviceNotFound = 2, DriverError = 3
@@ -21,33 +21,30 @@ namespace Send {
     };
 }
 
-
-// 使用 class 来封装所有与 DLL 相关的状态和行为
-class InputSimulator {
+// 仅改名，不改变逻辑/实现；该类当前未在外部使用
+class ISim {
 public:
-    InputSimulator();
-    ~InputSimulator();
+    ISim();
+    ~ISim();
 
-    Send::Error Init(Send::SendType type);
-    // MoveRelative 的参数现在匹配新的函数
-    void MoveRelative(int dx, int dy);
-    // MoveAbsolute 暂时无法实现，因为我们不知道新函数如何处理绝对移动，先注释掉
-    // void MoveAbsolute(int x, int y);
+    Send::Error init(Send::SendType type);
+    // 相对移动
+    void move(int dx, int dy);
+    // 绝对移动接口暂不提供（原注释保留意图）
+    // void moveAbs(int x, int y);
 
 private:
-    HMODULE hDll;
+    HMODULE dll_;
 
-    // --- 使用新的、正确的函数指针类型 ---
-    typedef Send::Error(__stdcall* PFN_IbSendInit)(Send::SendType type, Send::InitFlags flags, void* argument);
-    typedef void(__stdcall* PFN_IbSendDestroy)();
-    // 这是关键：定义新的鼠标移动函数指针
-    typedef bool(__stdcall* PFN_IbSendMouseMove)(int dx, int dy, Send::MoveMode mode);
+    // 函数指针类型（简洁命名）
+    using SendInitFn = Send::Error(__stdcall*)(Send::SendType, Send::InitFlags, void*);
+    using SendDestroyFn = void(__stdcall*)();
+    using SendMouseMoveFn = bool(__stdcall*)(int, int, Send::MoveMode);
 
-    // --- 更新函数指针变量 ---
-    PFN_IbSendInit pIbSendInit;
-    PFN_IbSendDestroy pIbSendDestroy;
-    // 使用新的鼠标移动指针
-    PFN_IbSendMouseMove pIbSendMouseMove;
+    // 函数指针成员
+    SendInitFn init_;
+    SendDestroyFn destroy_;
+    SendMouseMoveFn move_;
 
-    bool is_initialized_successfully;
+    bool ready_;
 };

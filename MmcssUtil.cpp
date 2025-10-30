@@ -1,23 +1,23 @@
 #include "MmcssUtil.hpp"
 #pragma comment(lib, "Avrt.lib")
 
-HANDLE EnableMmcssIfConfigured(bool enable, const wchar_t* task_name, AVRT_PRIORITY priority, DWORD* out_task_index) {
+HANDLE MmcssEnable(bool enable, const wchar_t* task, AVRT_PRIORITY prio, DWORD* outIdx) {
     if (!enable) return nullptr;
-    if (!task_name) task_name = L"Games";
-    DWORD task_index = 0;
-    HANDLE h = AvSetMmThreadCharacteristicsW(task_name, &task_index);
+    if (!task) task = L"Games";
+    DWORD idx = 0;
+    HANDLE h = AvSetMmThreadCharacteristicsW(task, &idx);
     if (!h) {
         std::cerr << "[MMCSS] AvSetMmThreadCharacteristicsW failed: " << GetLastError() << std::endl;
         return nullptr;
     }
-    if (!AvSetMmThreadPriority(h, priority)) {
+    if (!AvSetMmThreadPriority(h, prio)) {
         std::cerr << "[MMCSS] AvSetMmThreadPriority failed: " << GetLastError() << std::endl;
     }
-    if (out_task_index) *out_task_index = task_index;
-    std::wcout << L"[MMCSS] Enabled for thread. Task=" << task_name << L", priority=" << (int)priority << std::endl;
+    if (outIdx) *outIdx = idx;
+    std::wcout << L"[MMCSS] Enabled for thread. Task=" << task << L", priority=" << (int)prio << std::endl;
     return h;
 }
 
-void DisableMmcss(HANDLE h) {
+void MmcssDisable(HANDLE h) {
     if (h) AvRevertMmThreadCharacteristics(h);
 }
