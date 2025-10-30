@@ -3,7 +3,6 @@
 #include <chrono>
 #include <stdexcept>
 #include <algorithm>
-#include <iomanip>
 #include <cmath>
 #include <sstream>
 #include <thread>
@@ -61,8 +60,6 @@ public:
             cv::namedWindow(c.window_title, cv::WINDOW_AUTOSIZE);
         }
         lg::o() << "Detect center " << c.crop_size_px << "x" << c.crop_size_px << lg::endl;
-        help();
-
         // 初始化 PID 控制器（像素域）。输出再乘以 mouse_correction_factor 转为鼠标单位。
         px.setK(c.pid_kp_x, c.pid_ki_x, c.pid_kd_x);
         px.setLim(c.pid_output_limit, c.pid_integral_limit);
@@ -139,11 +136,6 @@ public:
     }
 
 private:
-    void help() {
-        lg::o() << lg::nl << "--- Controls ---" << lg::endl;
-
-    }
-
     Detection* pick() {
         Detection* target = nullptr;
         double min_dist_to_center = c.lock_radius_px;
@@ -210,14 +202,10 @@ private:
         const double smoothing_factor = 0.05;
         if (first) {
             tTot = tm.loop_ms;
-            tInf = tm.infer_ms;
-            tPost = tm.post_ms;
             first = false;
         }
         else {
             tTot = smoothing_factor * tm.loop_ms + (1.0 - smoothing_factor) * tTot;
-            tInf = smoothing_factor * tm.infer_ms + (1.0 - smoothing_factor) * tInf;
-            tPost = smoothing_factor * tm.post_ms + (1.0 - smoothing_factor) * tPost;
         }
 
     }
@@ -265,7 +253,7 @@ private:
     std::vector<Detection> ds;
     Timing tm;
     bool vis;
-    double tTot = 0.0, tInf = 0.0, tPost = 0.0;
+    double tTot = 0.0;
     bool first = true;
     // 延迟统计
     LatAgg lat;

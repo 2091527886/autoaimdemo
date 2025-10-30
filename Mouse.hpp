@@ -1,7 +1,6 @@
 #pragma once
 
 #include <windows.h>
-#include <stdexcept>
 #include "InputSimulator.hpp"
 
 // 仅迁移，不改变逻辑/接口

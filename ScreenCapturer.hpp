@@ -10,7 +10,6 @@ class ScreenCapturer {
 public:
     // Reporting helper
     metrics::CaptureReporting reporter;
-public:
     ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_height);
     ~ScreenCapturer();
 

@@ -55,12 +55,6 @@ add_executable(aimassistant
   Mouse.cpp
   PidController.cpp
   SystemTuner.cpp
-  
-  
-  
-  
-  
-  
   ObjDet.cpp
   ScreenCapturer.cpp
 )

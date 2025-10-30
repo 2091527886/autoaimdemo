@@ -7,7 +7,6 @@
 #include <array>
 #include <chrono>
 #include <stdexcept>
-#include <iostream>
 #include <algorithm>
 #include "Log.hpp"
 
@@ -124,6 +123,15 @@ bool ScreenCapturer::capture(cv::Mat& frame, const cv::Rect& crop_region) {
     auto t_total_start = std::chrono::high_resolution_clock::now();
     double t_acquire_ms = 0.0, t_qi_ms = 0.0, t_copy_ms = 0.0, t_map_ms = 0.0, t_cvt_ms = 0.0, t_unmap_ms = 0.0, t_total_ms = 0.0;
 
+    // Minimal helper: compute and report on failure paths (logic unchanged)
+    auto report_if_fail = [&]() {
+        if (cfg.capture_timing && !cfg.capture_timing_on_success) {
+            t_total_ms = std::chrono::duration<double, std::milli>(
+                std::chrono::high_resolution_clock::now() - t_total_start).count();
+            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+        }
+    };
+
     IDXGIResource* pDesktopResource = nullptr;
     DXGI_OUTDUPL_FRAME_INFO frameInfo;
 
@@ -137,18 +145,12 @@ bool ScreenCapturer::capture(cv::Mat& frame, const cv::Rect& crop_region) {
             ++statCacheRe;
             return true;
         }
-    if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
-            t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
-            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
-        }
+        report_if_fail();
         return false;
     }
     if (FAILED(hr)) {
         lg::ok_or_hrfail_if(true, P_C, "AcquireNextFrame", hr, SUCCEEDED(hr));
-    if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
-            t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
-            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
-        }
+        report_if_fail();
         return false;
     }
 
@@ -159,10 +161,7 @@ bool ScreenCapturer::capture(cv::Mat& frame, const cv::Rect& crop_region) {
     t_qi_ms = std::chrono::duration<double, std::milli>(t_qi_e - t_qi_s).count();
     SafeRelease(&pDesktopResource);
     if (FAILED(hr)) {
-    if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
-            t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
-            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
-        }
+        report_if_fail();
         dup->ReleaseFrame();
         return false;
     }
@@ -178,10 +177,7 @@ bool ScreenCapturer::capture(cv::Mat& frame, const cv::Rect& crop_region) {
             ++statCacheRe;
             return true;
         }
-        t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
-    if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
-            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
-        }
+        report_if_fail();
         return false;
     }
 
@@ -237,10 +233,7 @@ bool ScreenCapturer::capture(cv::Mat& frame, const cv::Rect& crop_region) {
         return served;
     }
     if (FAILED(hr)) {
-        t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
-    if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
-            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
-        }
+        report_if_fail();
         idx++;
         return false;
     }

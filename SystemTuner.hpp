@@ -4,7 +4,6 @@
 // NOTE: Logic unchanged from original modules. Only consolidated.
 
 #include <windows.h>
-#include <winnt.h>
 #include <avrt.h>
 #include <d3d11.h>
 #include <dxgi1_2.h>

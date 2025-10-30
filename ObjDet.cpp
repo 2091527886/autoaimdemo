@@ -1,6 +1,5 @@
 #include "ObjDet.hpp"
 
-#include <iostream>
 #include "Log.hpp"
 #include <sstream>
 #include <stdexcept>

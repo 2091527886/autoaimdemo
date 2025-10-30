@@ -2,7 +2,6 @@
 #include "Config.hpp"
 #include "SystemTuner.hpp"
 
-#include <iostream>
 #include <algorithm>
 #include <chrono>
 

@@ -1,8 +1,6 @@
 #pragma once // 防止头文件被重复包含
 
 #include <windows.h>
-#include <cstdint> // 包含这个头文件以使用 uint32_t
-
 // 声明我们将要使用的枚举
 // 注意：保持命名空间与枚举不变，避免影响外部调用
 namespace Send {

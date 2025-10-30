@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
-#include <iostream>
 // Legacy alias macros removed
 // Fields
 
