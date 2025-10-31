@@ -40,6 +40,35 @@
 // --- 5. 核心协调器 (Aim) ---
 class Aim {
 public:
+    // FPS 锁定/补偿控制（短名）
+    struct FpsCtl {
+        double tgt_ms = 8.0;
+        long long spin_us = 0;
+        size_t drop = 0;
+        double ovr = 0.0;
+        explicit FpsCtl(const Config& cfg) {
+            tgt_ms = 1000.0 / std::max(1, cfg.fps);
+            spin_us = cfg.fps_spin_us;
+        }
+        double end(double proc_ms) {
+            if (proc_ms <= tgt_ms) {
+                double rem = tgt_ms - proc_ms;
+                double sl = rem - (double)spin_us / 1000.0;
+                if (sl > 0.0) std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(sl));
+                if (spin_us > 0) {
+                    auto se = std::chrono::high_resolution_clock::now() + std::chrono::microseconds((long long)spin_us);
+                    while (std::chrono::high_resolution_clock::now() < se) { /* spin */ }
+                }
+                ovr = 0.0;
+                return tgt_ms;
+            } else {
+                ovr = proc_ms - tgt_ms; // 超出目标帧时间
+                drop++;
+                return proc_ms; // 不补偿，允许掉帧
+            }
+        }
+    };
+
     Aim()
         : c(),
         cap(c, c.crop_size_px, c.crop_size_px), // 传递 cfg + crop_size
@@ -49,7 +78,8 @@ public:
         crop((cap.w() - c.crop_size_px) / 2, (cap.h() - c.crop_size_px) / 2, c.crop_size_px, c.crop_size_px),
         ctr(c.crop_size_px / 2, c.crop_size_px / 2),
         vis(c.enable_visual),
-        lat(static_cast<size_t>(std::max(1, c.log_latency_every_n)))
+        lat(static_cast<size_t>(std::max(1, c.log_latency_every_n))),
+        fc(c)
     {
         if (cap.w() < c.crop_size_px || cap.h() < c.crop_size_px) {
             throw std::runtime_error("Screen resolution is smaller than configured crop_size_px.");
@@ -108,20 +138,8 @@ public:
             auto loop_end_time = std::chrono::high_resolution_clock::now();
             double proc_ms = std::chrono::duration<double, std::milli>(loop_end_time - loop_start_time).count();
             if (c.fps_lock) {
-                double tgt_ms = 1000.0 / std::max(1, c.fps);
-                double remain = tgt_ms - proc_ms;
-                if (remain > 0.0) {
-                    // 预留微自旋预算
-                    double sleep_ms = remain - (double)c.fps_spin_us / 1000.0;
-                    if (sleep_ms > 0.0) {
-                        std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(sleep_ms));
-                    }
-                    if (c.fps_spin_us > 0) {
-                        auto spin_end = std::chrono::high_resolution_clock::now() + std::chrono::microseconds((long long)c.fps_spin_us);
-                        while (std::chrono::high_resolution_clock::now() < spin_end) { /* spin */ }
-                    }
-                }
-                tm.loop_ms = std::max(proc_ms, tgt_ms);
+                double frame_ms = fc.end(proc_ms);
+                tm.loop_ms = frame_ms;
             } else {
                 tm.loop_ms = proc_ms;
             }
@@ -129,7 +147,7 @@ public:
 
             // 计算 dt（秒）供 PID 使用
             if (c.pid_use_measured_dt) {
-                dt = std::max(0.001, tm.loop_ms / 1000.0);
+                dt = std::max(0.001, tm.loop_ms / 1000.0); // 锁FPS后为tgt，掉帧时为proc
             } else {
                 dt = std::max(0.001, c.pid_fixed_dt_ms / 1000.0);
             }
@@ -137,6 +155,18 @@ public:
 
             if (c.log_latency) {
                 lat.push(fl);
+                // 按相同节流频率输出 drop/ovr
+                ++fcnt;
+                int n = std::max(1, c.log_latency_every_n);
+                if (fcnt % (size_t)n == 0) {
+                    size_t drop_now = fc.drop - drop_prev;
+                    lg::o() << lg::fx2
+                            << P_L "[fps] "
+                            << "drop=" << drop_now
+                            << " | ovr=" << fc.ovr << "ms"
+                            << lg::endl << lg::df;
+                    drop_prev = fc.drop;
+                }
             }
 
             if (vis) {
@@ -275,6 +305,11 @@ private:
     bool first = true;
     // 延迟统计
     LatAgg lat;
+
+    // FPS 控制
+    FpsCtl fc;
+    size_t fcnt = 0;      // 打印节流计数
+    size_t drop_prev = 0; // 上次打印时累计掉帧数
 
     // PID 控制
     PidController px;
