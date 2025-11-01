@@ -321,7 +321,8 @@ private:
 int main() {
     Config boot_cfg; // KEEP
     // 从环境变量读取可选亲和配置
-    boot_cfg.load_affinity_env();
+    boot_cfg.fromEnv();
+    boot_cfg.validate();
     if (boot_cfg.enable_affinity && boot_cfg.affinity_main_mask) {
         setAffinity(boot_cfg.affinity_main_mask,
             boot_cfg.opt_report && boot_cfg.opt_report_system);
