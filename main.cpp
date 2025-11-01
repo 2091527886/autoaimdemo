@@ -305,16 +305,14 @@ private:
             std::ostringstream stats_stream;
             stats_stream << lg::fx1 << "FPS: " << smoothed_fps << lg::df;
             cv::putText(img, stats_stream.str(), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 255), 2);
-            // 检测 FPS（由检测线程耗时估算）
+            // 第二行紧凑：DET + DROP/OVR
+            std::ostringstream line2;
+            line2 << lg::fx1;
             if (det_ms_last > 0.0) {
-                std::ostringstream detfps;
-                detfps << lg::fx1 << "DET: " << (1000.0 / det_ms_last) << lg::df;
-                cv::putText(img, detfps.str(), cv::Point(10, 60), cv::FONT_HERSHEY_SIMPLEX, 0.9, cv::Scalar(0, 220, 255), 2);
+                line2 << "DET: " << (1000.0 / det_ms_last) << " | ";
             }
-            // 附加 drop/ovr 显示
-            std::ostringstream fps2;
-            fps2 << lg::fx2 << "DROP: " << dropS << " | OVR: " << ovrS << "ms" << lg::df;
-            cv::putText(img, fps2.str(), cv::Point(10, 90), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 200, 255), 2);
+            line2 << "DROP: " << dropS << " | OVR: " << ovrS << "ms" << lg::df;
+            cv::putText(img, line2.str(), cv::Point(10, 60), cv::FONT_HERSHEY_SIMPLEX, 0.9, cv::Scalar(0, 220, 255), 2);
         }
         cv::imshow(c.window_title, img);
     }
