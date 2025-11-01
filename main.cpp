@@ -160,6 +160,7 @@ public:
             // 用于统计的近似端到端：主循或检测取慢者
             double loop_e2e = std::max(tm.loop_ms, det_ms_last);
             fl.loop_ms = loop_e2e;
+            e2e_ms_last = loop_e2e;
 
             // 计算 dt（秒）供 PID 使用
             if (c.pid_use_measured_dt) {
@@ -298,7 +299,9 @@ private:
             cv::putText(img, label, cv::Point(det.box.x, det.box.y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 1);
         }
         if (tTot > 0) {
-            double smoothed_fps = 1000.0 / tTot;
+            // 将可视化 FPS 改为 E2E（近似）
+            double e2e = (e2e_ms_last > 0.0 ? e2e_ms_last : tTot);
+            double smoothed_fps = 1000.0 / e2e;
             std::ostringstream stats_stream;
             stats_stream << lg::fx1 << "FPS: " << smoothed_fps << lg::df;
             cv::putText(img, stats_stream.str(), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 255), 2);
@@ -342,6 +345,7 @@ private:
     Timing tm;
     bool vis;
     double det_ms_last = 0.0;
+    double e2e_ms_last = 0.0;
     double tTot = 0.0;
     bool first = true;
     // 延迟统计
