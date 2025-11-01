@@ -241,6 +241,15 @@ struct Game_overlay::Impl
     std::wstring gpu_luid;
     int gpu_idx = -1;
     bool gpu_enum = false;
+    bool vsync = false; // 默认不使用 vsync
+    int  max_latency = 1;
+
+    bool skip_empty = true;
+    int  idle_sleep_ms = 50;
+
+    // small window
+    bool small_window = true;
+    int  cfg_win_x = 0, cfg_win_y = 0, cfg_win_w = 640, cfg_win_h = 640;
 
     void UseVirtualScreen() { useVirtual = true; }
     void SetBounds(int x, int y, int w, int h) { useVirtual = false; winX = x; winY = y; winW = w; winH = h; }
@@ -282,11 +291,21 @@ void Game_overlay::SetMaxFPS(unsigned f) { impl_->maxFps.store(f); }
 
 void Game_overlay::SetConfig(const Config& cfg)
 {
-    // copy subset for overlay gpu
-    impl_->gpu_enum = cfg.ovl_gpu_enum;
-    impl_->gpu_idx  = cfg.ovl_gpu_idx;
-    impl_->gpu_name = cfg.ovl_gpu_name;
-    impl_->gpu_luid = cfg.ovl_gpu_luid;
+    // copy subset for overlay gpu/vsync/latency
+    impl_->gpu_enum    = cfg.ovl_gpu_enum;
+    impl_->gpu_idx     = cfg.ovl_gpu_idx;
+    impl_->gpu_name    = cfg.ovl_gpu_name;
+    impl_->gpu_luid    = cfg.ovl_gpu_luid;
+    impl_->vsync       = cfg.ovl_vsync;
+    impl_->max_latency = cfg.ovl_max_latency;
+
+    impl_->skip_empty     = cfg.ovl_skip_empty;
+    impl_->idle_sleep_ms  = cfg.ovl_idle_sleep_ms;
+    impl_->small_window   = cfg.ovl_small_window;
+    impl_->cfg_win_x      = cfg.ovl_win_x;
+    impl_->cfg_win_y      = cfg.ovl_win_y;
+    impl_->cfg_win_w      = cfg.ovl_win_w;
+    impl_->cfg_win_h      = cfg.ovl_win_h;
 }
 
 void Game_overlay::BeginFrame() { impl_->BeginFrame(); }
@@ -476,7 +495,17 @@ LRESULT CALLBACK Game_overlay::Impl::WndProc(HWND hWnd, UINT msg, WPARAM wParam,
 
 bool Game_overlay::Impl::CreateWindowAndDevices()
 {
-    if (useVirtual) GetVirtualScreen(winX, winY, winW, winH);
+    if (small_window) {
+        useVirtual = false;
+        int vx, vy, vw, vh; GetVirtualScreen(vx, vy, vw, vh);
+        winW = (cfg_win_w > 0) ? cfg_win_w : 640;
+        winH = (cfg_win_h > 0) ? cfg_win_h : 640;
+        int cx = vx + (vw - winW) / 2;
+        int cy = vy + (vh - winH) / 2;
+        winX = (cfg_win_x != 0) ? cfg_win_x : cx;
+        winY = (cfg_win_y != 0) ? cfg_win_y : cy;
+    }
+    else if (useVirtual) GetVirtualScreen(winX, winY, winW, winH);
     else if (winW <= 0 || winH <= 0) GetVirtualScreen(winX, winY, winW, winH);
 
     WNDCLASSEXW wc{ sizeof(WNDCLASSEXW) };
@@ -576,9 +605,9 @@ bool Game_overlay::Impl::CreateWindowAndDevices()
         return false;
     }
 
-    // set maximum frame latency to 1~2
+    // set maximum frame latency if configured (>0)
     ComPtr<IDXGIDevice1> dxgiDev1; d3d.As(&dxgiDev1);
-    if (dxgiDev1) dxgiDev1->SetMaximumFrameLatency(1);
+    if (dxgiDev1 && max_latency > 0) dxgiDev1->SetMaximumFrameLatency((UINT)std::min(std::max(1, max_latency), 3));
 
     if (FAILED(DCompositionCreateDevice(dxgiDev.Get(), IID_PPV_ARGS(&dcompDevice)))) { lg::werr(P_E, "DCompositionCreateDevice"); return false; }
     if (FAILED(dcompDevice->CreateTargetForHwnd(hwnd, TRUE, &dcompTarget))) { lg::werr(P_E, "CreateTargetForHwnd"); return false; }
@@ -779,10 +808,34 @@ void Game_overlay::Impl::RenderOne()
         ShowWindow(hwnd, SW_SHOWNA);
     }
 
+    auto dl = std::atomic_load_explicit(&current, std::memory_order_acquire);
+
+    // 空帧跳过：没有绘制命令时不渲染不Present
+    if (skip_empty && (!dl || dl->cmds.empty()))
+    {
+        ShowWindow(hwnd, SW_HIDE);
+        ComPtr<IDXGISwapChain2> sc2; swapChain.As(&sc2);
+        HANDLE h = sc2 ? sc2->GetFrameLatencyWaitableObject() : nullptr;
+        DWORD ms = (DWORD)std::max(1, idle_sleep_ms);
+        if (h) WaitForSingleObject(h, ms); else Sleep(ms);
+        return;
+    }
+    else
+    {
+        ShowWindow(hwnd, SW_SHOWNA);
+    }
+
     d2dCtx->BeginDraw();
+
     d2dCtx->Clear(D2D1::ColorF(0.f, 0.f, 0.f, 0.f));
 
-    auto dl = std::atomic_load_explicit(&current, std::memory_order_acquire);
+    // 将全屏坐标平移到小窗口局部坐标
+    D2D1_MATRIX_3X2_F __oldM;
+    if (small_window) {
+        d2dCtx->GetTransform(&__oldM);
+        d2dCtx->SetTransform(D2D1::Matrix3x2F::Translation((float)-winX, (float)-winY));
+    }
+
     if (dl)
     {
         for (const auto& c : dl->cmds)
@@ -869,6 +922,11 @@ void Game_overlay::Impl::RenderOne()
         }
     }
 
+    // 恢复变换
+    if (small_window) {
+        d2dCtx->SetTransform(__oldM);
+    }
+
     HRESULT hrEnd = d2dCtx->EndDraw();
     if (FAILED(hrEnd))
     {
@@ -876,6 +934,13 @@ void Game_overlay::Impl::RenderOne()
         CreateTargets();
     }
 
-    // vsync to reduce cross-adapter present pressure
-    swapChain->Present(1, 0);
+    HRESULT phr = S_OK;
+    if (vsync) {
+        phr = swapChain->Present(1, 0);
+    } else {
+        phr = swapChain->Present(0, 0);
+    }
+    if (phr == DXGI_STATUS_OCCLUDED || phr == DXGI_ERROR_ACCESS_LOST) {
+        Sleep(100);
+    }
 }

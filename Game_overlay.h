@@ -46,7 +46,7 @@ public:
 
     void SetMaxFPS(unsigned fps);
 
-    // Provide config for GPU selection/logging
+    // Provide config for GPU/vsync/latency
     void SetConfig(const Config& cfg);
 
     Game_overlay();

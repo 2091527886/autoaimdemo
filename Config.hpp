@@ -142,6 +142,21 @@ public:
     std::wstring ovl_gpu_name;                // 名称包含匹配（优先级最高）
     std::wstring ovl_gpu_luid;                // 形如 hi:lo（十进制或0x..）
 
+    // ---------- Overlay 同步/延迟（仅用于 Game_overlay） ----------
+    bool         ovl_vsync = false;           // 默认不使用 VSync（跨适配器降低延迟）
+    int          ovl_max_latency = 1;         // 最大帧延迟(1..3)，<=0 表示不控制
+
+    // ---------- Overlay 空闲节流（仅用于 Game_overlay） ----------
+    bool         ovl_skip_empty = true;       // 无绘制命令时跳过渲染与Present
+    int          ovl_idle_sleep_ms = 50;      // 空闲时休眠毫秒数
+
+    // ---------- Overlay 小窗口（仅用于 Game_overlay） ----------
+    bool         ovl_small_window = true;     // 启用小窗口，默认使用裁剪尺寸
+    int          ovl_win_x = 0;               // 0 表示默认居中
+    int          ovl_win_y = 0;               // 0 表示默认居中
+    int          ovl_win_w = crop_size_px;    // 默认用检测裁剪尺寸
+    int          ovl_win_h = crop_size_px;    // 默认用检测裁剪尺寸
+
     // ---------- Overlay per-class 颜色（默认 enemy=红, teammate=绿） ----------
     bool ovl_cls = true;
     std::vector<int> ovl_cr { 255, 0 };
