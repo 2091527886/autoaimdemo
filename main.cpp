@@ -27,6 +27,7 @@
 // --- 2. 鼠标控制器 (Mouse) ---
 #include "OverlayAnimator.hpp"
 #include "Mouse.hpp"
+#include "MouAsync.hpp"
 #include "HotkeyManager.hpp"
 #include "ObjDet.hpp"
 #include "ScreenCapturer.hpp"
@@ -96,6 +97,7 @@ public:
         cap.set_roi(crop);
         cap.start();
         det.start();
+        mou.start();
         // 初始化 PID 控制器（像素域）。输出再乘以 mouse_correction_factor 转为鼠标单位。
         px.setK(c.pid_kp_x, c.pid_ki_x, c.pid_kd_x);
         px.setLim(c.pid_output_limit, c.pid_integral_limit);
@@ -106,6 +108,7 @@ public:
     ~Aim() {
         cap.stop();
         det.stop();
+        mou.stop();
         if (vis) cv::destroyAllWindows();
     }
 
@@ -147,7 +150,8 @@ public:
             Detection* target = pick();
             move(target);
             auto t_mouse_end = std::chrono::high_resolution_clock::now();
-            fl.mou_ms = std::chrono::duration<double, std::milli>(t_mouse_end - t_mouse_start).count();
+            // 记录异步线程上一次实际驱动调用耗时
+            fl.mou_ms = mou.last_ms();
 
             auto loop_end_time = std::chrono::high_resolution_clock::now();
             double proc_ms = std::chrono::duration<double, std::milli>(loop_end_time - loop_start_time).count();
@@ -254,7 +258,7 @@ private:
             int move_y = static_cast<int>(out_y_pix * mfac);
 
             if (move_x != 0 || move_y != 0) {
-                m.Move(move_x, move_y);
+                mou.put(move_x, move_y);
             }
         }
 
@@ -271,7 +275,7 @@ private:
             int move_x = static_cast<int>(corrected_dx);
             int move_y = static_cast<int>(corrected_dy);
             if (move_x != 0 || move_y != 0) {
-                m.Move(move_x, move_y);
+                mou.put(move_x, move_y);
             }
         }
     }
@@ -333,7 +337,7 @@ private:
     CapAsync cap;
     ObjDet od;
     DetAsync det;
-    Mouse m;
+    MouAsync mou;
     HotkeyManager hk;
     const cv::Rect crop;
     const cv::Point ctr;
