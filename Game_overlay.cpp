@@ -7,6 +7,7 @@
 #include <dwmapi.h>
 #include <d3d11.h>
 #include <dxgi1_2.h>
+#include <dxgi1_3.h>
 #include <d2d1_1.h>
 #include <dwrite.h>
 #include <wincodec.h>
@@ -562,10 +563,11 @@ bool Game_overlay::Impl::CreateWindowAndDevices()
     scd.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     scd.SampleDesc.Count = 1;
     scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    scd.BufferCount = 2;
+    scd.BufferCount = 3; // triple buffering for smoother
     scd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
     scd.AlphaMode = DXGI_ALPHA_MODE_PREMULTIPLIED;
     scd.Scaling = DXGI_SCALING_STRETCH;
+    scd.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
 
     if (FAILED(factory2->CreateSwapChainForComposition(
         d3d.Get(), &scd, nullptr, &swapChain)))
@@ -573,6 +575,10 @@ bool Game_overlay::Impl::CreateWindowAndDevices()
         lg::werr(P_E, "CreateSwapChainForComposition");
         return false;
     }
+
+    // set maximum frame latency to 1~2
+    ComPtr<IDXGIDevice1> dxgiDev1; d3d.As(&dxgiDev1);
+    if (dxgiDev1) dxgiDev1->SetMaximumFrameLatency(1);
 
     if (FAILED(DCompositionCreateDevice(dxgiDev.Get(), IID_PPV_ARGS(&dcompDevice)))) { lg::werr(P_E, "DCompositionCreateDevice"); return false; }
     if (FAILED(dcompDevice->CreateTargetForHwnd(hwnd, TRUE, &dcompTarget))) { lg::werr(P_E, "CreateTargetForHwnd"); return false; }
@@ -723,7 +729,10 @@ HRESULT Game_overlay::Impl::CreateTextFormat(
 void Game_overlay::Impl::RenderLoop()
 {
     running = true;
-    auto last = std::chrono::high_resolution_clock::now();
+
+    HANDLE frameWait = nullptr;
+    ComPtr<IDXGISwapChain2> sc2; if (swapChain) swapChain.As(&sc2);
+    if (sc2) frameWait = sc2->GetFrameLatencyWaitableObject();
 
     MSG msg{};
     while (running.load())
@@ -741,13 +750,16 @@ void Game_overlay::Impl::RenderLoop()
         if (!running.load()) break;
 
         unsigned cap = maxFps.load();
-        if (cap > 0)
+        DWORD timeout = (cap > 0) ? (1000u / cap) : INFINITE;
+        if (frameWait)
         {
-            auto now = std::chrono::high_resolution_clock::now();
-            auto minDelta = std::chrono::microseconds(1'000'000 / cap);
-            if (now - last < minDelta) { Sleep(1); continue; }
-            last = now;
+            WaitForSingleObject(frameWait, timeout);
         }
+        else if (cap > 0)
+        {
+            Sleep(timeout);
+        }
+
         RenderOne();
     }
 }
@@ -864,5 +876,6 @@ void Game_overlay::Impl::RenderOne()
         CreateTargets();
     }
 
-    swapChain->Present(0, 0);
+    // vsync to reduce cross-adapter present pressure
+    swapChain->Present(1, 0);
 }
