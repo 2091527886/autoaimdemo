@@ -29,6 +29,10 @@ bool CapAsync::get(cv::Mat& out) {
     return true;
 }
 
+void CapAsync::drain() {
+    cap.reporter.drain();
+}
+
 void CapAsync::run() {
     // Optional small warmup sleep to let main init
     using namespace std::chrono_literals;

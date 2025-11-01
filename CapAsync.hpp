@@ -29,6 +29,9 @@ public:
     // Fetch latest frame (returns false if no new frame)
     bool get(cv::Mat& out);
 
+    // Drain capture stats (print in main thread)
+    void drain();
+
     // Proxy dimensions (from ScreenCapturer)
     int w() const { return cap.w(); }
     int h() const { return cap.h(); }

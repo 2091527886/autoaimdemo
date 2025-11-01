@@ -96,9 +96,13 @@ void ObjDet::detect(const cv::Mat& img,
     auto t3 = std::chrono::high_resolution_clock::now();
     tm.post_ms = std::chrono::duration<double, std::milli>(t3 - t2).count();
 
-    if (cfg.perf_report) {
-        if (perf_.ShouldReport()) {
-            perf_.PrintReport(*model_);
+    if (cfg.perf_report && perf_.ShouldReport()) {
+        auto report = model_->performanceReport();
+        const std::string& tp = std::get<0>(report);
+        if (!tp.empty()) {
+            tm.trt_throughput = tp;
+            tm.trt_cpu_lat = std::get<1>(report);
+            tm.trt_gpu_lat = std::get<2>(report);
         }
     }
 }

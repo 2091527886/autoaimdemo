@@ -6,12 +6,17 @@
 #include <limits>
 #include "Log.hpp"
 #include <algorithm>
+#include <string>
 
 // Timing details for detection pipeline
 struct Timing {
     double infer_ms = 0;
     double post_ms = 0;
     double loop_ms = 0;
+    // TRT perf strings (filled in det thread, printed in main)
+    std::string trt_throughput;
+    std::string trt_cpu_lat;
+    std::string trt_gpu_lat;
 };
 
 // Per-frame latency breakdown
@@ -34,10 +39,6 @@ public:
         if (buf.size() >= wnd) {
             printClear();
         }
-    }
-
-    void flush() {
-        if (!buf.empty()) printClear();
     }
 
 private:

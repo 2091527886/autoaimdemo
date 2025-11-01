@@ -180,8 +180,21 @@ public:
                             << "drop=" << drop_now
                             << " | ovr=" << fc.ovr << "ms"
                             << lg::endl << lg::df;
+                    // 缓存到可视化
+                    dropS = drop_now;
+                    ovrS = fc.ovr;
                     drop_prev = fc.drop;
                 }
+            }
+            // 仅在主线程打印采集统计，避免并发输出
+            cap.drain();
+
+            // 检测性能日志由主线程统一输出
+            if (!tm.trt_throughput.empty()) {
+                lg::ml(P_T, tm.trt_throughput, tm.trt_cpu_lat, tm.trt_gpu_lat);
+                tm.trt_throughput.clear();
+                tm.trt_cpu_lat.clear();
+                tm.trt_gpu_lat.clear();
             }
 
             if (vis) {
@@ -288,6 +301,10 @@ private:
             std::ostringstream stats_stream;
             stats_stream << lg::fx1 << "FPS: " << smoothed_fps << lg::df;
             cv::putText(img, stats_stream.str(), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 255), 2);
+            // 附加 drop/ovr 显示
+            std::ostringstream fps2;
+            fps2 << lg::fx2 << "DROP: " << dropS << " | OVR: " << ovrS << "ms" << lg::df;
+            cv::putText(img, fps2.str(), cv::Point(10, 60), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 200, 255), 2);
         }
         cv::imshow(c.window_title, img);
     }
@@ -326,12 +343,15 @@ private:
     FpsCtl fc;
     size_t fcnt = 0;      // 打印节流计数
     size_t drop_prev = 0; // 上次打印时累计掉帧数
+    size_t dropS = 0;     // 可视化缓存
+    double ovrS = 0.0;
 
     // PID 控制
     PidController px;
     PidController py;
     double dt = 1.0/60.0;
 };
+
 
 // --- 主函数 ---
 int main() {
