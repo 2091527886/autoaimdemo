@@ -14,6 +14,8 @@ inline constexpr OverlayColor ARGB(uint8_t a, uint8_t r, uint8_t g, uint8_t b) {
     return (OverlayColor(a) << 24) | (OverlayColor(r) << 16) | (OverlayColor(g) << 8) | OverlayColor(b);
 }
 
+class Config; // fwd
+
 class Game_overlay
 {
 public:
@@ -43,6 +45,9 @@ public:
     void SetWindowBounds(int x, int y, int w, int h);
 
     void SetMaxFPS(unsigned fps);
+
+    // Provide config for GPU selection/logging
+    void SetConfig(const Config& cfg);
 
     Game_overlay();
     ~Game_overlay();

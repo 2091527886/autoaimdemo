@@ -1,4 +1,6 @@
 #include "Game_overlay.h"
+#include "Log.hpp"
+#include "Config.hpp"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -20,6 +22,8 @@
 #include <string>
 #include <cstdint>
 #include <chrono>
+#include <algorithm>
+#include <cwctype>
 
 #pragma comment(lib, "dwmapi.lib")
 #pragma comment(lib, "d3d11.lib")
@@ -55,6 +59,111 @@ static D2D1_COLOR_F ToD2DColor(OverlayColor argb)
     float g = float((argb >> 8) & 0xFF) / 255.f;
     float b = float((argb >> 0) & 0xFF) / 255.f;
     return D2D1::ColorF(r, g, b, a);
+}
+
+// ---- GPU select helpers (overlay-local, env-driven) ----
+static std::wstring wenv(const wchar_t* k)
+{
+    wchar_t buf[512];
+    DWORD n = GetEnvironmentVariableW(k, buf, (DWORD)_countof(buf));
+    if (n == 0 || n >= _countof(buf)) return L"";
+    return std::wstring(buf, buf + n);
+}
+
+static std::wstring wlower(std::wstring s)
+{
+    std::transform(s.begin(), s.end(), s.begin(), [](wchar_t c){ return std::towlower(c); });
+    return s;
+}
+
+static bool parse_idx(const std::wstring& s, int& out)
+{
+    if (s.empty()) return false;
+    try { out = std::stoi(s); return out >= 0; } catch (...) { return false; }
+}
+
+static bool parse_luid(const std::wstring& s, LUID& out)
+{
+    // format: hi:lo (hex or dec)
+    size_t p = s.find(L':');
+    if (p == std::wstring::npos) return false;
+    auto sh = s.substr(0, p), sl = s.substr(p + 1);
+    auto to_u32 = [](const std::wstring& t, DWORD& v)->bool {
+        try {
+            size_t idx = 0; int base = 10;
+            if (t.size() > 2 && (t.rfind(L"0x",0)==0 || t.rfind(L"0X",0)==0)) { base = 16; }
+            v = (DWORD)std::stoul(t, &idx, base);
+            return idx == t.size();
+        } catch (...) { return false; }
+    };
+    DWORD hi=0, lo=0;
+    if (!to_u32(sh, hi) || !to_u32(sl, lo)) return false;
+    out.HighPart = (LONG)hi;
+    out.LowPart  = (DWORD)lo;
+    return true;
+}
+
+struct GpuInfo { ComPtr<IDXGIAdapter1> adp; DXGI_ADAPTER_DESC1 desc{}; int idx=-1; };
+
+static std::vector<GpuInfo> list_adapters()
+{
+    std::vector<GpuInfo> v;
+    ComPtr<IDXGIFactory1> fac;
+    if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&fac)))) return v;
+    for (UINT i=0;;++i) {
+        ComPtr<IDXGIAdapter1> a; DXGI_ADAPTER_DESC1 d{};
+        if (fac->EnumAdapters1(i, &a) == DXGI_ERROR_NOT_FOUND) break;
+        if (!a) break;
+        if (FAILED(a->GetDesc1(&d))) continue;
+        if (d.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) continue; // skip WARP
+        v.push_back({ a, d, (int)i });
+    }
+    return v;
+}
+
+static void log_adapters(const std::vector<GpuInfo>& v)
+{
+    for (auto& g: v) {
+        std::wstring name(g.desc.Description);
+        double mb = (double)g.desc.DedicatedVideoMemory / (1024.0*1024.0);
+        lg::o() << P_I "OVL GPU[" << g.idx << "] "
+                << std::string(name.begin(), name.end())
+                << " | ven=0x" << std::hex << std::uppercase << g.desc.VendorId
+                << " dev=0x" << g.desc.DeviceId << std::dec << std::nouppercase
+                << " | memMB=" << (int)mb
+                << " | luid=" << g.desc.AdapterLuid.HighPart << ":" << g.desc.AdapterLuid.LowPart
+                << lg::endl;
+    }
+}
+
+// pick by Config fields set via SetConfig
+static ComPtr<IDXGIAdapter1> pick_adapter_cfg(const std::wstring& name,
+                                              const std::wstring& luid,
+                                              int idx,
+                                              bool do_enum)
+{
+    auto v = list_adapters();
+    if (do_enum) log_adapters(v);
+    if (v.empty()) return {};
+    if (!name.empty()) {
+        auto kn = wlower(name);
+        for (auto& g: v) {
+            std::wstring dn(g.desc.Description);
+            if (wlower(dn).find(kn) != std::wstring::npos) return g.adp;
+        }
+    }
+    if (!luid.empty()) {
+        LUID t{}; if (parse_luid(luid, t)) {
+            for (auto& g: v) {
+                if (g.desc.AdapterLuid.HighPart==t.HighPart && g.desc.AdapterLuid.LowPart==t.LowPart)
+                    return g.adp;
+            }
+        }
+    }
+    if (idx >= 0) {
+        for (auto& g: v) if (g.idx==idx) return g.adp;
+    }
+    return {};
 }
 
 struct DrawCmd
@@ -126,6 +235,12 @@ struct Game_overlay::Impl
     int nextImageId = 1;
     std::unordered_map<int, ImageRes> images;
 
+    // config view (overlay-only fields used)
+    std::wstring gpu_name;
+    std::wstring gpu_luid;
+    int gpu_idx = -1;
+    bool gpu_enum = false;
+
     void UseVirtualScreen() { useVirtual = true; }
     void SetBounds(int x, int y, int w, int h) { useVirtual = false; winX = x; winY = y; winW = w; winH = h; }
 
@@ -163,6 +278,15 @@ bool Game_overlay::GetVisible() const { return impl_->visible.load(); }
 void Game_overlay::UseVirtualScreen() { impl_->UseVirtualScreen(); }
 void Game_overlay::SetWindowBounds(int x, int y, int w, int h) { impl_->SetBounds(x, y, w, h); }
 void Game_overlay::SetMaxFPS(unsigned f) { impl_->maxFps.store(f); }
+
+void Game_overlay::SetConfig(const Config& cfg)
+{
+    // copy subset for overlay gpu
+    impl_->gpu_enum = cfg.ovl_gpu_enum;
+    impl_->gpu_idx  = cfg.ovl_gpu_idx;
+    impl_->gpu_name = cfg.ovl_gpu_name;
+    impl_->gpu_luid = cfg.ovl_gpu_luid;
+}
 
 void Game_overlay::BeginFrame() { impl_->BeginFrame(); }
 void Game_overlay::EndFrame() { impl_->EndFrame(); }
@@ -360,13 +484,12 @@ bool Game_overlay::Impl::CreateWindowAndDevices()
     wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     wc.lpszClassName = L"GameOverlayDCompWnd";
     wc.hbrBackground = nullptr;
-    if (!RegisterClassExW(&wc))
-        return false;
+    if (!RegisterClassExW(&wc)) { lg::werr(P_E, "RegisterClassExW"); return false; }
 
     DWORD ex = WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED;
     hwnd = CreateWindowExW(ex, wc.lpszClassName, L"", WS_POPUP,
         winX, winY, winW, winH, nullptr, nullptr, hinst, this);
-    if (!hwnd) return false;
+    if (!hwnd) { lg::werr(P_E, "CreateWindowExW"); return false; }
 
     BOOL dwm = FALSE;
     if (SUCCEEDED(DwmIsCompositionEnabled(&dwm)) && dwm)
@@ -391,11 +514,34 @@ bool Game_overlay::Impl::CreateWindowAndDevices()
         D3D_FEATURE_LEVEL_10_0
     };
     D3D_FEATURE_LEVEL flOut{};
-    if (FAILED(D3D11CreateDevice(
-        nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, flags,
-        featureLevels, _countof(featureLevels),
-        D3D11_SDK_VERSION, &d3d, &flOut, &d3dCtx)))
+    HRESULT hr = E_FAIL;
     {
+        // try config-selected adapter first
+        ComPtr<IDXGIAdapter1> pick = pick_adapter_cfg(gpu_name, gpu_luid, gpu_idx, gpu_enum);
+        if (pick) {
+            hr = D3D11CreateDevice(
+                pick.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, flags,
+                featureLevels, _countof(featureLevels),
+                D3D11_SDK_VERSION, &d3d, &flOut, &d3dCtx);
+            if (FAILED(hr)) {
+                lg::hrfail(P_E, "D3D11CreateDevice(pick)", hr);
+            } else {
+                DXGI_ADAPTER_DESC1 d{}; pick->GetDesc1(&d);
+                std::wstring n(d.Description);
+                lg::o() << P_I "OVL use GPU: " << std::string(n.begin(), n.end()) << lg::endl;
+            }
+        }
+        if (FAILED(hr)) {
+            // fallback to default
+            hr = D3D11CreateDevice(
+                nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, flags,
+                featureLevels, _countof(featureLevels),
+                D3D11_SDK_VERSION, &d3d, &flOut, &d3dCtx);
+        }
+    }
+    if (FAILED(hr))
+    {
+        lg::hrfail(P_E, "D3D11CreateDevice", hr);
         return false;
     }
 
@@ -424,24 +570,21 @@ bool Game_overlay::Impl::CreateWindowAndDevices()
     if (FAILED(factory2->CreateSwapChainForComposition(
         d3d.Get(), &scd, nullptr, &swapChain)))
     {
+        lg::werr(P_E, "CreateSwapChainForComposition");
         return false;
     }
 
-    if (FAILED(DCompositionCreateDevice(
-        dxgiDev.Get(), IID_PPV_ARGS(&dcompDevice))))
-    {
-        return false;
-    }
-    if (FAILED(dcompDevice->CreateTargetForHwnd(hwnd, TRUE, &dcompTarget))) return false;
-    if (FAILED(dcompDevice->CreateVisual(&dcompRoot))) return false;
-    if (FAILED(dcompRoot->SetContent(swapChain.Get()))) return false;
-    if (FAILED(dcompTarget->SetRoot(dcompRoot.Get()))) return false;
+    if (FAILED(DCompositionCreateDevice(dxgiDev.Get(), IID_PPV_ARGS(&dcompDevice)))) { lg::werr(P_E, "DCompositionCreateDevice"); return false; }
+    if (FAILED(dcompDevice->CreateTargetForHwnd(hwnd, TRUE, &dcompTarget))) { lg::werr(P_E, "CreateTargetForHwnd"); return false; }
+    if (FAILED(dcompDevice->CreateVisual(&dcompRoot))) { lg::werr(P_E, "CreateVisual"); return false; }
+    if (FAILED(dcompRoot->SetContent(swapChain.Get()))) { lg::werr(P_E, "SetContent"); return false; }
+    if (FAILED(dcompTarget->SetRoot(dcompRoot.Get()))) { lg::werr(P_E, "SetRoot"); return false; }
     dcompDevice->Commit();
 
-    if (FAILED(CreateTargets())) return false;
+    if (FAILED(CreateTargets())) { lg::werr(P_E, "CreateTargets"); return false; }
 
     if (FAILED(d2dCtx->CreateSolidColorBrush(
-        D2D1::ColorF(1.f, 1.f, 1.f, 1.f), &brush))) return false;
+        D2D1::ColorF(1.f, 1.f, 1.f, 1.f), &brush))) { lg::werr(P_E, "CreateSolidColorBrush"); return false; }
     d2dCtx->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
     d2dCtx->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_CLEARTYPE);
 
@@ -449,6 +592,7 @@ bool Game_overlay::Impl::CreateWindowAndDevices()
         DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
         reinterpret_cast<IUnknown**>(dwFactory.GetAddressOf()))))
     {
+        lg::werr(P_E, "DWriteCreateFactory");
         return false;
     }
 
@@ -461,6 +605,7 @@ bool Game_overlay::Impl::CreateWindowAndDevices()
 
 void Game_overlay::Impl::DestroyWindowAndDevices()
 {
+    lg::o() << P_I "Overlay.Destroy" << lg::endl;
     ReleaseTargets();
     brush.Reset();
     d2dCtx.Reset();
@@ -485,11 +630,9 @@ HRESULT Game_overlay::Impl::CreateTargets()
     ReleaseTargets();
 
     ComPtr<ID3D11Texture2D> bb;
-    if (FAILED(swapChain->GetBuffer(0, IID_PPV_ARGS(&bb))))
-        return E_FAIL;
+    if (FAILED(swapChain->GetBuffer(0, IID_PPV_ARGS(&bb)))) { lg::werr(P_E, "GetBuffer"); return E_FAIL; }
 
-    if (FAILED(d3d->CreateRenderTargetView(bb.Get(), nullptr, &rtv)))
-        return E_FAIL;
+    if (FAILED(d3d->CreateRenderTargetView(bb.Get(), nullptr, &rtv))) { lg::werr(P_E, "CreateRenderTargetView"); return E_FAIL; }
 
     if (!d2dFactory)
     {
@@ -501,26 +644,26 @@ HRESULT Game_overlay::Impl::CreateTargets()
             D2D1_FACTORY_TYPE_MULTI_THREADED,
             __uuidof(ID2D1Factory1),
             &opts,
-            reinterpret_cast<void**>(d2dFactory.GetAddressOf()))))
+            reinterpret_cast<void**>(d2dFactory.GetAddressOf())))) {
+            lg::werr(P_E, "D2D1CreateFactory");
             return E_FAIL;
+        }
     }
 
     if (!d2dDevice)
     {
         ComPtr<IDXGIDevice> dxgiDev; d3d.As(&dxgiDev);
-        if (FAILED(d2dFactory->CreateDevice(dxgiDev.Get(), &d2dDevice)))
-            return E_FAIL;
+        if (FAILED(d2dFactory->CreateDevice(dxgiDev.Get(), &d2dDevice))) { lg::werr(P_E, "CreateDevice(D2D) "); return E_FAIL; }
     }
 
     if (!d2dCtx)
     {
         if (FAILED(d2dDevice->CreateDeviceContext(
-            D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &d2dCtx)))
-            return E_FAIL;
+            D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &d2dCtx))) { lg::werr(P_E, "CreateDeviceContext"); return E_FAIL; }
     }
 
     ComPtr<IDXGISurface> surf;
-    if (FAILED(bb.As(&surf))) return E_FAIL;
+    if (FAILED(bb.As(&surf))) { lg::werr(P_E, "As(IdxgiSurface)"); return E_FAIL; }
 
     D2D1_BITMAP_PROPERTIES1 props =
         D2D1::BitmapProperties1(
@@ -533,8 +676,7 @@ HRESULT Game_overlay::Impl::CreateTargets()
         );
 
     if (FAILED(d2dCtx->CreateBitmapFromDxgiSurface(
-        surf.Get(), &props, &d2dTarget)))
-        return E_FAIL;
+        surf.Get(), &props, &d2dTarget))) { lg::werr(P_E, "CreateBitmapFromDxgiSurface"); return E_FAIL; }
 
     d2dCtx->SetTarget(d2dTarget.Get());
 
@@ -718,6 +860,7 @@ void Game_overlay::Impl::RenderOne()
     HRESULT hrEnd = d2dCtx->EndDraw();
     if (FAILED(hrEnd))
     {
+        lg::hrfail(P_E, "EndDraw", hrEnd);
         CreateTargets();
     }
 

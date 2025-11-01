@@ -101,7 +101,8 @@ public:
         ctl = std::make_unique<CtlAsync>(c, mou);
         ctl->set(ctr, mfac);
         ctl->start();
-        if (c.ovl) ovl.start();
+        if (c.ovl) { lg::o() << P_B "Overlay=ON" << lg::endl; ovl.start(); }
+        else { lg::o() << P_B "Overlay=OFF" << lg::endl; }
     }
 
     ~Aim() {

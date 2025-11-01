@@ -136,6 +136,21 @@ public:
     int       ovl_b = 0;
     float     ovl_thick = 2.0f;
 
+    // ---------- Overlay GPU 选择/枚举（仅用于 Game_overlay） ----------
+    bool         ovl_gpu_enum = false;        // 枚举并日志打印适配器
+    int          ovl_gpu_idx  = -1;           // 0-based；<0 表示未设置
+    std::wstring ovl_gpu_name;                // 名称包含匹配（优先级最高）
+    std::wstring ovl_gpu_luid;                // 形如 hi:lo（十进制或0x..）
+
+    // ---------- Overlay per-class 颜色（默认 enemy=红, teammate=绿） ----------
+    bool ovl_cls = true;
+    std::vector<int> ovl_cr { 255, 0 };
+    std::vector<int> ovl_cg { 0, 255 };
+    std::vector<int> ovl_cb { 0, 0 };
+
+    // 仅显示某一类（-1 显示全部；>=0 仅该 class_id）
+    int ovl_only = -1;
+
     // ---------- Overlay 动画（强制 DWM 产帧） ----------
     bool      overlay_anim = false;
     long long overlay_interval_100ns = 110; // 定时器间隔（100ns）
@@ -175,6 +190,14 @@ public:
         overlay_interval_100ns = std::max(1ll, overlay_interval_100ns);
         overlay_spin_us = std::max(0ll, overlay_spin_us);
         overlay_px = std::max(1, overlay_px);
+        // overlay per-class 配色尺寸/范围
+        auto pad = [&](std::vector<int>& v, size_t n, int d){ if (v.size()<n) v.resize(n, d); for (auto& x: v){ x = std::max(0, std::min(255, x)); } };
+        if (ovl_cls) {
+            size_t n = classes.size();
+            pad(ovl_cr, n, ovl_r);
+            pad(ovl_cg, n, ovl_g);
+            pad(ovl_cb, n, ovl_b);
+        }
         // 合理范围软约束（不改 const 值，仅在此处校验）
         // conf_thresh/y_anchor_ratio 等 const 值仅检测
         if (!(conf_thresh >= 0.0f && conf_thresh <= 1.0f)) {

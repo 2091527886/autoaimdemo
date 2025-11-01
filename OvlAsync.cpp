@@ -1,10 +1,14 @@
 #include "OvlAsync.hpp"
 #include <chrono>
 #include <algorithm>
+#include "Log.hpp"
 
 void OvlAsync::start() {
     bool ex = false;
     if (!go.compare_exchange_strong(ex, true)) return;
+    lg::o() << P_B "Overlay=ON (fps=" << c.ovl_fps
+            << ", a=" << c.ovl_a << ", rgb=" << c.ovl_r << "," << c.ovl_g << "," << c.ovl_b
+            << ", th=" << c.ovl_thick << ")" << lg::endl;
     th = std::thread(&OvlAsync::run, this);
 }
 
@@ -12,6 +16,7 @@ void OvlAsync::stop() {
     bool ex = true;
     if (go.compare_exchange_strong(ex, false)) {
         if (th.joinable()) th.join();
+        lg::o() << P_B "Overlay=OFF" << lg::endl;
     }
 }
 
@@ -29,7 +34,12 @@ void OvlAsync::put(const std::vector<Detection>& ds, const cv::Rect& crop) {
 void OvlAsync::run() {
     gover.UseVirtualScreen();
     gover.SetMaxFPS((unsigned)std::max(1, c.ovl_fps));
-    gover.Start();
+    gover.SetConfig(c);
+    {
+        bool ok = gover.Start();
+        lg::ok_or_werr(P_B, "Overlay.Start", ok);
+        if (!ok) return;
+    }
 
     int seen = seq.load(std::memory_order_acquire);
 
@@ -51,11 +61,19 @@ void OvlAsync::run() {
 
         gover.BeginFrame();
         for (const auto& d : cur) {
+            if (c.ovl_only >= 0 && d.class_id != c.ovl_only) continue;
             float x = (float)(r.x + d.box.x);
             float y = (float)(r.y + d.box.y);
             float w = (float)d.box.width;
             float h = (float)d.box.height;
-            gover.AddRect({x,y,w,h}, ARGB((uint8_t)c.ovl_a,(uint8_t)c.ovl_r,(uint8_t)c.ovl_g,(uint8_t)c.ovl_b), (float)c.ovl_thick);
+            int cid = d.class_id;
+            int rr = c.ovl_r, gg = c.ovl_g, bb = c.ovl_b;
+            if (c.ovl_cls && cid >= 0) {
+                if (cid < (int)c.ovl_cr.size()) rr = c.ovl_cr[cid];
+                if (cid < (int)c.ovl_cg.size()) gg = c.ovl_cg[cid];
+                if (cid < (int)c.ovl_cb.size()) bb = c.ovl_cb[cid];
+            }
+            gover.AddRect({x,y,w,h}, ARGB((uint8_t)c.ovl_a,(uint8_t)rr,(uint8_t)gg,(uint8_t)bb), (float)c.ovl_thick);
         }
         gover.EndFrame();
     }
