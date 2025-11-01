@@ -157,7 +157,9 @@ public:
             } else {
                 tm.loop_ms = proc_ms;
             }
-            fl.loop_ms = tm.loop_ms;
+            // 用于统计的近似端到端：主循或检测取慢者
+            double loop_e2e = std::max(tm.loop_ms, det_ms_last);
+            fl.loop_ms = loop_e2e;
 
             // 计算 dt（秒）供 PID 使用
             if (c.pid_use_measured_dt) {
@@ -300,10 +302,16 @@ private:
             std::ostringstream stats_stream;
             stats_stream << lg::fx1 << "FPS: " << smoothed_fps << lg::df;
             cv::putText(img, stats_stream.str(), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 255), 2);
+            // 检测 FPS（由检测线程耗时估算）
+            if (det_ms_last > 0.0) {
+                std::ostringstream detfps;
+                detfps << lg::fx1 << "DET: " << (1000.0 / det_ms_last) << lg::df;
+                cv::putText(img, detfps.str(), cv::Point(10, 60), cv::FONT_HERSHEY_SIMPLEX, 0.9, cv::Scalar(0, 220, 255), 2);
+            }
             // 附加 drop/ovr 显示
             std::ostringstream fps2;
             fps2 << lg::fx2 << "DROP: " << dropS << " | OVR: " << ovrS << "ms" << lg::df;
-            cv::putText(img, fps2.str(), cv::Point(10, 60), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 200, 255), 2);
+            cv::putText(img, fps2.str(), cv::Point(10, 90), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 200, 255), 2);
         }
         cv::imshow(c.window_title, img);
     }
