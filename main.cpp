@@ -11,7 +11,6 @@
 // Input Simulator (确保头文件在项目路径中)
 #include "Config.hpp"
 #include "Timing.hpp"
-#include "PidController.hpp"
 #include "SystemTuner.hpp"
 #include "Reporting.hpp"
 #include "Detection.hpp"
@@ -30,7 +29,6 @@
 #include "MouAsync.hpp"
 #include "CtlAsync.hpp"
 #include "HotkeyManager.hpp"
-#include "ObjDet.hpp"
 #include "ScreenCapturer.hpp"
 #include "CapAsync.hpp"
 #include "DetAsync.hpp"
@@ -76,9 +74,8 @@ public:
     Aim()
         : c(),
         cap(c),
-        od(c),
         det(c),
-        m(),
+        mou(),
         hk(c),
         crop((cap.w() - c.crop_size_px) / 2, (cap.h() - c.crop_size_px) / 2, c.crop_size_px, c.crop_size_px),
         ctr(c.crop_size_px / 2, c.crop_size_px / 2),
@@ -102,11 +99,6 @@ public:
         ctl = std::make_unique<CtlAsync>(c, mou);
         ctl->set(ctr, mfac);
         ctl->start();
-        // 初始化 PID 控制器（像素域）。保留但不在主线程使用（保持接口不变）。
-        px.setK(c.pid_kp_x, c.pid_ki_x, c.pid_kd_x);
-        px.setLim(c.pid_output_limit, c.pid_integral_limit);
-        py.setK(c.pid_kp_y, c.pid_ki_y, c.pid_kd_y);
-        py.setLim(c.pid_output_limit, c.pid_integral_limit);
     }
 
     ~Aim() {
@@ -150,14 +142,12 @@ public:
             }
             fl.det_ms = det_ms_last;
 
-            // 3) 鼠标控制计时（整体阶段）
-            auto t_mouse_start = std::chrono::high_resolution_clock::now();
+            // 3) 鼠标控制（异步线程统计耗时）
             // 采集用户输入状态
             bool smooth_pressed = hk.SmoothPressed();
             bool single = hk.SingleShotJustPressed();
             // 将选择+PID+单发异步化（保持逻辑不变）
             ctl->put(ds, smooth_pressed, single, dt);
-            auto t_mouse_end = std::chrono::high_resolution_clock::now();
             // 记录异步线程上一次实际驱动调用耗时
             fl.mou_ms = mou.last_ms();
 
@@ -212,7 +202,7 @@ public:
             }
 
             if (vis) {
-                draw(target);
+                draw(nullptr);
             }
             char key = static_cast<char>(cv::waitKey(1));
             if (key == 27) { // ESC
@@ -226,72 +216,6 @@ public:
     }
 
 private:
-    Detection* pick() {
-        // deprecated: moved to CtlAsync
-
-        Detection* target = nullptr;
-        double min_dist_to_center = c.lock_radius_px;
-        for (auto& det : ds) {
-            if (!c.is_target(det.class_id)) continue; // 过滤非目标类别
-            cv::Point box_center(det.box.x + det.box.width / 2, det.box.y + det.box.height / 2);
-            double dist = std::hypot(box_center.x - ctr.x, box_center.y - ctr.y);
-            if (dist < min_dist_to_center) {
-                min_dist_to_center = dist;
-                target = &det;
-            }
-        }
-        return target;
-    }
-
-    void move(const Detection* target) {
-        // deprecated: moved to CtlAsync
-
-        // 若无目标或未按住按键：释放 PID 积分，避免历史积分殘留
-        bool smooth_pressed = hk.SmoothPressed(); // unused
-        if (!target || !smooth_pressed) {
-            px.reset();
-            py.reset();
-            // 仍保留单次 F8 逻辑
-            if (!target) return;
-        }
-
-        if (smooth_pressed) {
-            cv::Point target_point(
-                target->box.x + target->box.width / 2,
-                target->box.y + static_cast<int>(target->box.height * c.y_anchor_ratio)
-            );
-            double err_x = static_cast<double>(target_point.x - ctr.x);
-            double err_y = static_cast<double>(target_point.y - ctr.y);
-
-            // PID 在像素域输出，再乘鼠标校正因子转为鼠标单位
-            double out_x_pix = px.step(err_x, dt);
-            double out_y_pix = py.step(err_y, dt);
-            int move_x = static_cast<int>(out_x_pix * mfac);
-            int move_y = static_cast<int>(out_y_pix * mfac);
-
-            if (move_x != 0 || move_y != 0) {
-                mou.put(move_x, move_y);
-            }
-        }
-
-        // 单发模式：保持边沿触发语义
-        if (hk.SingleShotJustPressed()) {
-            cv::Point target_point(
-                target->box.x + target->box.width / 2,
-                target->box.y + static_cast<int>(target->box.height * c.y_anchor_ratio)
-            );
-            double dx_pixels = static_cast<double>(target_point.x - ctr.x);
-            double dy_pixels = static_cast<double>(target_point.y - ctr.y);
-            double corrected_dx = dx_pixels * mfac;
-            double corrected_dy = dy_pixels * mfac;
-            int move_x = static_cast<int>(corrected_dx);
-            int move_y = static_cast<int>(corrected_dy);
-            if (move_x != 0 || move_y != 0) {
-                mou.put(move_x, move_y);
-            }
-        }
-    }
-
     void stats() {
         const double smoothing_factor = 0.05;
         if (first) {
@@ -347,7 +271,6 @@ private:
 
     Config c;
     CapAsync cap;
-    ObjDet od;
     DetAsync det;
     MouAsync mou;
     std::unique_ptr<CtlAsync> ctl;
@@ -373,9 +296,6 @@ private:
     size_t dropS = 0;     // 可视化缓存
     double ovrS = 0.0;
 
-    // PID 控制
-    PidController px;
-    PidController py;
     double dt = 1.0/60.0;
 };
 

@@ -25,7 +25,7 @@ public:
     const std::string window_title = "YOLO Real-time Detection";
 
     // ---------- 帧率控制 ----------
-    bool fps_lock = true;                   // 启用帧率锁
+    bool fps_lock = false;                   // 启用帧率锁
     int  fps = 70;                         // 目标 FPS
     long long fps_spin_us = 0;              // 微自旋补偿（us）
 
@@ -108,7 +108,7 @@ public:
 
     // ---------- 运行时日志/统计 ----------
     bool capture_debug = false;             // 捕获链路调试
-    int  capture_debug_every_n = 300;
+    int  capture_debug_every_n = 30;
     bool log_latency = true;                // 延迟统计
     int  log_latency_every_n = 60;
     bool latency_on_capture_only = true;
