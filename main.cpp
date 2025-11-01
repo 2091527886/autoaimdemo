@@ -32,6 +32,7 @@
 #include "ScreenCapturer.hpp"
 #include "CapAsync.hpp"
 #include "DetAsync.hpp"
+#include "OvlAsync.hpp"
 
 // --- 3. 屏幕捕捉器 (ScreenCapturer) - 优化版本 ---
 // (moved to ScreenCapturer.hpp/.cpp)
@@ -81,7 +82,8 @@ public:
         ctr(c.crop_size_px / 2, c.crop_size_px / 2),
         vis(c.enable_visual),
         lat(static_cast<size_t>(std::max(1, c.log_latency_every_n))),
-        fc(c)
+        fc(c),
+        ovl(c)
     {
         if (cap.w() < c.crop_size_px || cap.h() < c.crop_size_px) {
             throw std::runtime_error("Screen resolution is smaller than configured crop_size_px.");
@@ -99,12 +101,14 @@ public:
         ctl = std::make_unique<CtlAsync>(c, mou);
         ctl->set(ctr, mfac);
         ctl->start();
+        if (c.ovl) ovl.start();
     }
 
     ~Aim() {
         cap.stop();
         det.stop();
         if (ctl) ctl->stop();
+        if (c.ovl) ovl.stop();
         mou.stop();
         if (vis) cv::destroyAllWindows();
     }
@@ -139,6 +143,7 @@ public:
                 ds = std::move(ds_new);
                 tm = tm_new; // 仅覆盖检测阶段计时字段（保持 loop_ms 后续计算）
                 det_ms_last = tm.infer_ms + tm.post_ms;
+                if (c.ovl) ovl.put(ds, crop);
             }
             fl.det_ms = det_ms_last;
 
@@ -297,6 +302,8 @@ private:
     double ovrS = 0.0;
 
     double dt = 1.0/60.0;
+
+    OvlAsync ovl;
 };
 
 

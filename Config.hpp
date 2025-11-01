@@ -127,6 +127,15 @@ public:
     bool opt_report_verbose = true;
     int  opt_report_every_n = 60;
 
+    // ---------- Overlay 游戏内绘制 ----------
+    bool      ovl = true;              // 默认启用
+    int       ovl_fps = 120;           // 刷新上限
+    int       ovl_a = 160;             // 颜色 ARGB
+    int       ovl_r = 0;
+    int       ovl_g = 255;
+    int       ovl_b = 0;
+    float     ovl_thick = 2.0f;
+
     // ---------- Overlay 动画（强制 DWM 产帧） ----------
     bool      overlay_anim = false;
     long long overlay_interval_100ns = 110; // 定时器间隔（100ns）

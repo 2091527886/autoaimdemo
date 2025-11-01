@@ -61,6 +61,8 @@ add_executable(aimassistant
   DetAsync.cpp
   MouAsync.cpp
   CtlAsync.cpp
+  Game_overlay.cpp
+  OvlAsync.cpp
 )
 
 # 启用 Release 高优化/LTO/AVX
@@ -86,7 +88,7 @@ endif()
 
 # 4) 平台/系统库链接（Windows + DirectX）
 if(WIN32)
-  target_link_libraries(aimassistant PRIVATE d3d11 dxgi avrt)
+  target_link_libraries(aimassistant PRIVATE d3d11 dxgi d2d1 dwrite windowscodecs dcomp dwmapi avrt)
 endif()
 
 target_include_directories(aimassistant PRIVATE
