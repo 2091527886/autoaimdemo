@@ -132,16 +132,15 @@ public:
 
             // 2) 异步检测：推入最新帧并尝试取回最新检测
             det.put(img);
-            auto t_det_start = std::chrono::high_resolution_clock::now();
             std::vector<Detection> ds_new;
             Timing tm_new;
             bool has_new = det.get(ds_new, tm_new);
-            auto t_det_end = std::chrono::high_resolution_clock::now();
             if (has_new) {
                 ds = std::move(ds_new);
                 tm = tm_new; // 仅覆盖检测阶段计时字段（保持 loop_ms 后续计算）
+                det_ms_last = tm.infer_ms + tm.post_ms;
             }
-            fl.det_ms = std::chrono::duration<double, std::milli>(t_det_end - t_det_start).count();
+            fl.det_ms = det_ms_last;
 
             // 3) 鼠标控制计时（整体阶段）
             auto t_mouse_start = std::chrono::high_resolution_clock::now();
@@ -334,6 +333,7 @@ private:
     std::vector<Detection> ds;
     Timing tm;
     bool vis;
+    double det_ms_last = 0.0;
     double tTot = 0.0;
     bool first = true;
     // 延迟统计
