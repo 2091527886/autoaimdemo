@@ -31,6 +31,7 @@
 #include "ObjDet.hpp"
 #include "ScreenCapturer.hpp"
 #include "CapAsync.hpp"
+#include "DetAsync.hpp"
 
 // --- 3. 屏幕捕捉器 (ScreenCapturer) - 优化版本 ---
 // (moved to ScreenCapturer.hpp/.cpp)
@@ -74,6 +75,7 @@ public:
         : c(),
         cap(c),
         od(c),
+        det(c),
         m(),
         hk(c),
         crop((cap.w() - c.crop_size_px) / 2, (cap.h() - c.crop_size_px) / 2, c.crop_size_px, c.crop_size_px),
@@ -93,6 +95,7 @@ public:
         lg::o() << "Detect center " << c.crop_size_px << "x" << c.crop_size_px << lg::endl;
         cap.set_roi(crop);
         cap.start();
+        det.start();
         // 初始化 PID 控制器（像素域）。输出再乘以 mouse_correction_factor 转为鼠标单位。
         px.setK(c.pid_kp_x, c.pid_ki_x, c.pid_kd_x);
         px.setLim(c.pid_output_limit, c.pid_integral_limit);
@@ -102,6 +105,7 @@ public:
 
     ~Aim() {
         cap.stop();
+        det.stop();
         if (vis) cv::destroyAllWindows();
     }
 
@@ -126,10 +130,17 @@ public:
                 continue;
             }
 
-            // 2) 检测计时（外层整体）
+            // 2) 异步检测：推入最新帧并尝试取回最新检测
+            det.put(img);
             auto t_det_start = std::chrono::high_resolution_clock::now();
-            od.detect(img, ds, c, tm);
+            std::vector<Detection> ds_new;
+            Timing tm_new;
+            bool has_new = det.get(ds_new, tm_new);
             auto t_det_end = std::chrono::high_resolution_clock::now();
+            if (has_new) {
+                ds = std::move(ds_new);
+                tm = tm_new; // 仅覆盖检测阶段计时字段（保持 loop_ms 后续计算）
+            }
             fl.det_ms = std::chrono::duration<double, std::milli>(t_det_end - t_det_start).count();
 
             // 3) 鼠标控制计时（整体阶段）
@@ -296,6 +307,7 @@ private:
     Config c;
     CapAsync cap;
     ObjDet od;
+    DetAsync det;
     Mouse m;
     HotkeyManager hk;
     const cv::Rect crop;

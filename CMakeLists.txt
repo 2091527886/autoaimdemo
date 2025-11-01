@@ -58,6 +58,7 @@ add_executable(aimassistant
   ObjDet.cpp
   ScreenCapturer.cpp
   CapAsync.cpp
+  DetAsync.cpp
 )
 
 # 启用 Release 高优化/LTO/AVX
