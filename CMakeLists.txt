@@ -60,6 +60,7 @@ add_executable(aimassistant
   CapAsync.cpp
   DetAsync.cpp
   MouAsync.cpp
+  CtlAsync.cpp
 )
 
 # 启用 Release 高优化/LTO/AVX

@@ -28,6 +28,7 @@
 #include "OverlayAnimator.hpp"
 #include "Mouse.hpp"
 #include "MouAsync.hpp"
+#include "CtlAsync.hpp"
 #include "HotkeyManager.hpp"
 #include "ObjDet.hpp"
 #include "ScreenCapturer.hpp"
@@ -98,7 +99,10 @@ public:
         cap.start();
         det.start();
         mou.start();
-        // 初始化 PID 控制器（像素域）。输出再乘以 mouse_correction_factor 转为鼠标单位。
+        ctl = std::make_unique<CtlAsync>(c, mou);
+        ctl->set(ctr, mfac);
+        ctl->start();
+        // 初始化 PID 控制器（像素域）。保留但不在主线程使用（保持接口不变）。
         px.setK(c.pid_kp_x, c.pid_ki_x, c.pid_kd_x);
         px.setLim(c.pid_output_limit, c.pid_integral_limit);
         py.setK(c.pid_kp_y, c.pid_ki_y, c.pid_kd_y);
@@ -108,6 +112,7 @@ public:
     ~Aim() {
         cap.stop();
         det.stop();
+        if (ctl) ctl->stop();
         mou.stop();
         if (vis) cv::destroyAllWindows();
     }
@@ -147,8 +152,11 @@ public:
 
             // 3) 鼠标控制计时（整体阶段）
             auto t_mouse_start = std::chrono::high_resolution_clock::now();
-            Detection* target = pick();
-            move(target);
+            // 采集用户输入状态
+            bool smooth_pressed = hk.SmoothPressed();
+            bool single = hk.SingleShotJustPressed();
+            // 将选择+PID+单发异步化（保持逻辑不变）
+            ctl->put(ds, smooth_pressed, single, dt);
             auto t_mouse_end = std::chrono::high_resolution_clock::now();
             // 记录异步线程上一次实际驱动调用耗时
             fl.mou_ms = mou.last_ms();
@@ -219,6 +227,8 @@ public:
 
 private:
     Detection* pick() {
+        // deprecated: moved to CtlAsync
+
         Detection* target = nullptr;
         double min_dist_to_center = c.lock_radius_px;
         for (auto& det : ds) {
@@ -234,8 +244,10 @@ private:
     }
 
     void move(const Detection* target) {
+        // deprecated: moved to CtlAsync
+
         // 若无目标或未按住按键：释放 PID 积分，避免历史积分殘留
-        bool smooth_pressed = hk.SmoothPressed();
+        bool smooth_pressed = hk.SmoothPressed(); // unused
         if (!target || !smooth_pressed) {
             px.reset();
             py.reset();
@@ -338,6 +350,7 @@ private:
     ObjDet od;
     DetAsync det;
     MouAsync mou;
+    std::unique_ptr<CtlAsync> ctl;
     HotkeyManager hk;
     const cv::Rect crop;
     const cv::Point ctr;
