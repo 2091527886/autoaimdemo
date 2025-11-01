@@ -30,6 +30,7 @@
 #include "HotkeyManager.hpp"
 #include "ObjDet.hpp"
 #include "ScreenCapturer.hpp"
+#include "CapAsync.hpp"
 
 // --- 3. 屏幕捕捉器 (ScreenCapturer) - 优化版本 ---
 // (moved to ScreenCapturer.hpp/.cpp)
@@ -71,7 +72,7 @@ public:
 
     Aim()
         : c(),
-        cap(c, c.crop_size_px, c.crop_size_px), // 传递 cfg + crop_size
+        cap(c),
         od(c),
         m(),
         hk(c),
@@ -90,6 +91,8 @@ public:
             cv::namedWindow(c.window_title, cv::WINDOW_AUTOSIZE);
         }
         lg::o() << "Detect center " << c.crop_size_px << "x" << c.crop_size_px << lg::endl;
+        cap.set_roi(crop);
+        cap.start();
         // 初始化 PID 控制器（像素域）。输出再乘以 mouse_correction_factor 转为鼠标单位。
         px.setK(c.pid_kp_x, c.pid_ki_x, c.pid_kd_x);
         px.setLim(c.pid_output_limit, c.pid_integral_limit);
@@ -98,6 +101,7 @@ public:
     }
 
     ~Aim() {
+        cap.stop();
         if (vis) cv::destroyAllWindows();
     }
 
@@ -109,7 +113,7 @@ public:
 
             // 1) 截屏计时
             auto t_cap_start = std::chrono::high_resolution_clock::now();
-            bool got = cap.capture(img, crop);
+            bool got = cap.get(img);
             auto t_cap_end = std::chrono::high_resolution_clock::now();
             fl.cap_ms = std::chrono::duration<double, std::milli>(t_cap_end - t_cap_start).count();
             if (!got) {
@@ -290,7 +294,7 @@ private:
     }
 
     Config c;
-    ScreenCapturer cap;
+    CapAsync cap;
     ObjDet od;
     Mouse m;
     HotkeyManager hk;

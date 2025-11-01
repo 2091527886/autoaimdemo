@@ -57,6 +57,7 @@ add_executable(aimassistant
   SystemTuner.cpp
   ObjDet.cpp
   ScreenCapturer.cpp
+  CapAsync.cpp
 )
 
 # 启用 Release 高优化/LTO/AVX
