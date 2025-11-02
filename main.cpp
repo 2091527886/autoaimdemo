@@ -235,7 +235,6 @@ private:
     }
 
     void draw(const Detection* tgtBest) {
-        cv::circle(img, ctr, static_cast<int>(c.lock_radius_px), cv::Scalar(255, 255, 0), 1);
         for (const auto& det : ds) {
             // 可视化：所有检测都显示；追踪类加星号，当前目标红框
             cv::Scalar color = (&det == tgtBest) ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0);

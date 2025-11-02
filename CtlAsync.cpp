@@ -1,9 +1,10 @@
 #include "CtlAsync.hpp"
 #include <cmath>
+#include <limits>
 
 static Detection* pick_target(std::vector<Detection>& ds, const Config& c, const cv::Point& ctr) {
     Detection* target = nullptr;
-    double min_dist_to_center = c.lock_radius_px;
+    double min_dist_to_center = std::numeric_limits<double>::infinity();
     for (auto& det : ds) {
         if (!c.is_target(det.class_id)) continue;
         cv::Point box_center(det.box.x + det.box.width / 2, det.box.y + det.box.height / 2);

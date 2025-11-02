@@ -25,8 +25,8 @@ public:
     const std::string window_title = "YOLO Real-time Detection";
 
     // ---------- 帧率控制 ----------
-    bool fps_lock = false;                   // 启用帧率锁
-    int  fps = 70;                         // 目标 FPS
+    bool fps_lock = true;                   // 启用帧率锁
+    int  fps = 60;                         // 目标 FPS
     long long fps_spin_us = 0;              // 微自旋补偿（us）
 
     // ---------- 亲和/环境（SetThreadAffinityMask） ----------
@@ -78,7 +78,6 @@ public:
 
     // ---------- 截屏/检测区域 ----------
     const int   crop_size_px   = 640;       // 居中正方形
-    const int   lock_radius_px = 320;       // 中心锁定半径
     const float conf_thresh    = 0.6f;      // 检测阈值
 
     // ---------- 操作/热键 ----------
@@ -220,9 +219,6 @@ public:
         }
         if (!(y_anchor_ratio >= 0.0 && y_anchor_ratio <= 1.0)) {
             lg::e() << P_E "y_anchor_ratio out of [0,1]" << lg::endl;
-        }
-        if (lock_radius_px > crop_size_px) {
-            lg::e() << P_E "lock_radius_px > crop_size_px" << lg::endl;
         }
     }
 };
