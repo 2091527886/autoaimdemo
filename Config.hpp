@@ -73,7 +73,7 @@ private:
 
 public:
     // ---------- 引擎/路径 ----------
-    std::string engine_path = "n.engine";
+    std::string engine_path = "l.engine";
     std::string resolve_engine_path() const { return engine_path; }
 
     // ---------- 截屏/检测区域 ----------
@@ -128,7 +128,7 @@ public:
 
     // ---------- Overlay 游戏内绘制 ----------
     bool      ovl = true;              // 默认启用
-    int       ovl_fps = 120;           // 刷新上限
+    int       ovl_fps = 60;           // 刷新上限
     int       ovl_a = 160;             // 颜色 ARGB
     int       ovl_r = 0;
     int       ovl_g = 255;
@@ -137,7 +137,7 @@ public:
 
     // ---------- Overlay GPU 选择/枚举（仅用于 Game_overlay） ----------
     bool         ovl_gpu_enum = false;        // 枚举并日志打印适配器
-    int          ovl_gpu_idx  = -1;           // 0-based；<0 表示未设置
+    int          ovl_gpu_idx  = 1;           // 0-based；<0 表示未设置
     std::wstring ovl_gpu_name;                // 名称包含匹配（优先级最高）
     std::wstring ovl_gpu_luid;                // 形如 hi:lo（十进制或0x..）
 
