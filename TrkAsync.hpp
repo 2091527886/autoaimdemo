@@ -4,6 +4,7 @@
 #include <mutex>
 #include <vector>
 #include <opencv2/core.hpp>
+#include <windows.h>
 #include "Detection.hpp"
 #include "Config.hpp"
 #include "ByteTrack.hpp"
@@ -38,4 +39,6 @@ private:
 
     std::atomic<bool> go{false};
     std::thread th;
+
+    HANDLE ev_{nullptr};
 };

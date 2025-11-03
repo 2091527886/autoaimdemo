@@ -4,19 +4,23 @@
 void TrkAsync::start() {
     bool ex = false;
     if (!go.compare_exchange_strong(ex, true)) return;
+    if (!ev_) ev_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     th = std::thread(&TrkAsync::run, this);
 }
 
 void TrkAsync::stop() {
     bool ex = true;
     if (go.compare_exchange_strong(ex, false)) {
+        if (ev_) SetEvent(ev_);
         if (th.joinable()) th.join();
+        if (ev_) { CloseHandle(ev_); ev_ = nullptr; }
     }
 }
 
 void TrkAsync::put(const std::vector<Detection>& ds) {
     std::lock_guard<std::mutex> lk(mx);
     in_ds = ds; seq.fetch_add(1, std::memory_order_release);
+    if (ev_) SetEvent(ev_);
 }
 
 bool TrkAsync::get(std::vector<Detection>& out) {
@@ -32,7 +36,12 @@ void TrkAsync::run() {
     int seen = seq.load(std::memory_order_acquire);
     while (go.load(std::memory_order_relaxed)) {
         int s = seq.load(std::memory_order_acquire);
-        if (s == seen) { std::this_thread::sleep_for(1ms); continue; }
+        if (s == seen) { 
+            if (ev_) WaitForSingleObject(ev_, INFINITE);
+            if (!go.load(std::memory_order_relaxed)) break;
+            s = seq.load(std::memory_order_acquire);
+            if (s == seen) continue;
+        }
         seen = s;
         std::vector<Detection> cur;
         {

@@ -4,6 +4,7 @@
 #include <vector>
 #include <mutex>
 #include <opencv2/core.hpp>
+#include <windows.h>
 #include "Detection.hpp"
 #include "Config.hpp"
 #include "Game_overlay.h"
@@ -35,5 +36,6 @@ private:
     cv::Rect crop_{};
     std::mutex mx;
 
+    HANDLE ev_{nullptr};
     Game_overlay gover;
 };

@@ -4,6 +4,7 @@
 #include <thread>
 #include <vector>
 #include <opencv2/opencv.hpp>
+#include <windows.h>
 #include "Detection.hpp"
 #include "Timing.hpp"
 #include "ObjDet.hpp"
@@ -51,4 +52,7 @@ private:
     // thread control
     std::atomic<bool> go{false};
     std::thread th;
+
+    // event for input arrival
+    HANDLE ev_in{nullptr};
 };

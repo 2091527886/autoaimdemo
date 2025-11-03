@@ -6,6 +6,7 @@
 void OvlAsync::start() {
     bool ex = false;
     if (!go.compare_exchange_strong(ex, true)) return;
+    if (!ev_) ev_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     lg::o() << P_B "Overlay=ON (fps=" << c.ovl_fps
             << ", a=" << c.ovl_a << ", rgb=" << c.ovl_r << "," << c.ovl_g << "," << c.ovl_b
             << ", th=" << c.ovl_thick << ")" << lg::endl;
@@ -15,7 +16,9 @@ void OvlAsync::start() {
 void OvlAsync::stop() {
     bool ex = true;
     if (go.compare_exchange_strong(ex, false)) {
+        if (ev_) SetEvent(ev_);
         if (th.joinable()) th.join();
+        if (ev_) { CloseHandle(ev_); ev_ = nullptr; }
         lg::o() << P_B "Overlay=OFF" << lg::endl;
     }
 }
@@ -29,6 +32,7 @@ void OvlAsync::put(const std::vector<Detection>& ds, const cv::Rect& crop) {
     ds_ = ds;
     crop_ = crop;
     seq.fetch_add(1, std::memory_order_release);
+    if (ev_) SetEvent(ev_);
 }
 
 void OvlAsync::run() {
@@ -46,8 +50,10 @@ void OvlAsync::run() {
     while (go.load(std::memory_order_relaxed)) {
         int s = seq.load(std::memory_order_acquire);
         if (s == seen) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(4));
-            continue;
+            if (ev_) WaitForSingleObject(ev_, INFINITE);
+            if (!go.load(std::memory_order_relaxed)) break;
+            s = seq.load(std::memory_order_acquire);
+            if (s == seen) continue;
         }
         seen = s;
 

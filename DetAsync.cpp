@@ -4,13 +4,16 @@
 void DetAsync::start() {
     bool expected = false;
     if (!go.compare_exchange_strong(expected, true)) return;
+    if (!ev_in) ev_in = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     th = std::thread(&DetAsync::run, this);
 }
 
 void DetAsync::stop() {
     bool expected = true;
     if (go.compare_exchange_strong(expected, false)) {
+        if (ev_in) SetEvent(ev_in);
         if (th.joinable()) th.join();
+        if (ev_in) { CloseHandle(ev_in); ev_in = nullptr; }
     }
 }
 
@@ -19,6 +22,7 @@ void DetAsync::put(const cv::Mat& img) {
     img.copyTo(inb[wr_in]);
     in_last.store(wr_in, std::memory_order_release);
     wr_in ^= 1;
+    if (ev_in) SetEvent(ev_in);
 }
 
 bool DetAsync::get(std::vector<Detection>& out, Timing& tm) {
@@ -35,8 +39,10 @@ void DetAsync::run() {
     while (go.load(std::memory_order_relaxed)) {
         int i = in_last.load(std::memory_order_acquire);
         if (i < 0 || i == in_seen) {
-            std::this_thread::sleep_for(1ms);
-            continue;
+            if (ev_in) WaitForSingleObject(ev_in, INFINITE);
+            if (!go.load(std::memory_order_relaxed)) break;
+            i = in_last.load(std::memory_order_acquire);
+            if (i < 0 || i == in_seen) continue;
         }
         // work on a local copy to keep producer free
         cv::Mat img;
