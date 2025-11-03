@@ -14,6 +14,9 @@ public:
     explicit OvlAsync(const Config& cfg) : c(cfg) {}
     ~OvlAsync() { stop(); }
 
+    // last overlay draw cost (ms)
+    double last_ms() const { return last_ms_.load(std::memory_order_relaxed); }
+
     OvlAsync(const OvlAsync&) = delete;
     OvlAsync& operator=(const OvlAsync&) = delete;
 
@@ -38,4 +41,8 @@ private:
 
     HANDLE ev_{nullptr};
     Game_overlay gover;
+
+    // stats
+    std::atomic<double> last_ms_{0.0};
 };
+

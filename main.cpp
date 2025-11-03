@@ -183,6 +183,10 @@ public:
             ctl->put(ds, smooth_pressed, single, dt);
             // 记录异步线程上一次实际驱动调用耗时
             fl.mou_ms = mou.last_ms();
+            // 记录控制/跟踪/叠加耗时（如启用）
+            fl.ctl_ms = ctl->last_ms();
+            if (c.trk) { fl.trk_ms = trk.last_ms(); }
+            if (c.ovl) { fl.ovl_ms = ovl.last_ms(); }
 
             auto loop_end_time = std::chrono::high_resolution_clock::now();
             double proc_ms = std::chrono::duration<double, std::milli>(loop_end_time - loop_start_time).count();

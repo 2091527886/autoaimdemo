@@ -32,6 +32,7 @@ bool TrkAsync::get(std::vector<Detection>& out) {
 }
 
 void TrkAsync::run() {
+    using clock = std::chrono::high_resolution_clock;
     using namespace std::chrono_literals;
     int seen = seq.load(std::memory_order_acquire);
     while (go.load(std::memory_order_relaxed)) {
@@ -49,7 +50,10 @@ void TrkAsync::run() {
             cur = in_ds;
         }
         std::vector<Detection> out;
+        auto t0 = clock::now();
         trk.update(cur, out);
+        auto t1 = clock::now();
+        last_ms_.store(std::chrono::duration<double, std::milli>(t1 - t0).count(), std::memory_order_relaxed);
         {
             std::lock_guard<std::mutex> lk(mx);
             out_ds.swap(out);

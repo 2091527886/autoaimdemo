@@ -14,6 +14,9 @@ public:
     explicit TrkAsync(const Config& cfg) : c(cfg), trk(cfg) {}
     ~TrkAsync() { stop(); }
 
+    // last tracking cost (ms)
+    double last_ms() const { return last_ms_.load(std::memory_order_relaxed); }
+
     TrkAsync(const TrkAsync&) = delete;
     TrkAsync& operator=(const TrkAsync&) = delete;
 
@@ -41,4 +44,7 @@ private:
     std::thread th;
 
     HANDLE ev_{nullptr};
+
+    // stats
+    std::atomic<double> last_ms_{0.0};
 };

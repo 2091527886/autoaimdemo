@@ -1,6 +1,7 @@
 #include "CtlAsync.hpp"
 #include <cmath>
 #include <limits>
+#include <chrono>
 
 static Detection* pick_by_tid(std::vector<Detection>& ds, int tid) {
     if (tid < 0) return nullptr;
@@ -47,6 +48,7 @@ void CtlAsync::put(const std::vector<Detection>& ds, bool smooth, bool single, d
 }
 
 void CtlAsync::run() {
+    using clock = std::chrono::high_resolution_clock;
     int seen = seq_.load(std::memory_order_acquire);
     while (go_.load(std::memory_order_relaxed)) {
         int s = seq_.load(std::memory_order_acquire);
@@ -58,12 +60,13 @@ void CtlAsync::run() {
         }
         seen = s;
         Msg cur;
-        {
-            std::lock_guard<std::mutex> lk(mx_);
-            cur = msg_;
-        }
+       auto t0 = clock::now();
+       {
+           std::lock_guard<std::mutex> lk(mx_);
+           cur = msg_;
+       }
 
-        // 选择目标（优先沿用 track_id）
+       // 选择目标（优先沿用 track_id）
         auto ds_copy = cur.ds; // 拷贝以供 pick 修改
         Detection* target = pick_by_tid(ds_copy, cur_tid_);
         if (!target) target = pick_target(ds_copy, c, ctr_);
@@ -72,7 +75,7 @@ void CtlAsync::run() {
         // 无目标时：按策略决定是否移动到预测
         if (!target) {
             px.reset(); py.reset();
-            if (!cur.smooth) continue; // 非平滑直接跳过
+            if (!cur.smooth) { last_ms_.store(std::chrono::duration<double, std::milli>(clock::now()-t0).count(), std::memory_order_relaxed); continue; } // 非平滑直接跳过
             if (!c.trk_pred_move) continue; // 配置禁止预测移动
             // 如果存在任何预测框（is_pred=true 且为目标类），选择最近中心
             Detection* pred_tgt = nullptr;
@@ -84,7 +87,7 @@ void CtlAsync::run() {
                 double dist = std::hypot(box_center.x - ctr_.x, box_center.y - ctr_.y);
                 if (dist < min_d) { min_d = dist; pred_tgt = &d; }
             }
-            if (!pred_tgt) continue;
+            if (!pred_tgt) { last_ms_.store(std::chrono::duration<double, std::milli>(clock::now()-t0).count(), std::memory_order_relaxed); continue; }
             // 使用预测目标进行 PID
             cv::Point tp(
                 pred_tgt->box.x + pred_tgt->box.width / 2,
@@ -97,11 +100,11 @@ void CtlAsync::run() {
             int move_x = (int)(out_x_pix * mfac_);
             int move_y = (int)(out_y_pix * mfac_);
             if (move_x || move_y) mou_.put(move_x, move_y);
+            last_ms_.store(std::chrono::duration<double, std::milli>(clock::now()-t0).count(), std::memory_order_relaxed);
             continue;
         }
 
         if (!cur.smooth) { px.reset(); py.reset(); }
-
         if (cur.smooth && target) {
             cv::Point tp(
                 target->box.x + target->box.width / 2,

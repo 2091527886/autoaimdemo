@@ -15,6 +15,9 @@ public:
     CtlAsync(const Config& cfg, MouAsync& mou) : c(cfg), mou_(mou) {}
     ~CtlAsync() { stop(); }
 
+    // last control-step cost (ms)
+    double last_ms() const { return last_ms_.load(std::memory_order_relaxed); }
+
     void set(cv::Point ctr, double mfac) {
         ctr_ = ctr; mfac_ = mfac;
         px.setK(c.pid_kp_x, c.pid_ki_x, c.pid_kd_x);
@@ -51,4 +54,8 @@ private:
 
     // track-keeping
     int cur_tid_ = -1;
+
+    // stats
+    std::atomic<double> last_ms_{0.0};
 };
+

@@ -65,6 +65,7 @@ void OvlAsync::run() {
             r = crop_;
         }
 
+        auto t0 = std::chrono::high_resolution_clock::now();
         gover.BeginFrame();
         for (const auto& d : cur) {
             if (c.ovl_only >= 0 && d.class_id != c.ovl_only) continue;
@@ -87,6 +88,8 @@ void OvlAsync::run() {
             }
         }
         gover.EndFrame();
+        auto t1 = std::chrono::high_resolution_clock::now();
+        last_ms_.store(std::chrono::duration<double, std::milli>(t1 - t0).count(), std::memory_order_relaxed);
     }
 
     gover.Stop();
