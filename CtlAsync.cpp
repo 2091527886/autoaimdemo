@@ -23,13 +23,16 @@ static Detection* pick_target(std::vector<Detection>& ds, const Config& c, const
 void CtlAsync::start() {
     bool ex = false;
     if (!go_.compare_exchange_strong(ex, true)) return;
+    if (!ev_) ev_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     th_ = std::thread(&CtlAsync::run, this);
 }
 
 void CtlAsync::stop() {
     bool ex = true;
     if (go_.compare_exchange_strong(ex, false)) {
+        if (ev_) SetEvent(ev_);
         if (th_.joinable()) th_.join();
+        if (ev_) { CloseHandle(ev_); ev_ = nullptr; }
     }
 }
 
@@ -40,6 +43,7 @@ void CtlAsync::put(const std::vector<Detection>& ds, bool smooth, bool single, d
     msg_.single = single;
     msg_.dt = dt;
     seq_.fetch_add(1, std::memory_order_release);
+    if (ev_) SetEvent(ev_);
 }
 
 void CtlAsync::run() {
@@ -47,8 +51,10 @@ void CtlAsync::run() {
     while (go_.load(std::memory_order_relaxed)) {
         int s = seq_.load(std::memory_order_acquire);
         if (s == seen) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            continue;
+            if (ev_) WaitForSingleObject(ev_, INFINITE);
+            if (!go_.load(std::memory_order_relaxed)) break;
+            s = seq_.load(std::memory_order_acquire);
+            if (s == seen) continue;
         }
         seen = s;
         Msg cur;

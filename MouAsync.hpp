@@ -3,6 +3,7 @@
 #include <atomic>
 #include <thread>
 #include <chrono>
+#include <windows.h>
 #include "Mouse.hpp"
 
 // Minimal async mouse sender: keeps latest dx,dy; executes in worker thread
@@ -37,4 +38,5 @@ private:
     // thread
     std::atomic<bool> go_{false};
     std::thread th_;
+    HANDLE ev_ = nullptr;
 };

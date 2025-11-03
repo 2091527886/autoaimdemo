@@ -4,6 +4,7 @@
 #include <mutex>
 #include <vector>
 #include <chrono>
+#include <windows.h>
 #include "Detection.hpp"
 #include "PidController.hpp"
 #include "Config.hpp"
@@ -35,6 +36,7 @@ private:
     std::thread th_;
     std::atomic<bool> go_{false};
     std::atomic<int> seq_{0};
+    HANDLE ev_ = nullptr;
 
     // geom
     cv::Point ctr_{0,0};
