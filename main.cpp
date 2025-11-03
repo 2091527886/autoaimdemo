@@ -50,18 +50,34 @@ public:
         long long spin_us = 0;
         size_t drop = 0;
         double ovr = 0.0;
+        HANDLE ht = nullptr;
         explicit FpsCtl(const Config& cfg) {
             tgt_ms = 1000.0 / std::max(1, cfg.fps);
             spin_us = cfg.fps_spin_us;
+            ht = CreateWaitableTimerExW(NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+            if (!ht) ht = CreateWaitableTimerW(NULL, FALSE, NULL);
         }
+        ~FpsCtl() { if (ht) CloseHandle(ht); }
         double end(double proc_ms) {
             if (proc_ms <= tgt_ms) {
                 double rem = tgt_ms - proc_ms;
                 double sl = rem - (double)spin_us / 1000.0;
-                if (sl > 0.0) std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(sl));
+                if (sl > 0.0) {
+                    if (ht) {
+                        LARGE_INTEGER due; long long q100ns = (long long)(sl * 10000.0);
+                        if (q100ns < 1) q100ns = 1; due.QuadPart = -q100ns;
+                        if (SetWaitableTimer(ht, &due, 0, nullptr, nullptr, FALSE)) {
+                            WaitForSingleObject(ht, INFINITE);
+                        } else {
+                            std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(sl));
+                        }
+                    } else {
+                        std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(sl));
+                    }
+                }
                 if (spin_us > 0) {
                     auto se = std::chrono::high_resolution_clock::now() + std::chrono::microseconds((long long)spin_us);
-                    while (std::chrono::high_resolution_clock::now() < se) { /* spin */ }
+                    while (std::chrono::high_resolution_clock::now() < se) { YieldProcessor(); }
                 }
                 ovr = 0.0;
                 return tgt_ms;

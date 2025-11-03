@@ -40,6 +40,6 @@ Mouse::~Mouse() {
 void Mouse::Move(int dx, int dy) {
     if (move_) {
         bool ok = move_(dx, dy, Send::MoveMode::Relative);
-        lg::ok_or_werr_msg(true, P_M, std::string("mv dx=") + std::to_string(dx) + " dy=" + std::to_string(dy), ok);
+        lg::ok_or_werr_msg(false, P_M, std::string("mv dx=") + std::to_string(dx) + " dy=" + std::to_string(dy), ok);
     }
 }
