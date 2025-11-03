@@ -252,7 +252,7 @@ bool ScreenCapturer::capture(cv::Mat& frame, const cv::Rect& crop_region) {
 
     t_total_ms = std::chrono::duration<double, std::milli>(t_unmap_e - t_total_start).count();
     idx++;
-    if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
+    if (cfg.capture_timing) {
         reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
     }
     ++statOk;
