@@ -32,6 +32,7 @@
 #include "ScreenCapturer.hpp"
 #include "CapAsync.hpp"
 #include "DetAsync.hpp"
+#include "TrkAsync.hpp"
 #include "OvlAsync.hpp"
 
 // --- 3. 屏幕捕捉器 (ScreenCapturer) - 优化版本 ---
@@ -76,6 +77,7 @@ public:
         : c(),
         cap(c),
         det(c),
+        trk(c),
         mou(),
         hk(c),
         crop((cap.w() - c.crop_size_px) / 2, (cap.h() - c.crop_size_px) / 2, c.crop_size_px, c.crop_size_px),
@@ -97,6 +99,7 @@ public:
         cap.set_roi(crop);
         cap.start();
         det.start();
+        if (c.trk) trk.start();
         mou.start();
         ctl = std::make_unique<CtlAsync>(c, mou);
         ctl->set(ctr, mfac);
@@ -108,6 +111,7 @@ public:
     ~Aim() {
         cap.stop();
         det.stop();
+        if (c.trk) trk.stop();
         if (ctl) ctl->stop();
         if (c.ovl) ovl.stop();
         mou.stop();
@@ -144,6 +148,13 @@ public:
                 ds = std::move(ds_new);
                 tm = tm_new; // 仅覆盖检测阶段计时字段（保持 loop_ms 后续计算）
                 det_ms_last = tm.infer_ms + tm.post_ms;
+                if (c.trk) {
+                    trk.put(ds);
+                    std::vector<Detection> ds_trk;
+                    if (trk.get(ds_trk)) {
+                        if (!ds_trk.empty()) ds = std::move(ds_trk); // only replace when tracker has confirmed outputs
+                    }
+                }
                 if (c.ovl) ovl.put(ds, crop);
             }
             fl.det_ms = det_ms_last;
@@ -277,6 +288,7 @@ private:
     Config c;
     CapAsync cap;
     DetAsync det;
+    TrkAsync trk;
     MouAsync mou;
     std::unique_ptr<CtlAsync> ctl;
     HotkeyManager hk;

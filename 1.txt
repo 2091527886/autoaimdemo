@@ -1,0 +1,52 @@
+>------ 生成 已启动: 项目: CMakeLists，配置: Release ------
+  [1/16] Building CXX object CMakeFiles\aimassistant.dir\PidController.cpp.obj
+  [2/16] Building CXX object CMakeFiles\aimassistant.dir\MouAsync.cpp.obj
+  [3/16] Building CXX object CMakeFiles\aimassistant.dir\Mouse.cpp.obj
+  [4/16] Building CXX object CMakeFiles\aimassistant.dir\SystemTuner.cpp.obj
+  [5/16] Building CXX object CMakeFiles\aimassistant.dir\ByteTrack.cpp.obj
+  FAILED: CMakeFiles/aimassistant.dir/ByteTrack.cpp.obj 
+  C:\PROGRA~1\MICROS~4\2022\COMMUN~1\VC\Tools\MSVC\1444~1.352\bin\Hostx64\x64\cl.exe  /nologo /TP -DNOMINMAX -DUNICODE -DWIN32_LEAN_AND_MEAN -D_UNICODE -IC:\Users\233h\Downloads\auto-build -IC:\Users\233h\Downloads\tensorrtyolo\include -external:IC:\cuda\opencv\build\include -external:W0 /DWIN32 /D_WINDOWS /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /W4 /permissive- /utf-8 /O2 /GL /arch:AVX512 /showIncludes /FoCMakeFiles\aimassistant.dir\ByteTrack.cpp.obj /FdCMakeFiles\aimassistant.dir\ /FS -c C:\Users\233h\Downloads\auto-build\ByteTrack.cpp
+C:\Users\233h\Downloads\auto-build\ByteTrack.cpp(279): error C2065: “keep”: 未声明的标识符
+  [6/16] Building CXX object CMakeFiles\aimassistant.dir\OverlayAnimator.cpp.obj
+  [7/16] Building CXX object CMakeFiles\aimassistant.dir\CtlAsync.cpp.obj
+  [8/16] Building CXX object CMakeFiles\aimassistant.dir\TrkAsync.cpp.obj
+  [9/16] Building CXX object CMakeFiles\aimassistant.dir\OvlAsync.cpp.obj
+  [10/16] Building CXX object CMakeFiles\aimassistant.dir\Game_overlay.cpp.obj
+C:\Users\233h\Downloads\auto-build\Game_overlay.cpp(5): warning C4005: “WIN32_LEAN_AND_MEAN”: 宏重定义
+  C:\Users\233h\Downloads\auto-build\Game_overlay.cpp(5): note: 之前在命令行上声明的“WIN32_LEAN_AND_MEAN”
+C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\include\xutility(4813): warning C4244: “=”: 从“wchar_t”转换到“char”，可能丢失数据
+  C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\include\xutility(4813): note: 模板实例化上下文(最早的实例化上下文)为
+  C:\Users\233h\Downloads\auto-build\Game_overlay.cpp(131): note: 查看对正在编译的函数 模板 实例化“std::basic_string<char,std::char_traits<char>,std::allocator<char>>::basic_string<std::_String_iterator<std::_String_val<std::_Simple_types<_Elem>>>,0>(_Iter,_Iter,const _Alloc &)”的引用
+          with
+          [
+              _Elem=wchar_t,
+              _Iter=std::_String_iterator<std::_String_val<std::_Simple_types<wchar_t>>>,
+              _Alloc=std::allocator<char>
+          ]
+  C:\Users\233h\Downloads\auto-build\Game_overlay.cpp(136): note: 请参阅 "log_adapters" 中对 "std::basic_string<char,std::char_traits<char>,std::allocator<char>>::basic_string" 的第一个引用
+  C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\include\xstring(812): note: 查看对正在编译的函数 模板 实例化“void std::basic_string<char,std::char_traits<char>,std::allocator<char>>::_Construct_from_iter<wchar_t*,wchar_t*,_Size_type>(_Iter,const _Sent,_Size)”的引用
+          with
+          [
+              _Size_type=std::+::_Size_type,
+              _Iter=wchar_t *,
+              _Sent=wchar_t *,
+              _Size=std::+::_Size_type
+          ]
+  C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\include\xstring(968): note: 查看对正在编译的函数 模板 实例化“_OutIt *std::_Copy_n_unchecked4<wchar_t*,_Size,char*>(_InIt,_SizeTy,_OutIt)”的引用
+          with
+          [
+              _OutIt=char *,
+              _Size=std::+::_Size_type,
+              _InIt=wchar_t *,
+              _SizeTy=std::+::_Size_type
+          ]
+  [11/16] Building CXX object CMakeFiles\aimassistant.dir\CapAsync.cpp.obj
+  [12/16] Building CXX object CMakeFiles\aimassistant.dir\DetAsync.cpp.obj
+  [13/16] Building CXX object CMakeFiles\aimassistant.dir\ScreenCapturer.cpp.obj
+  [14/16] Building CXX object CMakeFiles\aimassistant.dir\ObjDet.cpp.obj
+  [15/16] Building CXX object CMakeFiles\aimassistant.dir\main.cpp.obj
+C:\Users\233h\Downloads\auto-build\main.cpp(249): warning C4458: “det”的声明隐藏了类成员
+  C:\Users\233h\Downloads\auto-build\main.cpp(290): note: 参见“Aim::det”的声明
+  ninja: build stopped: subcommand failed.
+
+生成 失败。

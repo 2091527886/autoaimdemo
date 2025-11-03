@@ -73,7 +73,12 @@ void OvlAsync::run() {
                 if (cid < (int)c.ovl_cg.size()) gg = c.ovl_cg[cid];
                 if (cid < (int)c.ovl_cb.size()) bb = c.ovl_cb[cid];
             }
-            gover.AddRect({x,y,w,h}, ARGB((uint8_t)c.ovl_a,(uint8_t)rr,(uint8_t)gg,(uint8_t)bb), (float)c.ovl_thick);
+            auto col = ARGB((uint8_t)c.ovl_a,(uint8_t)rr,(uint8_t)gg,(uint8_t)bb);
+            gover.AddRect({x,y,w,h}, col, (float)c.ovl_thick);
+            if (d.track_id >= 0) {
+                std::wstring txt = L"#" + std::to_wstring(d.track_id);
+                gover.AddText(x, std::max(0.0f, y - 12.0f), txt, 14.0f, ARGB(255,255,255,255));
+            }
         }
         gover.EndFrame();
     }

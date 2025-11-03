@@ -46,4 +46,7 @@ private:
     struct Msg { std::vector<Detection> ds; bool smooth=false; bool single=false; double dt=0.016; };
     std::mutex mx_;
     Msg msg_;
+
+    // track-keeping
+    int cur_tid_ = -1;
 };

@@ -14,7 +14,7 @@
 // Methods
 
 
-class Config {
+class Config { // NOTE: keep names short & readable
 public:
     // ---------- 基础/日志 ----------
     bool log_init_verbose = true;           // 初始化阶段日志
@@ -172,6 +172,19 @@ public:
     int       overlay_px = 2;               // 像素大小
     int       overlay_x = 0, overlay_y = 0; // 位置
 
+    // ---------- ByteTrack/Kalman 跟踪 ----------
+    bool  trk = true;            // 开关
+    float trk_th = 0.6f;         // 高阈值
+    float trk_th_lo = 0.1f;      // 低阈值
+    float trk_iou = 0.6f;        // IoU 阈值（更严格，减少错配）
+    int   trk_max_age = 30;      // 轨迹最大丢失帧数
+    int   trk_min_hits = 3;      // 确认命中次数
+    bool  trk_pred_move = false;  // 丢失时是否按预测移动（默认关闭，减少飘）
+    bool  trk_cls_match = true;  // 关联是否要求类别一致
+    double trk_maha = 9.49;      // 马氏距离门限（4DOF 95%≈9.49）
+    bool  trk_out_nms = true;    // 输出前进行轨迹级NMS
+    float trk_out_nms_iou = 0.7f; // 输出NMS IoU 阈值
+
     // ---------- 线程调度（MMCSS/内存优先级） ----------
     bool mmcss_main = false;
     std::wstring mmcss_task = L"Pro Audio";
@@ -212,8 +225,15 @@ public:
             pad(ovl_cg, n, ovl_g);
             pad(ovl_cb, n, ovl_b);
         }
+        // 跟踪参数夹紧
+        trk_th     = std::clamp(trk_th, 0.0f, 1.0f);
+        trk_th_lo  = std::clamp(trk_th_lo, 0.0f, trk_th);
+        trk_iou    = std::clamp(trk_iou, 0.0f, 1.0f);
+        trk_max_age = std::max(1, trk_max_age);
+        trk_min_hits = std::max(0, trk_min_hits);
+        trk_maha = std::max(0.0, trk_maha);
+        trk_out_nms_iou = std::clamp(trk_out_nms_iou, 0.0f, 1.0f);
         // 合理范围软约束（不改 const 值，仅在此处校验）
-        // conf_thresh/y_anchor_ratio 等 const 值仅检测
         if (!(conf_thresh >= 0.0f && conf_thresh <= 1.0f)) {
             lg::e() << P_E "conf_thresh out of [0,1]" << lg::endl;
         }

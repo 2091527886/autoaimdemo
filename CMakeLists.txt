@@ -61,6 +61,8 @@ add_executable(aimassistant
   DetAsync.cpp
   MouAsync.cpp
   CtlAsync.cpp
+  ByteTrack.cpp
+  TrkAsync.cpp
   Game_overlay.cpp
   OvlAsync.cpp
 )

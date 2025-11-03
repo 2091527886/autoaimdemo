@@ -1,0 +1,50 @@
+#include "TrkAsync.hpp"
+#include <chrono>
+
+void TrkAsync::start() {
+    bool ex = false;
+    if (!go.compare_exchange_strong(ex, true)) return;
+    th = std::thread(&TrkAsync::run, this);
+}
+
+void TrkAsync::stop() {
+    bool ex = true;
+    if (go.compare_exchange_strong(ex, false)) {
+        if (th.joinable()) th.join();
+    }
+}
+
+void TrkAsync::put(const std::vector<Detection>& ds) {
+    std::lock_guard<std::mutex> lk(mx);
+    in_ds = ds; seq.fetch_add(1, std::memory_order_release);
+}
+
+bool TrkAsync::get(std::vector<Detection>& out) {
+    int s = out_seq.load(std::memory_order_acquire);
+    if (s < 0) return false;
+    std::lock_guard<std::mutex> lk(mx);
+    out = out_ds;
+    return true;
+}
+
+void TrkAsync::run() {
+    using namespace std::chrono_literals;
+    int seen = seq.load(std::memory_order_acquire);
+    while (go.load(std::memory_order_relaxed)) {
+        int s = seq.load(std::memory_order_acquire);
+        if (s == seen) { std::this_thread::sleep_for(1ms); continue; }
+        seen = s;
+        std::vector<Detection> cur;
+        {
+            std::lock_guard<std::mutex> lk(mx);
+            cur = in_ds;
+        }
+        std::vector<Detection> out;
+        trk.update(cur, out);
+        {
+            std::lock_guard<std::mutex> lk(mx);
+            out_ds.swap(out);
+            out_seq.store(seen, std::memory_order_release);
+        }
+    }
+}
