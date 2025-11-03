@@ -65,6 +65,7 @@ add_executable(aimassistant
   TrkAsync.cpp
   Game_overlay.cpp
   OvlAsync.cpp
+  LatCsvAsync.cpp
 )
 
 # 启用 Release 高优化/LTO/AVX

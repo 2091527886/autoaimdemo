@@ -34,6 +34,7 @@
 #include "DetAsync.hpp"
 #include "TrkAsync.hpp"
 #include "OvlAsync.hpp"
+#include "LatCsvAsync.hpp"
 
 // --- 3. 屏幕捕捉器 (ScreenCapturer) - 优化版本 ---
 // (moved to ScreenCapturer.hpp/.cpp)
@@ -103,6 +104,8 @@ public:
         fc(c),
         ovl(c)
     {
+        if (c.lat_csv) latcsv.start(c.lat_csv_path);
+
         if (cap.w() < c.crop_size_px || cap.h() < c.crop_size_px) {
             throw std::runtime_error("Screen resolution is smaller than configured crop_size_px.");
         }
@@ -125,6 +128,7 @@ public:
     }
 
     ~Aim() {
+        if (c.lat_csv) latcsv.stop();
         cap.stop();
         det.stop();
         if (c.trk) trk.stop();
@@ -153,6 +157,8 @@ public:
                 }
                 continue;
             }
+            // 成功取到帧：递增帧号并记录
+            c.frame_idx++; fl.idx = c.frame_idx;
             fl.cap_ms = cap.last_ms();
 
             // 2) 异步检测：推入最新帧并尝试取回最新检测
@@ -200,6 +206,9 @@ public:
             double loop_e2e = std::max(tm.loop_ms, det_ms_last);
             fl.loop_ms = loop_e2e;
             e2e_ms_last = loop_e2e;
+
+           // 异步CSV写入（仅在成功帧）
+           if (c.lat_csv) { latcsv.put(fl); }
 
             // 计算 dt（秒）供 PID 使用
             if (c.pid_use_measured_dt) {
@@ -336,6 +345,9 @@ private:
     double dt = 1.0/60.0;
 
     OvlAsync ovl;
+
+    // csv
+    LatCsvAsync latcsv;
 };
 
 

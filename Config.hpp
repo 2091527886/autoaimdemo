@@ -16,6 +16,10 @@
 
 class Config { // NOTE: keep names short & readable
 public:
+    // 计时CSV/帧号
+    bool lat_csv = false;
+    std::string lat_csv_path = "latency.csv";
+    unsigned long long frame_idx = 0;
     // ---------- 基础/日志 ----------
     bool log_init_verbose = true;           // 初始化阶段日志
     int  capture_timeout_ms = 16;           // AcquireNextFrame 超时（ms）

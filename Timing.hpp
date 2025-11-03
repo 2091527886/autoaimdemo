@@ -21,6 +21,7 @@ struct Timing {
 
 // Per-frame latency breakdown
 struct FrameLat {
+    unsigned long long idx = 0;
     double cap_ms = 0.0;
     double det_ms  = 0.0;
     double mou_ms   = 0.0;
