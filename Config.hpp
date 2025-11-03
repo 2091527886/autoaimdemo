@@ -26,7 +26,7 @@ public:
 
     // ---------- 帧率控制 ----------
     bool fps_lock = true;                   // 启用帧率锁
-    int  fps = 60;                         // 目标 FPS
+    int  fps = 30;                         // 目标 FPS
     long long fps_spin_us = 0;              // 微自旋补偿（us）
 
     // ---------- 亲和/环境（SetThreadAffinityMask） ----------
@@ -99,7 +99,7 @@ public:
     const double pid_output_limit   = 400.0; // 每帧像素输出限幅
     const double pid_integral_limit = 300.0; // 积分限幅
     const bool   pid_use_measured_dt = true; // 用实测 dt
-    const double pid_fixed_dt_ms     = 16.0; // 固定 dt（ms）
+    const double pid_fixed_dt_ms     = 33.333; // 固定 dt（ms）（对应30fps）
 
     // ---------- 类别/标签 ----------
     std::vector<std::string> classes { "enemy","teammate" };
@@ -128,7 +128,7 @@ public:
 
     // ---------- Overlay 游戏内绘制 ----------
     bool      ovl = true;              // 默认启用
-    int       ovl_fps = 60;           // 刷新上限
+    int       ovl_fps = 30;           // 刷新上限
     int       ovl_a = 160;             // 颜色 ARGB
     int       ovl_r = 0;
     int       ovl_g = 255;
