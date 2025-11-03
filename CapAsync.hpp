@@ -4,6 +4,7 @@
 #include <thread>
 #include <opencv2/opencv.hpp>
 #include "ScreenCapturer.hpp"
+#include <windows.h>
 
 class Config;
 
@@ -22,6 +23,12 @@ public:
     // Control
     void start();
     void stop();
+
+    // Wait for new frame ready; timeout_ms<0 -> infinite, =0 -> poll
+    bool wait(int timeout_ms);
+
+    // expose event handle for advanced waits
+    HANDLE hev() const { return ev; }
 
     // ROI management: set once or at runtime (thread-safe)
     void set_roi(const cv::Rect& r);
@@ -55,4 +62,7 @@ private:
     // thread control
     std::atomic<bool> go{false};
     std::thread th;
+
+    // frame-ready event (auto-reset)
+    HANDLE ev = nullptr;
 };

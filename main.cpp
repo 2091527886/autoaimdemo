@@ -146,10 +146,9 @@ public:
             auto t_cap_end = std::chrono::high_resolution_clock::now();
             fl.cap_ms = std::chrono::duration<double, std::milli>(t_cap_end - t_cap_start).count();
             if (!got) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                // 仅统计成功截屏帧：直接继续下一帧
+                // 等待新帧事件，事件驱动，避免固定1ms轮询尾延迟；同时不破坏FPS限制（超时后继续）
+                cap.wait((int)std::max(0.0, fc.tgt_ms));
                 if (c.log_latency && !c.latency_on_capture_only) {
-                    // 如果也要统计失败帧，则把仅有 capture_ms 的 fl 加入
                     lat.push(fl);
                 }
                 continue;

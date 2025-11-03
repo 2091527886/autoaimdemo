@@ -4,6 +4,7 @@
 void CapAsync::start() {
     bool expected = false;
     if (!go.compare_exchange_strong(expected, true)) return; // already running
+    if (!ev) ev = CreateEventW(nullptr, FALSE, FALSE, nullptr); // auto-reset
     th = std::thread(&CapAsync::run, this);
 }
 
@@ -11,6 +12,7 @@ void CapAsync::stop() {
     bool expected = true;
     if (go.compare_exchange_strong(expected, false)) {
         if (th.joinable()) th.join();
+        if (ev) { CloseHandle(ev); ev = nullptr; }
     }
 }
 
@@ -27,6 +29,13 @@ bool CapAsync::get(cv::Mat& out) {
     b[i].copyTo(out);
     seen = i;
     return true;
+}
+
+bool CapAsync::wait(int timeout_ms) {
+    if (!ev) return false;
+    DWORD to = (timeout_ms < 0) ? INFINITE : (DWORD)timeout_ms;
+    DWORD r = WaitForSingleObject(ev, to);
+    return r == WAIT_OBJECT_0;
 }
 
 void CapAsync::drain() {
@@ -56,6 +65,7 @@ void CapAsync::run() {
             tmp.copyTo(b[wr]);
             last.store(wr, std::memory_order_release);
             wr ^= 1;
+            if (ev) SetEvent(ev);
         } else {
             std::this_thread::sleep_for(1ms);
         }
