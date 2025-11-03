@@ -142,15 +142,18 @@ public:
 
             // 1) 截屏计时
             bool got = cap.get(img);
-            fl.cap_ms = cap.last_ms();
             if (!got) {
-                // 等待新帧事件，事件驱动，避免固定1ms轮询尾延迟；同时不破坏FPS限制（超时后继续）
+                // 等待新帧事件，事件驱动，避免固定1ms轮询尾延迟；计入等待时间到 cap_ms
+                auto ws = std::chrono::high_resolution_clock::now();
                 cap.wait((int)std::max(0.0, fc.tgt_ms));
+                auto we = std::chrono::high_resolution_clock::now();
+                fl.cap_ms = std::chrono::duration<double, std::milli>(we - ws).count();
                 if (c.log_latency && !c.latency_on_capture_only) {
                     lat.push(fl);
                 }
                 continue;
             }
+            fl.cap_ms = cap.last_ms();
 
             // 2) 异步检测：推入最新帧并尝试取回最新检测
             det.put(img);
