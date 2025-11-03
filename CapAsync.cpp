@@ -59,8 +59,11 @@ void CapAsync::run() {
             std::this_thread::sleep_for(1ms);
             continue;
         }
+        auto t0 = std::chrono::high_resolution_clock::now();
         cv::Mat tmp;
         bool ok = cap.capture(tmp, r);
+        auto t1 = std::chrono::high_resolution_clock::now();
+        last_ms_.store(std::chrono::duration<double, std::milli>(t1 - t0).count(), std::memory_order_relaxed);
         if (ok) {
             tmp.copyTo(b[wr]);
             last.store(wr, std::memory_order_release);

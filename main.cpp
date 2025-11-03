@@ -141,10 +141,8 @@ public:
             FrameLat fl; // 本帧延迟统计
 
             // 1) 截屏计时
-            auto t_cap_start = std::chrono::high_resolution_clock::now();
             bool got = cap.get(img);
-            auto t_cap_end = std::chrono::high_resolution_clock::now();
-            fl.cap_ms = std::chrono::duration<double, std::milli>(t_cap_end - t_cap_start).count();
+            fl.cap_ms = cap.last_ms();
             if (!got) {
                 // 等待新帧事件，事件驱动，避免固定1ms轮询尾延迟；同时不破坏FPS限制（超时后继续）
                 cap.wait((int)std::max(0.0, fc.tgt_ms));

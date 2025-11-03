@@ -39,6 +39,9 @@ public:
     // Drain capture stats (print in main thread)
     void drain();
 
+    // Last capture wall time (ms), includes wait/serve decisions
+    double last_ms() const { return last_ms_.load(std::memory_order_relaxed); }
+
     // Proxy dimensions (from ScreenCapturer)
     int w() const { return cap.w(); }
     int h() const { return cap.h(); }
@@ -65,4 +68,7 @@ private:
 
     // frame-ready event (auto-reset)
     HANDLE ev = nullptr;
+
+    // timing
+    std::atomic<double> last_ms_{0.0};
 };

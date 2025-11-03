@@ -143,14 +143,24 @@ bool ScreenCapturer::capture(cv::Mat& frame, const cv::Rect& crop_region) {
     if (hr == DXGI_ERROR_WAIT_TIMEOUT) {
         if (serveCache(frame)) {
             ++statCacheRe;
+            if (cfg.capture_timing && cfg.capture_timing_on_success) {
+                t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
+                reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            }
             return true;
         }
-        report_if_fail();
+        if (cfg.capture_timing && !cfg.capture_timing_on_success) {
+            t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
+            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+        }
         return false;
     }
     if (FAILED(hr)) {
         lg::ok_or_hrfail_if(true, P_C, "AcquireNextFrame", hr, SUCCEEDED(hr));
-        report_if_fail();
+        if (cfg.capture_timing && !cfg.capture_timing_on_success) {
+            t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
+            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+        }
         return false;
     }
 
@@ -161,7 +171,10 @@ bool ScreenCapturer::capture(cv::Mat& frame, const cv::Rect& crop_region) {
     t_qi_ms = std::chrono::duration<double, std::milli>(t_qi_e - t_qi_s).count();
     SafeRelease(&pDesktopResource);
     if (FAILED(hr)) {
-        report_if_fail();
+        if (cfg.capture_timing && !cfg.capture_timing_on_success) {
+            t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
+            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+        }
         dup->ReleaseFrame();
         return false;
     }
@@ -175,9 +188,16 @@ bool ScreenCapturer::capture(cv::Mat& frame, const cv::Rect& crop_region) {
         if (served) {
             ++statSkipDirty;
             ++statCacheRe;
+            if (cfg.capture_timing && cfg.capture_timing_on_success) {
+                t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
+                reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            }
             return true;
         }
-        report_if_fail();
+        if (cfg.capture_timing && !cfg.capture_timing_on_success) {
+            t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
+            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+        }
         return false;
     }
 
@@ -209,8 +229,16 @@ bool ScreenCapturer::capture(cv::Mat& frame, const cv::Rect& crop_region) {
         bool served = serveCache(frame);
         if (served) ++statCacheRe;
         t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
-    if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
-            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+        if (cfg.capture_timing) {
+            if (served) {
+                if (cfg.capture_timing_on_success) {
+                    reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+                }
+            } else {
+                if (!cfg.capture_timing_on_success) {
+                    reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+                }
+            }
         }
         idx++;
         return served;
@@ -226,8 +254,16 @@ bool ScreenCapturer::capture(cv::Mat& frame, const cv::Rect& crop_region) {
         bool served = serveCache(frame);
         if (served) ++statCacheRe;
         t_total_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_total_start).count();
-    if (cfg.capture_timing && !cfg.capture_timing_on_success) { 
-            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+        if (cfg.capture_timing) {
+            if (served) {
+                if (cfg.capture_timing_on_success) {
+                    reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+                }
+            } else {
+                if (!cfg.capture_timing_on_success) {
+                    reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+                }
+            }
         }
         idx++;
         return served;
