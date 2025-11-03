@@ -109,14 +109,14 @@ public:
     bool capture_debug = false;             // 捕获链路调试
     int  capture_debug_every_n = 30;
     bool log_latency = true;                // 延迟统计
-    int  log_latency_every_n = 60;
+    int  log_latency_every_n = 30;
     bool latency_on_capture_only = true;
     bool capture_timing = true;             // 采集分步计时
-    int  capture_timing_every_n = 60;
+    int  capture_timing_every_n = 30;
     bool capture_timing_each_frame = false;
     bool capture_timing_on_success = true;
     bool perf_report = true;                // TRT-YOLO 报告
-    int  perf_report_every_n = 60;
+    int  perf_report_every_n = 30;
     bool perf_each_frame = false;
 
     // ---------- 优化启用报告 ----------
@@ -124,7 +124,7 @@ public:
     bool opt_report_capture = true;
     bool opt_report_system = true;
     bool opt_report_verbose = true;
-    int  opt_report_every_n = 60;
+    int  opt_report_every_n = 30;
 
     // ---------- Overlay 游戏内绘制 ----------
     bool      ovl = true;              // 默认启用
