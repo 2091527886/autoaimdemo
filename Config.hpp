@@ -34,9 +34,9 @@ public:
     long long fps_spin_us = 0;              // 微自旋补偿（us）
 
     // ---------- 亲和/环境（SetThreadAffinityMask） ----------
-    bool     enable_affinity = false;       // 启用线程亲和
-    uint64_t affinity_main_mask = 0;        // 主线程掩码
-    uint64_t affinity_overlay_mask = 0;     // Overlay 线程掩码
+    bool     enable_affinity = true;       // 启用线程亲和
+    uint64_t affinity_main_mask = 0xC000;        // 主线程掩码
+    uint64_t affinity_overlay_mask = 0xC000;     // Overlay 线程掩码
 
     // 从环境变量覆盖（可选）：AIMAFF_MAIN, AIMAFF_OVERLAY
     void load_affinity_env() {
