@@ -28,43 +28,43 @@ bool ScreenCapturer::init_dxgi() {
 bool ScreenCapturer::cap_dxgi(cv::Mat& frame, const cv::Rect& crop_region) {
     using clock = std::chrono::high_resolution_clock;
     auto t_total_start = clock::now();
-    double t_acquire_ms = 0.0, t_qi_ms = 0.0, t_copy_ms = 0.0, t_map_ms = 0.0, t_cvt_ms = 0.0, t_unmap_ms = 0.0, t_total_ms = 0.0;
+    double aq = 0.0, qi = 0.0, cp = 0.0, mp = 0.0, cv = 0.0, up = 0.0, tt = 0.0;
 
     auto report_if_fail = [&]() {
         if (cfg.capture_timing && !cfg.capture_timing_on_success) {
-            t_total_ms = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
-            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            tt = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
+            reportTimes(aq, qi, cp, mp, cv, up, tt);
         }
     };
 
     IDXGIResource* pDesktopResource = nullptr;
     DXGI_OUTDUPL_FRAME_INFO frameInfo;
 
-    auto t_acq_s = clock::now();
+    auto t_acq_s = clock::now(); // aq
     HRESULT hr = dup->AcquireNextFrame(cfg.capture_timeout_ms, &frameInfo, &pDesktopResource);
     auto t_acq_e = clock::now();
-    t_acquire_ms = std::chrono::duration<double, std::milli>(t_acq_e - t_acq_s).count();
+    aq = std::chrono::duration<double, std::milli>(t_acq_e - t_acq_s).count();
 
     if (hr == DXGI_ERROR_WAIT_TIMEOUT) {
         if (serveCache(frame)) {
             ++statCacheRe;
             if (cfg.capture_timing && cfg.capture_timing_on_success) {
-                t_total_ms = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
-                reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+                tt = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
+                reportTimes(aq, qi, cp, mp, cv, up, tt);
             }
             return true;
         }
         if (cfg.capture_timing && !cfg.capture_timing_on_success) {
-            t_total_ms = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
-            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            tt = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
+            reportTimes(aq, qi, cp, mp, cv, up, tt);
         }
         return false;
     }
     if (FAILED(hr)) {
         lg::ok_or_hrfail_if(true, P_C, "AcquireNextFrame", hr, SUCCEEDED(hr));
         if (cfg.capture_timing && !cfg.capture_timing_on_success) {
-            t_total_ms = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
-            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            tt = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
+            reportTimes(aq, qi, cp, mp, cv, up, tt);
         }
         return false;
     }
@@ -73,12 +73,12 @@ bool ScreenCapturer::cap_dxgi(cv::Mat& frame, const cv::Rect& crop_region) {
     auto t_qi_s = clock::now();
     hr = pDesktopResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&pAcquiredDesktopImage);
     auto t_qi_e = clock::now();
-    t_qi_ms = std::chrono::duration<double, std::milli>(t_qi_e - t_qi_s).count();
+    qi = std::chrono::duration<double, std::milli>(t_qi_e - t_qi_s).count();
     SafeRelease(&pDesktopResource);
     if (FAILED(hr)) {
         if (cfg.capture_timing && !cfg.capture_timing_on_success) {
-            t_total_ms = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
-            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            tt = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
+            reportTimes(aq, qi, cp, mp, cv, up, tt);
         }
         dup->ReleaseFrame();
         return false;
@@ -94,14 +94,14 @@ bool ScreenCapturer::cap_dxgi(cv::Mat& frame, const cv::Rect& crop_region) {
             ++statSkipDirty;
             ++statCacheRe;
             if (cfg.capture_timing && cfg.capture_timing_on_success) {
-                t_total_ms = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
-                reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+                tt = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
+                reportTimes(aq, qi, cp, mp, cv, up, tt);
             }
             return true;
         }
         if (cfg.capture_timing && !cfg.capture_timing_on_success) {
-            t_total_ms = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
-            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            tt = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
+            reportTimes(aq, qi, cp, mp, cv, up, tt);
         }
         return false;
     }
@@ -120,7 +120,7 @@ bool ScreenCapturer::cap_dxgi(cv::Mat& frame, const cv::Rect& crop_region) {
     auto t_copy_s = clock::now();
     ctx->CopySubresourceRegion(stage[curr], 0, 0, 0, 0, pAcquiredDesktopImage, 0, &sourceRegion);
     auto t_copy_e = clock::now();
-    t_copy_ms = std::chrono::duration<double, std::milli>(t_copy_e - t_copy_s).count();
+    cp = std::chrono::duration<double, std::milli>(t_copy_e - t_copy_s).count();
 
     ctx->End(copyQ[curr]);
 
@@ -133,15 +133,15 @@ bool ScreenCapturer::cap_dxgi(cv::Mat& frame, const cv::Rect& crop_region) {
         ++statEvtWait;
         bool served = serveCache(frame);
         if (served) ++statCacheRe;
-        t_total_ms = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
+        tt = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
         if (cfg.capture_timing) {
             if (served) {
                 if (cfg.capture_timing_on_success) {
-                    reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+                    reportTimes(aq, qi, cp, mp, cv, up, tt);
                 }
             } else {
                 if (!cfg.capture_timing_on_success) {
-                    reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+                    reportTimes(aq, qi, cp, mp, cv, up, tt);
                 }
             }
         }
@@ -153,20 +153,20 @@ bool ScreenCapturer::cap_dxgi(cv::Mat& frame, const cv::Rect& crop_region) {
     auto t_map_s = clock::now();
     hr = ctx->Map(stage[prev], 0, D3D11_MAP_READ, D3D11_MAP_FLAG_DO_NOT_WAIT, &mappedResource);
     auto t_map_e = clock::now();
-    t_map_ms = std::chrono::duration<double, std::milli>(t_map_e - t_map_s).count();
+    mp = std::chrono::duration<double, std::milli>(t_map_e - t_map_s).count();
     if (hr == DXGI_ERROR_WAS_STILL_DRAWING) {
         ++statStillDraw;
         bool served = serveCache(frame);
         if (served) ++statCacheRe;
-        t_total_ms = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
+        tt = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
         if (cfg.capture_timing) {
             if (served) {
                 if (cfg.capture_timing_on_success) {
-                    reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+                    reportTimes(aq, qi, cp, mp, cv, up, tt);
                 }
             } else {
                 if (!cfg.capture_timing_on_success) {
-                    reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+                    reportTimes(aq, qi, cp, mp, cv, up, tt);
                 }
             }
         }
@@ -184,17 +184,17 @@ bool ScreenCapturer::cap_dxgi(cv::Mat& frame, const cv::Rect& crop_region) {
     cv::cvtColor(bgra_frame, frame, cv::COLOR_BGRA2BGR);
     frame.copyTo(cache);
     auto t_cvt_e = clock::now();
-    t_cvt_ms = std::chrono::duration<double, std::milli>(t_cvt_e - t_cvt_s).count();
+    cv = std::chrono::duration<double, std::milli>(t_cvt_e - t_cvt_s).count();
 
     auto t_unmap_s = clock::now();
     ctx->Unmap(stage[prev], 0);
     auto t_unmap_e = clock::now();
-    t_unmap_ms = std::chrono::duration<double, std::milli>(t_unmap_e - t_unmap_s).count();
+    up = std::chrono::duration<double, std::milli>(t_unmap_e - t_unmap_s).count();
 
-    t_total_ms = std::chrono::duration<double, std::milli>(t_unmap_e - t_total_start).count();
+    tt = std::chrono::duration<double, std::milli>(t_unmap_e - t_total_start).count();
     idx++;
     if (cfg.capture_timing) {
-        reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+        reportTimes(aq, qi, cp, mp, cv, up, tt);
     }
     ++statOk;
     dbgTick();

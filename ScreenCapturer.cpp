@@ -58,8 +58,10 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
     useWgc = (cfg.cap == 1);
     if (!useWgc) {
         init_dxgi();
+        reporter.SetBackend(metrics::CaptureReporting::Backend::DXGI);
     } else {
         init_wgc();
+        reporter.SetBackend(metrics::CaptureReporting::Backend::WGC);
     }
 
     // staging & queries

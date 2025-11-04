@@ -108,12 +108,15 @@ bool ScreenCapturer::cap_wgc(cv::Mat& frame, const cv::Rect& crop_region) {
     auto frm = wgc->pool.TryGetNextFrame();
     auto t_acq_e = clock::now();
     t_acquire_ms = std::chrono::duration<double, std::milli>(t_acq_e - t_acq_s).count();
+    // For WGC, treat second field as 'wa' (wait for frame event) collected in CapAsync
+    double t_wait_ms = get_wait_ms();
 
     if (!frm) {
         bool served = serveCache(frame);
         if (!served && cfg.capture_timing && !cfg.capture_timing_on_success) {
             t_total_ms = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
-            reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            // Map to WGC labels: gf=t_acquire_ms, wa=t_wait_ms
+            reportTimes(t_acquire_ms, t_wait_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
         }
         return served;
     }
@@ -131,7 +134,7 @@ bool ScreenCapturer::cap_wgc(cv::Mat& frame, const cv::Rect& crop_region) {
     auto t_copy_s = clock::now();
     ctx->CopySubresourceRegion(stage[curr], 0, 0, 0, 0, tex.get(), 0, &src);
     auto t_copy_e = clock::now();
-    t_copy_ms = std::chrono::duration<double, std::milli>(t_copy_e - t_copy_s).count();
+    t_copy_ms = std::chrono::duration<double, std::milli>(t_copy_e - t_copy_s).count(); // cp
 
     ctx->End(copyQ[curr]);
 
@@ -161,7 +164,7 @@ bool ScreenCapturer::cap_wgc(cv::Mat& frame, const cv::Rect& crop_region) {
     auto t_map_s = clock::now();
     HRESULT hrm = ctx->Map(stage[prev], 0, D3D11_MAP_READ, D3D11_MAP_FLAG_DO_NOT_WAIT, &mr);
     auto t_map_e = clock::now();
-    t_map_ms = std::chrono::duration<double, std::milli>(t_map_e - t_map_s).count();
+    t_map_ms = std::chrono::duration<double, std::milli>(t_map_e - t_map_s).count(); // mp
     if (hrm == DXGI_ERROR_WAS_STILL_DRAWING) {
         ++statStillDraw;
         bool served = serveCache(frame);
@@ -191,16 +194,16 @@ bool ScreenCapturer::cap_wgc(cv::Mat& frame, const cv::Rect& crop_region) {
     cv::cvtColor(bgra, frame, cv::COLOR_BGRA2BGR);
     frame.copyTo(cache);
     auto t_cvt_e = clock::now();
-    t_cvt_ms = std::chrono::duration<double, std::milli>(t_cvt_e - t_cvt_s).count();
+    t_cvt_ms = std::chrono::duration<double, std::milli>(t_cvt_e - t_cvt_s).count(); // cv
 
     auto t_unmap_s = clock::now();
     ctx->Unmap(stage[prev], 0);
     auto t_unmap_e = clock::now();
-    t_unmap_ms = std::chrono::duration<double, std::milli>(t_unmap_e - t_unmap_s).count();
+    t_unmap_ms = std::chrono::duration<double, std::milli>(t_unmap_e - t_unmap_s).count(); // up
 
     double t_total_ms_loc = std::chrono::duration<double, std::milli>(t_unmap_e - t_total_start).count();
     idx++;
-    if (cfg.capture_timing) reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms_loc);
+    if (cfg.capture_timing) reportTimes(t_acquire_ms, t_wait_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms_loc); // gf, wa, cp, mp, cv, up, tt
     ++statOk;
     dbgTick();
     return true;

@@ -4,6 +4,7 @@
 #include <opencv2/opencv.hpp>
 #include "Reporting.hpp"
 #include <windows.h>
+#include <atomic>
 
 class Config;
 
@@ -39,6 +40,11 @@ private:
     bool cap_wgc(cv::Mat& frame, const cv::Rect& crop_region);
     void rel_wgc();
 
+public:
+    // WGC wait accounting (set by CapAsync before capture)
+    void set_wait_ms(double ms) { last_wait_ms_.store(ms, std::memory_order_relaxed); }
+    double get_wait_ms() const { return last_wait_ms_.load(std::memory_order_relaxed); }
+
 private:
     const Config& cfg;
 
@@ -73,5 +79,8 @@ private:
 
     int width = 0;
     int height = 0;
+
+    // last WGC wait time (ms)
+    std::atomic<double> last_wait_ms_{0.0};
 };
 

@@ -27,7 +27,8 @@ public:
     // Wait for new frame ready; timeout_ms<0 -> infinite, =0 -> poll
     bool wait(int timeout_ms);
 
-    // expose event handle for advanced waits
+    // expose backend mode and event handle for advanced waits
+    bool is_wgc() const { return cap.is_wgc(); }
     HANDLE hev() const { return ev; }
 
     // ROI management: set once or at runtime (thread-safe)

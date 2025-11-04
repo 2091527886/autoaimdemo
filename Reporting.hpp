@@ -14,8 +14,12 @@
 namespace metrics {
 
 class CaptureReporting {
+ public:
+  enum class Backend { DXGI, WGC };
 public:
     explicit CaptureReporting(const Config& cfg) : cfg_(cfg) {}
+
+    void SetBackend(Backend b) { backend_ = b; }
 
     void BootBanner(size_t stagingCount) const {
         if (cfg_.opt_report && cfg_.opt_report_capture) {
@@ -72,15 +76,22 @@ public:
         if (!should_print || counter_ == 0) return;
 
         double n = static_cast<double>(counter_);
+        const char* l_acq = (backend_==Backend::WGC?"gf":"acq");
+        const char* l_qi  = (backend_==Backend::WGC?"wa":"qi");
+        const char* l_cpy = "cp";
+        const char* l_map = "mp";
+        const char* l_cvt = "cv";
+        const char* l_unm = "up";
+        const char* l_tot = "tt";
         lg::o() << lg::fx3
                   << lg::ovr(P_CP, counter_)
-                  << lg::fld("acq",  (acc_acq_ / n),  "ms")
-                  << lg::fld("qi",   (acc_qi_  / n),  "ms")
-                  << lg::fld("cpy",  (acc_copy_/ n),  "ms")
-                  << lg::fld("map",  (acc_map_ / n),  "ms")
-                  << lg::fld("cvt",  (acc_cvt_ / n),  "ms")
-                  << lg::fld("unm",  (acc_unmap_/n),  "ms")
-                  << lg::fld("tot",  (acc_total_/n),  "ms")
+                  << lg::fld(l_acq,  (acc_acq_ / n),  "ms")
+                  << lg::fld(l_qi,   (acc_qi_  / n),  "ms")
+                  << lg::fld(l_cpy,  (acc_copy_/ n),  "ms")
+                  << lg::fld(l_map,  (acc_map_ / n),  "ms")
+                  << lg::fld(l_cvt,  (acc_cvt_ / n),  "ms")
+                  << lg::fld(l_unm,  (acc_unmap_/n),  "ms")
+                  << lg::fld(l_tot,  (acc_total_/n),  "ms")
                   << lg::endl << lg::df;
 
         if (cfg_.opt_report && cfg_.opt_report_capture) {
@@ -110,12 +121,14 @@ public:
     }
 
 private:
-    const Config& cfg_;
-    size_t opt_counter_ = 0;
-    size_t stat_dirty_skips_ = 0, stat_event_not_ready_ = 0, stat_map_still_drawing_ = 0, stat_cache_reused_ = 0, stat_success_ = 0;
+   const Config& cfg_;
+   size_t opt_counter_ = 0;
+   size_t stat_dirty_skips_ = 0, stat_event_not_ready_ = 0, stat_map_still_drawing_ = 0, stat_cache_reused_ = 0, stat_success_ = 0;
 
-    size_t counter_ = 0;
-    double acc_acq_ = 0.0, acc_qi_ = 0.0, acc_copy_ = 0.0, acc_map_ = 0.0, acc_cvt_ = 0.0, acc_unmap_ = 0.0, acc_total_ = 0.0;
+   size_t counter_ = 0;
+   double acc_acq_ = 0.0, acc_qi_ = 0.0, acc_copy_ = 0.0, acc_map_ = 0.0, acc_cvt_ = 0.0, acc_unmap_ = 0.0, acc_total_ = 0.0;
+
+   Backend backend_ = Backend::DXGI;
 };
 
 

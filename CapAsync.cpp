@@ -60,12 +60,17 @@ void CapAsync::run() {
             continue;
         }
 
+        double wa_ms = 0.0;
         // If WGC backend, wait for frame event to avoid polling
         if (cap.is_wgc()) {
             HANDLE fe = cap.hev();
             if (fe) {
+                auto w0 = std::chrono::high_resolution_clock::now();
                 // finite wait to allow graceful stop
                 (void)WaitForSingleObject(fe, 5);
+                auto w1 = std::chrono::high_resolution_clock::now();
+                wa_ms = std::chrono::duration<double, std::milli>(w1 - w0).count();
+                cap.set_wait_ms(wa_ms);
                 if (!go.load(std::memory_order_relaxed)) break;
             }
         }
@@ -74,7 +79,8 @@ void CapAsync::run() {
         cv::Mat tmp;
         bool ok = cap.capture(tmp, r);
         auto t1 = std::chrono::high_resolution_clock::now();
-        last_ms_.store(std::chrono::duration<double, std::milli>(t1 - t0).count(), std::memory_order_relaxed);
+        double cap_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+        last_ms_.store(wa_ms + cap_ms, std::memory_order_relaxed);
         if (ok) {
             tmp.copyTo(b[wr]);
             last.store(wr, std::memory_order_release);
