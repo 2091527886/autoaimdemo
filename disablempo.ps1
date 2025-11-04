@@ -1,18 +1,18 @@
 #requires -version 5.1
 <#
-  关闭 DWM MPO（OverlayTestMode = 5）/ 还原 / 检查状态
+  Toggle DWM MPO (OverlayTestMode = 5) / Revert / Check status
 
-  用法示例：
-    - 关闭 MPO：      .\disablempo.ps1
-    - 仅检查：        .\disablempo.ps1 -CheckOnly
-    - 还原：          .\disablempo.ps1 -Revert
-    - 不提示重启：    .\disablempo.ps1 -NoReboot
-    - 修改后强制重启：.\disablempo.ps1 -ForceReboot
+  Usage examples:
+    - Disable MPO:       .\disablempo.ps1
+    - Check only:        .\disablempo.ps1 -CheckOnly
+    - Revert to default: .\disablempo.ps1 -Revert
+    - No reboot prompt:  .\disablempo.ps1 -NoReboot
+    - Force reboot:      .\disablempo.ps1 -ForceReboot
 
-  说明：
-    - 写入 HKLM:\SOFTWARE\Microsoft\Windows\Dwm\OverlayTestMode = 5 以关闭 MPO
-    - 某些系统/驱动版本需重启或注销后才完全生效
-    - 本脚本将使用 64 位注册表视图进行读写并在操作后立即校验
+  Notes:
+    - Writes HKLM:\SOFTWARE\Microsoft\Windows\Dwm\OverlayTestMode = 5 to disable MPO
+    - Some systems/drivers require reboot or logoff to take effect
+    - Uses 64-bit registry view and validates after write
 #>
 
 [CmdletBinding(SupportsShouldProcess=$true)]
@@ -34,12 +34,12 @@ function Test-ProcessIsElevated {
 
 function Relaunch-SelfAsAdmin {
     param([string[]]$PassthroughArgs)
-    Write-Host "[i] 正在请求管理员权限..."
+    Write-Host "INFO: requesting administrator privileges..."
     $exe = (Get-Process -Id $PID).Path
     $psi = New-Object System.Diagnostics.ProcessStartInfo $exe
     $psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" $($PassthroughArgs -join ' ')"
     $psi.Verb = "runas"
-    try { [Diagnostics.Process]::Start($psi) | Out-Null } catch { throw "用户拒绝提权或无法提权：$($_.Exception.Message)" }
+    try { [Diagnostics.Process]::Start($psi) | Out-Null } catch { throw "User declined or elevation failed: $($_.Exception.Message)" }
     exit
 }
 
@@ -58,7 +58,7 @@ function Get-ArgLineFromBoundParams {
 }
 
 function Get-OverlayTestModeValue {
-    # 确保使用 64 位注册表视图
+    # use 64-bit registry view
     $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, [Microsoft.Win32.RegistryView]::Registry64)
     $sub  = $base.OpenSubKey('SOFTWARE\\Microsoft\\Windows\\Dwm', $false)
     if ($null -eq $sub) { return $null }
@@ -81,15 +81,15 @@ function Remove-OverlayTestModeValue {
 function Show-CurrentState {
     $val = Get-OverlayTestModeValue
     if ($null -ne $val) {
-        Write-Host "[=] 当前 OverlayTestMode = $val"
-        if ($val -eq 5) { Write-Host "[=] 状态：MPO 关闭（OverlayTestMode=5）" }
+        Write-Host "STATUS: OverlayTestMode = $val"
+        if ($val -eq 5) { Write-Host "STATUS: MPO is DISABLED (OverlayTestMode=5)" }
     } else {
-        Write-Host "[=] 当前未设置 OverlayTestMode（系统默认）"
+        Write-Host "STATUS: OverlayTestMode is NOT set (system default)"
     }
 }
 #endregion
 
-# 提权
+# Elevation
 if (-not (Test-ProcessIsElevated)) {
     $argsLine = Get-ArgLineFromBoundParams -Bound $MyInvocation.BoundParameters
     Relaunch-SelfAsAdmin -PassthroughArgs $argsLine.Split(' ', [System.StringSplitOptions]::RemoveEmptyEntries)
@@ -102,42 +102,42 @@ try {
     }
 
     if ($Revert) {
-        if ($PSCmdlet.ShouldProcess('HKLM:SOFTWARE\\Microsoft\\Windows\\Dwm', '移除 OverlayTestMode')) {
+        if ($PSCmdlet.ShouldProcess('HKLM:SOFTWARE\\Microsoft\\Windows\\Dwm', 'Remove OverlayTestMode')) {
             Remove-OverlayTestModeValue
             $readback = Get-OverlayTestModeValue
             if ($null -eq $readback) {
-                Write-Host "[+] 已删除 OverlayTestMode（还原默认）"
+                Write-Host "OK: OverlayTestMode removed (restored default)"
             } else {
-                Write-Warning "[-] 删除失败：仍读取到值 $readback"
+                Write-Warning "WARN: remove failed, still reading value: $readback"
             }
         }
     } else {
-        if ($PSCmdlet.ShouldProcess('HKLM:SOFTWARE\\Microsoft\\Windows\\Dwm', '设置 OverlayTestMode=5（关闭 MPO）')) {
+        if ($PSCmdlet.ShouldProcess('HKLM:SOFTWARE\\Microsoft\\Windows\\Dwm', 'Set OverlayTestMode=5 (disable MPO)')) {
             Set-OverlayTestModeValue -Value 5
             $readback = Get-OverlayTestModeValue
             if ($readback -eq 5) {
-                Write-Host "[+] 已设置 OverlayTestMode = 5（关闭 MPO）"
+                Write-Host "OK: OverlayTestMode set to 5 (MPO disabled)"
             } else {
-                Write-Warning "[-] 写入后校验失败：读取到 $readback"
+                Write-Warning "WARN: validation failed after write, read back: $readback"
             }
         }
     }
 
     Show-CurrentState
 } catch {
-    Write-Error "操作失败：$($_.Exception.Message)"
+    Write-Error "ERROR: $($_.Exception.Message)"
     exit 1
 }
 
-# 重启逻辑
+# Reboot logic
 if ($ForceReboot) {
-    Write-Host "[i] 即将重启以应用更改..."
+    Write-Host "INFO: rebooting now to apply changes..."
     Restart-Computer -Force
 } elseif (-not $NoReboot) {
-    $r = Read-Host "是否现在重启计算机以生效? (Y/N)"
+    $r = Read-Host "Reboot now to apply changes? (Y/N)"
     if ($r -match '^[Yy]') {
         Restart-Computer -Force
     } else {
-        Write-Host "[i] 请手动注销或重启使设置完全生效。"
+        Write-Host "INFO: please logoff or reboot manually to fully apply the setting."
     }
 }
