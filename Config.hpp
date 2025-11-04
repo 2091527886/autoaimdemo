@@ -22,7 +22,18 @@ public:
     unsigned long long frame_idx = 0;
     // ---------- 基础/日志 ----------
     bool log_init_verbose = true;           // 初始化阶段日志
-    int  capture_timeout_ms = 16;           // AcquireNextFrame 超时（ms）
+    int  capture_timeout_ms = 16;           // AcquireNextFrame/TryGetNextFrame 超时（ms）
+
+    // ---------- 捕获后端/显示器/GPU ----------
+    // cap: 0=DXGI DDA, 1=WGC(Windows Graphics Capture)
+    int  cap = 0;
+    bool cap_enum = false;      // 枚举打印
+    int  cap_gpu = -1;          // 适配器索引
+    std::wstring cap_gpu_name;  // 名称包含匹配（优先）
+    std::wstring cap_gpu_luid;  // 形如 hi:lo
+    int  cap_out = 0;           // 输出索引
+    bool cap_cursor = false;    // 是否捕获鼠标（WGC）
+    bool cap_border = false;    // 是否显示边框（WGC）
 
     // ---------- 可视化 ----------
     const bool enable_visual = true;
@@ -223,6 +234,9 @@ public:
         overlay_interval_100ns = std::max(1ll, overlay_interval_100ns);
         overlay_spin_us = std::max(0ll, overlay_spin_us);
         overlay_px = std::max(1, overlay_px);
+        // 捕获后端
+        cap = (cap==1)?1:0;
+        cap_out = std::max(0, cap_out);
         // overlay per-class 配色尺寸/范围
         auto pad = [&](std::vector<int>& v, size_t n, int d){ if (v.size()<n) v.resize(n, d); for (auto& x: v){ x = std::max(0, std::min(255, x)); } };
         if (ovl_cls) {

@@ -42,13 +42,22 @@ private:
     size_t statCacheRe = 0;
     size_t statOk = 0;
 
+    // D3D/DXGI common
     struct IDXGIFactory1* fac = nullptr;
     struct IDXGIAdapter1* adp = nullptr;
     struct IDXGIOutput* out = nullptr;
     struct IDXGIOutput1* out1 = nullptr;
     struct ID3D11Device* dev = nullptr;
     struct ID3D11DeviceContext* ctx = nullptr;
+
+    // DDA only
     struct IDXGIOutputDuplication* dup = nullptr;
+
+    // WGC impl hidden (declared in .cpp)
+    struct WgcCtx;
+    WgcCtx* wgc = nullptr;
+    bool useWgc = false;
+
     int width = 0;
     int height = 0;
 };
