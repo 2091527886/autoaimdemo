@@ -42,7 +42,9 @@ struct ScreenCapturer::WgcCtx {
     winrt::Windows::Graphics::Capture::GraphicsCaptureItem item{ nullptr };
     winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool pool{ nullptr };
     winrt::Windows::Graphics::Capture::GraphicsCaptureSession sess{ nullptr };
+    winrt::event_token tok{};
 };
+
 
 bool ScreenCapturer::init_wgc() {
     // Initialize WinRT apartment (moved from ctor)
@@ -74,12 +76,27 @@ bool ScreenCapturer::init_wgc() {
     wgc->sess = wgc->pool.CreateCaptureSession(wgc->item);
     wgc->sess.IsCursorCaptureEnabled(cfg.cap_cursor);
     wgc->sess.IsBorderRequired(cfg.cap_border);
+
+    // Create auto-reset frame event
+    if (!fev) fev = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+
+    // Subscribe FrameArrived -> SetEvent(fev)
+    wgc->tok = wgc->pool.FrameArrived([this](auto&&, auto&&){
+        if (fev) SetEvent(fev);
+    });
+
     wgc->sess.StartCapture();
     return true;
 }
 
 void ScreenCapturer::rel_wgc() {
-    if (wgc) { delete wgc; wgc = nullptr; }
+    if (wgc) {
+        if (wgc->pool && wgc->tok.value) {
+            wgc->pool.FrameArrived(wgc->tok);
+        }
+        // session/pool will be released with wgc destruction
+        delete wgc; wgc = nullptr;
+    }
 }
 
 bool ScreenCapturer::cap_wgc(cv::Mat& frame, const cv::Rect& crop_region) {

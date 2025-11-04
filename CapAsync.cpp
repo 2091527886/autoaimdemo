@@ -59,6 +59,17 @@ void CapAsync::run() {
             std::this_thread::sleep_for(1ms);
             continue;
         }
+
+        // If WGC backend, wait for frame event to avoid polling
+        if (cap.is_wgc()) {
+            HANDLE fe = cap.hev();
+            if (fe) {
+                // finite wait to allow graceful stop
+                (void)WaitForSingleObject(fe, 5);
+                if (!go.load(std::memory_order_relaxed)) break;
+            }
+        }
+
         auto t0 = std::chrono::high_resolution_clock::now();
         cv::Mat tmp;
         bool ok = cap.capture(tmp, r);

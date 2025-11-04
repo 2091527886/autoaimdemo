@@ -3,6 +3,7 @@
 #include <array>
 #include <opencv2/opencv.hpp>
 #include "Reporting.hpp"
+#include <windows.h>
 
 class Config;
 
@@ -20,6 +21,10 @@ public:
 
     int w() const { return width; }
     int h() const { return height; }
+
+    // expose backend mode and WGC frame event (read-only)
+    bool is_wgc() const { return useWgc; }
+    HANDLE hev() const { return fev; }
 
 private:
     bool serveCache(cv::Mat& dst);
@@ -64,7 +69,9 @@ private:
     struct WgcCtx;
     WgcCtx* wgc = nullptr;
     bool useWgc = false;
+    HANDLE fev = nullptr; // WGC frame event (auto-reset)
 
     int width = 0;
     int height = 0;
 };
+

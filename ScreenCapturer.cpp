@@ -92,6 +92,7 @@ ScreenCapturer::~ScreenCapturer() {
     if (useWgc) {
         rel_wgc();
     }
+    if (fev) { CloseHandle(fev); fev = nullptr; }
     SafeRelease(&dup);
     SafeRelease(&out1);
     SafeRelease(&out);
