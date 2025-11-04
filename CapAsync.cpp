@@ -1,5 +1,7 @@
 #include "CapAsync.hpp"
 #include <chrono>
+#include "Config.hpp"
+#include "SystemTuner.hpp"
 
 void CapAsync::start() {
     bool expected = false;
@@ -43,6 +45,9 @@ void CapAsync::drain() {
 }
 
 void CapAsync::run() {
+    HANDLE hMm = MmcssEnable(c.mmcss_cap, c.mmcss_cap_task.c_str(), c.mmcss_cap_prio);
+    struct MmcssGuard { HANDLE h; ~MmcssGuard(){ MmcssDisable(h);} } _mmg{hMm};
+
     // Optional small warmup sleep to let main init
     using namespace std::chrono_literals;
     while (go.load(std::memory_order_relaxed)) {

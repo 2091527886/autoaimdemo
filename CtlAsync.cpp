@@ -2,6 +2,7 @@
 #include <cmath>
 #include <limits>
 #include <chrono>
+#include "SystemTuner.hpp"
 
 static Detection* pick_by_tid(std::vector<Detection>& ds, int tid) {
     if (tid < 0) return nullptr;
@@ -48,6 +49,9 @@ void CtlAsync::put(const std::vector<Detection>& ds, bool smooth, bool single, d
 }
 
 void CtlAsync::run() {
+    HANDLE hMm = MmcssEnable(c.mmcss_ctl, c.mmcss_ctl_task.c_str(), c.mmcss_ctl_prio);
+    struct MmcssGuard { HANDLE h; ~MmcssGuard(){ MmcssDisable(h);} } _mmg{hMm};
+
     using clock = std::chrono::high_resolution_clock;
     int seen = seq_.load(std::memory_order_acquire);
     while (go_.load(std::memory_order_relaxed)) {

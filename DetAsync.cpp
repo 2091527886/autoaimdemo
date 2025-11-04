@@ -1,5 +1,7 @@
 #include "DetAsync.hpp"
 #include <chrono>
+#include "Config.hpp"
+#include "SystemTuner.hpp"
 
 void DetAsync::start() {
     bool expected = false;
@@ -35,6 +37,9 @@ bool DetAsync::get(std::vector<Detection>& out, Timing& tm) {
 }
 
 void DetAsync::run() {
+    HANDLE hMm = MmcssEnable(c.mmcss_det, c.mmcss_det_task.c_str(), c.mmcss_det_prio);
+    struct MmcssGuard { HANDLE h; ~MmcssGuard(){ MmcssDisable(h);} } _mmg{hMm};
+
     using namespace std::chrono_literals;
     while (go.load(std::memory_order_relaxed)) {
         int i = in_last.load(std::memory_order_acquire);

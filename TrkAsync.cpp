@@ -1,5 +1,6 @@
 #include "TrkAsync.hpp"
 #include <chrono>
+#include "SystemTuner.hpp"
 
 void TrkAsync::start() {
     bool ex = false;
@@ -32,6 +33,9 @@ bool TrkAsync::get(std::vector<Detection>& out) {
 }
 
 void TrkAsync::run() {
+    HANDLE hMm = MmcssEnable(c.mmcss_trk, c.mmcss_trk_task.c_str(), c.mmcss_trk_prio);
+    struct MmcssGuard { HANDLE h; ~MmcssGuard(){ MmcssDisable(h);} } _mmg{hMm};
+
     using clock = std::chrono::high_resolution_clock;
     using namespace std::chrono_literals;
     int seen = seq.load(std::memory_order_acquire);

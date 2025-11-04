@@ -2,6 +2,7 @@
 #include <chrono>
 #include <algorithm>
 #include "Log.hpp"
+#include "SystemTuner.hpp"
 
 void OvlAsync::start() {
     bool ex = false;
@@ -32,13 +33,16 @@ void OvlAsync::put(const std::vector<Detection>& ds, const cv::Rect& crop) {
 }
 
 void OvlAsync::run() {
+    HANDLE hMm = MmcssEnable(c.mmcss_ovl, c.mmcss_ovl_task.c_str(), c.mmcss_ovl_prio);
+    struct MmcssGuard { HANDLE h; ~MmcssGuard(){ MmcssDisable(h);} } _mmg{hMm};
+
     gover.UseVirtualScreen();
     gover.SetMaxFPS((unsigned)std::max(1, c.ovl_fps));
     gover.SetConfig(c);
     {
         bool ok = gover.Start();
         lg::ok_or_werr(P_B, "Overlay.Start", ok);
-        if (!ok) return;
+        if (!ok) { return; }
     }
 
     int seen = seq.load(std::memory_order_acquire);

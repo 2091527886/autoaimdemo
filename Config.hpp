@@ -203,10 +203,32 @@ public:
     float trk_out_nms_iou = 0.7f; // 输出NMS IoU 阈值
 
     // ---------- 线程调度（MMCSS/内存优先级） ----------
-    bool mmcss_main = false;
-    std::wstring mmcss_task = L"Pro Audio";
+    // 主线程
+    bool mmcss_main = true;
+    std::wstring mmcss_task = L"Games";
     AVRT_PRIORITY mmcss_prio = AVRT_PRIORITY_HIGH;
     bool enable_thread_mem_prio = false;
+
+    // 模块线程（按需启用，不使用环境变量；短名、可读）
+    bool           mmcss_cap = true;           // 捕获
+    std::wstring   mmcss_cap_task = L"Capture";
+    AVRT_PRIORITY  mmcss_cap_prio = AVRT_PRIORITY_HIGH;
+
+    bool           mmcss_det = true;           // 检测
+    std::wstring   mmcss_det_task = L"Games";
+    AVRT_PRIORITY  mmcss_det_prio = AVRT_PRIORITY_NORMAL;
+
+    bool           mmcss_trk = true;           // 跟踪
+    std::wstring   mmcss_trk_task = L"Games";
+    AVRT_PRIORITY  mmcss_trk_prio = AVRT_PRIORITY_HIGH;
+
+    bool           mmcss_ctl = true;           // 控制/鼠标
+    std::wstring   mmcss_ctl_task = L"Pro Audio";
+    AVRT_PRIORITY  mmcss_ctl_prio = AVRT_PRIORITY_HIGH;
+
+    bool           mmcss_ovl = true;           // 叠加绘制
+    std::wstring   mmcss_ovl_task = L"Playback";
+    AVRT_PRIORITY  mmcss_ovl_prio = AVRT_PRIORITY_NORMAL;
 
     // ---------- DXGI 设备优先级/延迟 ----------
     int dxgi_gpu_prio = 3;                  // -1..7
