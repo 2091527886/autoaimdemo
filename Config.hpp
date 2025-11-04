@@ -185,7 +185,7 @@ public:
     float trk_iou = 0.6f;        // IoU 阈值（更严格，减少错配）
     int   trk_max_age = 30;      // 轨迹最大丢失帧数
     int   trk_min_hits = 3;      // 确认命中次数
-    bool  trk_pred_move = false;  // 丢失时是否按预测移动（默认关闭，减少飘）
+    bool  trk_pred_move = true;  // 丢失时是否按预测移动（默认关闭，减少飘）
     bool  trk_cls_match = true;  // 关联是否要求类别一致
     double trk_maha = 9.49;      // 马氏距离门限（4DOF 95%≈9.49）
     bool  trk_out_nms = true;    // 输出前进行轨迹级NMS
