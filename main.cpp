@@ -197,13 +197,14 @@ public:
             auto loop_end_time = std::chrono::high_resolution_clock::now();
             double proc_ms = std::chrono::duration<double, std::milli>(loop_end_time - loop_start_time).count();
             if (c.fps_lock) {
-                double frame_ms = fc.end(proc_ms);
+                double work_ms = std::max({proc_ms, fl.cap_ms, det_ms_last});
+                double frame_ms = fc.end(work_ms);
                 tm.loop_ms = frame_ms;
             } else {
                 tm.loop_ms = proc_ms;
             }
-            // 用于统计的近似端到端：主循或检测取慢者
-            double loop_e2e = std::max(tm.loop_ms, det_ms_last);
+            // 用于统计的近似端到端：计入截图等待/采集 + 推理
+            double loop_e2e = std::max({tm.loop_ms, fl.cap_ms, det_ms_last});
             fl.loop_ms = loop_e2e;
             e2e_ms_last = loop_e2e;
 
