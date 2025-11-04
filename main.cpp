@@ -6,7 +6,14 @@
 #include <cmath>
 #include <sstream>
 #include <thread>
+#include <atomic>
+#include <windows.h>
 // OpenCV
+
+// forward declare exit flag for use before its definition
+extern std::atomic<bool> g_exit_req;
+extern std::atomic<bool> g_exit_done;
+
 #include <opencv2/opencv.hpp>
 // Input Simulator (确保头文件在项目路径中)
 #include "Config.hpp"
@@ -140,6 +147,7 @@ public:
 
     void loop() {
         while (true) {
+            if (g_exit_req.load(std::memory_order_relaxed)) { lg::o() << lg::nl << P_I "Signal exit" << lg::endl; break; }
             auto loop_start_time = std::chrono::high_resolution_clock::now();
 
             FrameLat fl; // 本帧延迟统计
@@ -160,6 +168,7 @@ public:
                 if (c.log_latency && !c.latency_on_capture_only) {
                     lat.push(fl);
                 }
+                if (g_exit_req.load(std::memory_order_relaxed)) { lg::o() << lg::nl << P_I "Signal exit" << lg::endl; break; }
                 continue;
             }
             // 成功取到帧：递增帧号并记录
@@ -256,6 +265,7 @@ public:
             if (vis) {
                 draw(nullptr);
             }
+            if (g_exit_req.load(std::memory_order_relaxed)) { lg::o() << lg::nl << P_I "Signal exit" << lg::endl; break; }
             char key = static_cast<char>(cv::waitKey(1));
             if (key == 27) { // ESC
                 lg::o() << lg::nl << P_I "ESC, exit" << lg::endl;
@@ -358,7 +368,32 @@ private:
 
 
 // --- 主函数 ---
+std::atomic<bool> g_exit_req{false};
+std::atomic<bool> g_exit_done{false};
+static BOOL WINAPI CtrlHandler(DWORD type) {
+    switch (type) {
+    case CTRL_C_EVENT:
+    case CTRL_BREAK_EVENT:
+        g_exit_req.store(true, std::memory_order_relaxed);
+        return TRUE;
+    case CTRL_CLOSE_EVENT:
+    case CTRL_LOGOFF_EVENT:
+    case CTRL_SHUTDOWN_EVENT:
+        g_exit_req.store(true, std::memory_order_relaxed);
+        // give main loop some time to exit gracefully (flush CSV), then let OS proceed if not finished
+        for (int i = 0; i < 200; ++i) { // ~2s
+            if (g_exit_done.load(std::memory_order_relaxed)) return TRUE;
+            Sleep(10);
+        }
+        return FALSE; // not finished in time -> let system terminate
+    default:
+        return FALSE;
+    }
+}
+
 int main() {
+    SetConsoleCtrlHandler(CtrlHandler, TRUE);
+
     Config boot_cfg; // KEEP
     // 从环境变量读取可选亲和配置
     boot_cfg.fromEnv();
@@ -405,10 +440,12 @@ int main() {
         MmcssDisable(hMmcss);
         lg::ml(P_F, std::string("Fatal: ") + e.what(), "Check issues.", "Press Enter to exit.");
         std::cin.get();
+        g_exit_done.store(true, std::memory_order_relaxed);
         return -1;
     }
     lg::o() << lg::nl << P_I "Done" << lg::endl;
     overlay.stop();
     MmcssDisable(hMmcss);
+    g_exit_done.store(true, std::memory_order_relaxed);
     return 0;
 }

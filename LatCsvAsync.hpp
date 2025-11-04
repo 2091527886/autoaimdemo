@@ -36,7 +36,17 @@ public:
             if (ev_) SetEvent(ev_);
             if (th_.joinable()) th_.join();
             if (ev_) { CloseHandle(ev_); ev_ = nullptr; }
-            if (fp_) { fflush(fp_); fclose(fp_); fp_ = nullptr; }
+            // after worker thread drained, write the average line only (run() already flushed rows)
+            if (fp_) {
+                if (cnt_ > 0) {
+                    double n = static_cast<double>(cnt_);
+                    fprintf(fp_, "-1,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
+                        sum_cap_/n, sum_det_/n, sum_mou_/n, sum_trk_/n, sum_ctl_/n, sum_ovl_/n, sum_loop_/n);
+                }
+                fflush(fp_);
+                fclose(fp_);
+                fp_ = nullptr;
+            }
         }
     }
 
@@ -45,6 +55,15 @@ public:
         {
             std::lock_guard<std::mutex> lk(mx_);
             q_.push_back(f);
+            // accumulate sums for average line
+            sum_cap_ += f.cap_ms;
+            sum_det_ += f.det_ms;
+            sum_mou_ += f.mou_ms;
+            sum_trk_ += f.trk_ms;
+            sum_ctl_ += f.ctl_ms;
+            sum_ovl_ += f.ovl_ms;
+            sum_loop_ += f.loop_ms;
+            ++cnt_;
         }
         if (ev_) SetEvent(ev_);
     }
@@ -69,7 +88,7 @@ private:
                 fflush(fp_);
             }
         }
-        // drain leftover if any
+        // drain leftover if any (keep q_ for stop() to also flush and then print avg)
         if (fp_) {
             for (const auto& f : q_) {
                 fprintf(fp_, "%llu,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
@@ -86,4 +105,8 @@ private:
     std::mutex mx_;
     std::vector<FrameLat> q_;
     FILE* fp_ = nullptr;
+
+    // aggregates for averages
+    double sum_cap_ = 0.0, sum_det_ = 0.0, sum_mou_ = 0.0, sum_trk_ = 0.0, sum_ctl_ = 0.0, sum_ovl_ = 0.0, sum_loop_ = 0.0;
+    unsigned long long cnt_ = 0;
 };
