@@ -58,16 +58,15 @@ struct BTParams {
 class ByteTracker {
 public:
     explicit ByteTracker(const Config& c);
-    // Update with detections for one frame and output tracked boxes.
-    // If cfg.trk_pred_move is true, outputs predicted boxes for tracks without detection this frame.
     void update(const std::vector<Detection>& dets, std::vector<Detection>& out);
 private:
     BTParams p;
     int next_id = 1;
     std::vector<TrkNode> tracks;
+    bool use_bt = true;
+    bool use_kf = true;
 
     static double IoU(const cv::Rect& a, const cv::Rect& b);
-    // Hungarian assignment on cost matrix (lower cost better). Returns pairs (row->col)
     static std::vector<int> Hungarian(const std::vector<std::vector<double>>& cost);
 };
 

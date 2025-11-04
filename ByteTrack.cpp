@@ -134,12 +134,15 @@ bt::ByteTracker::ByteTracker(const Config& c) {
     p.iou_th  = c.trk_iou;
     p.max_age = std::max(1, c.trk_max_age);
     p.min_hits = std::max(0, c.trk_min_hits);
+    use_bt = c.trk_bt;
+    use_kf = c.trk_kf;
 }
 
 void bt::ByteTracker::update(const std::vector<Detection>& dets, std::vector<Detection>& out) {
     out.clear();
+    if (!use_bt) { out = dets; return; }
     // 1) Predict existing tracks
-    for (auto& t : tracks) { t.kf.predict(); t.age++; t.time_since_update++; }
+    for (auto& t : tracks) { if (use_kf) t.kf.predict(); t.age++; t.time_since_update++; }
 
     // 2) Split by score
     std::vector<int> hi, lo; hi.reserve(dets.size()); lo.reserve(dets.size());
@@ -154,12 +157,15 @@ void bt::ByteTracker::update(const std::vector<Detection>& dets, std::vector<Det
                 if (p.cls_match && d.class_id>=0 && tracks[i].class_id>=0 && d.class_id!=tracks[i].class_id) {
                     cost[i][j] = 1.0; // disallow by high cost
                 } else {
-                    // IoU + Mahalanobis gating
-                    double iou = IoU(tracks[i].kf.toRect(), d.box);
-                    double md = tracks[i].kf.maha(d.box);
-                    // gate by md (configurable)
-                    if (md > p.maha_th) { cost[i][j] = 1.0; }
-                    else { cost[i][j] = 1.0 - iou; }
+                    // IoU (+ optional Mahalanobis gating)
+                    double iou = IoU(use_kf ? tracks[i].kf.toRect() : tracks[i].last_box, d.box);
+                    if (use_kf) {
+                        double md = tracks[i].kf.maha(d.box);
+                        if (md > p.maha_th) { cost[i][j] = 1.0; }
+                        else { cost[i][j] = 1.0 - iou; }
+                    } else {
+                        cost[i][j] = 1.0 - iou;
+                    }
                 }
             }
         }
@@ -182,7 +188,7 @@ void bt::ByteTracker::update(const std::vector<Detection>& dets, std::vector<Det
     for (auto [ti, mj] : pairs_hi) {
         int di = hi[mj];
         auto& t = tracks[ti];
-        t.kf.update(dets[di].box);
+        if (use_kf) t.kf.update(dets[di].box);
         t.last_box = dets[di].box;
         t.class_id = dets[di].class_id;
         t.last_conf = dets[di].confidence;
@@ -206,10 +212,14 @@ void bt::ByteTracker::update(const std::vector<Detection>& dets, std::vector<Det
                 if (p.cls_match && d.class_id>=0 && tracks[i].class_id>=0 && d.class_id!=tracks[i].class_id) {
                     cost[ii][jj] = 1.0;
                 } else {
-                    double iou = IoU(tracks[i].kf.toRect(), d.box);
-                    double md = tracks[i].kf.maha(d.box);
-                    if (md > p.maha_th) { cost[ii][jj] = 1.0; }
-                    else { cost[ii][jj] = 1.0 - iou; }
+                    double iou = IoU(use_kf ? tracks[i].kf.toRect() : tracks[i].last_box, d.box);
+                    if (use_kf) {
+                        double md = tracks[i].kf.maha(d.box);
+                        if (md > p.maha_th) { cost[ii][jj] = 1.0; }
+                        else { cost[ii][jj] = 1.0 - iou; }
+                    } else {
+                        cost[ii][jj] = 1.0 - iou;
+                    }
                 }
             }
         }
@@ -222,7 +232,7 @@ void bt::ByteTracker::update(const std::vector<Detection>& dets, std::vector<Det
                 double iou = 1.0 - cost[ii][mj];
                 if (iou >= p.iou_th) {
                     auto& t = tracks[ti];
-                    t.kf.update(dets[di].box);
+                    if (use_kf) t.kf.update(dets[di].box);
                     t.last_box = dets[di].box;
                     t.class_id = dets[di].class_id;
                     t.last_conf = dets[di].confidence;
@@ -235,7 +245,7 @@ void bt::ByteTracker::update(const std::vector<Detection>& dets, std::vector<Det
 
     // 5) Create new tracks for remaining high-score detections
     for (int idx : hi) if (!det_matched[idx]) {
-        TrkNode t; t.id = next_id++; t.class_id = dets[idx].class_id; t.last_conf = dets[idx].confidence; t.kf.init(dets[idx].box); t.last_box = dets[idx].box; t.hits=1; t.age=1; t.time_since_update=0; tracks.push_back(std::move(t));
+        TrkNode t; t.id = next_id++; t.class_id = dets[idx].class_id; t.last_conf = dets[idx].confidence; if (use_kf) t.kf.init(dets[idx].box); t.last_box = dets[idx].box; t.hits=1; t.age=1; t.time_since_update=0; tracks.push_back(std::move(t));
         det_matched[idx] = true;
     }
 
@@ -257,7 +267,7 @@ void bt::ByteTracker::update(const std::vector<Detection>& dets, std::vector<Det
     std::vector<Detection> tmp;
     for (auto& t : tracks) {
         if (t.hits >= p.min_hits && t.time_since_update==0) {
-            Detection d; d.box = t.kf.toRect(); d.class_id = t.class_id; d.confidence = t.last_conf; d.track_id = t.id; d.is_pred = false;
+            Detection d; d.box = (use_kf ? t.kf.toRect() : t.last_box); d.class_id = t.class_id; d.confidence = t.last_conf; d.track_id = t.id; d.is_pred = false;
             tmp.push_back(d);
         }
     }

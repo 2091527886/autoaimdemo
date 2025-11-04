@@ -177,7 +177,9 @@ public:
     int       overlay_x = 0, overlay_y = 0; // 位置
 
     // ---------- ByteTrack/Kalman 跟踪 ----------
-    bool  trk = true;            // 开关
+    bool  trk = true;            // 总开关（线程）
+    bool  trk_bt = true;         // 是否启用 ByteTrack（否则直通）
+    bool  trk_kf = true;         // 是否启用 Kalman（预测/门控/状态输出）
     float trk_th = 0.6f;         // 高阈值
     float trk_th_lo = 0.1f;      // 低阈值
     float trk_iou = 0.6f;        // IoU 阈值（更严格，减少错配）
