@@ -81,7 +81,7 @@ void CapAsync::run() {
             wr ^= 1;
             if (ev) SetEvent(ev);
         } else {
-            std::this_thread::sleep_for(1ms);
+            // miss: no extra sleep (DXGI/WGC). AcquireNextFrame already blocks.
         }
     }
 }
