@@ -24,8 +24,6 @@ public:
     void stop();
 
     void put(const std::vector<Detection>& ds, const cv::Rect& crop);
-    void setVisible(bool v);
-
 private:
     void run();
 

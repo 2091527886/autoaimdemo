@@ -23,10 +23,6 @@ void OvlAsync::stop() {
     }
 }
 
-void OvlAsync::setVisible(bool v) {
-    gover.SetVisible(v);
-}
-
 void OvlAsync::put(const std::vector<Detection>& ds, const cv::Rect& crop) {
     std::lock_guard<std::mutex> lk(mx);
     ds_ = ds;

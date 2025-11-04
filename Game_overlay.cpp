@@ -10,7 +10,6 @@
 #include <dxgi1_3.h>
 #include <d2d1_1.h>
 #include <dwrite.h>
-#include <wincodec.h>
 #include <dcomp.h>
 #include <wrl/client.h>
 
@@ -169,15 +168,12 @@ static ComPtr<IDXGIAdapter1> pick_adapter_cfg(const std::wstring& name,
 
 struct DrawCmd
 {
-    enum Type { Line, Rect, RectFilled, Circle, CircleFilled, Text, Image } type;
+    enum Type { Rect, RectFilled, Text } type;
     OverlayColor color = 0;
     float thickness = 1.0f;
     union
     {
-        OverlayLine line;
         OverlayRect rect;
-        OverlayCircle circle;
-        struct { float x, y, w, h, opacity; int imageId; } image;
         struct { float x, y, size; } textPos;
     };
     std::wstring text;
@@ -187,13 +183,6 @@ struct DrawCmd
 struct DrawList
 {
     std::vector<DrawCmd> cmds;
-};
-
-struct ImageRes
-{
-    ComPtr<ID2D1Bitmap1> bmp;
-    float w = 0.f;
-    float h = 0.f;
 };
 
 struct Game_overlay::Impl
@@ -217,8 +206,6 @@ struct Game_overlay::Impl
     ComPtr<IDWriteFactory>         dwFactory;
     std::unordered_map<uint64_t, ComPtr<IDWriteTextFormat>> textFormatCache;
 
-    ComPtr<IWICImagingFactory>     wic;
-
     ComPtr<IDCompositionDevice>    dcompDevice;
     ComPtr<IDCompositionTarget>    dcompTarget;
     ComPtr<IDCompositionVisual>    dcompRoot;
@@ -231,10 +218,6 @@ struct Game_overlay::Impl
     std::mutex pendingMutex;
     DrawList pending;
     std::shared_ptr<DrawList> current;
-
-    std::mutex imgMutex;
-    int nextImageId = 1;
-    std::unordered_map<int, ImageRes> images;
 
     // config view (overlay-only fields used)
     std::wstring gpu_name;
@@ -261,17 +244,12 @@ struct Game_overlay::Impl
     void EndFrame();
     void AddCmd(const DrawCmd&);
 
-    int  LoadImageFromFile(const std::wstring& path);
-    void UnloadImage(int id);
-    void DrawImage(int id, float x, float y, float w, float h, float opacity);
-
     static LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
     bool    CreateWindowAndDevices();
     void    DestroyWindowAndDevices();
     void    RenderLoop();
     void    RenderOne();
 
-    HRESULT EnsureWic();
     HRESULT CreateTextFormat(const std::wstring& font, float size, IDWriteTextFormat** out);
     HRESULT CreateTargets();
     void    ReleaseTargets();
@@ -283,10 +261,7 @@ Game_overlay::~Game_overlay() { Stop(); }
 bool Game_overlay::Start() { return impl_->Start(); }
 void Game_overlay::Stop() { impl_->Stop(); }
 bool Game_overlay::IsRunning() const { return impl_->running.load(); }
-void Game_overlay::SetVisible(bool v) { impl_->visible.store(v); }
-bool Game_overlay::GetVisible() const { return impl_->visible.load(); }
 void Game_overlay::UseVirtualScreen() { impl_->UseVirtualScreen(); }
-void Game_overlay::SetWindowBounds(int x, int y, int w, int h) { impl_->SetBounds(x, y, w, h); }
 void Game_overlay::SetMaxFPS(unsigned f) { impl_->maxFps.store(f); }
 
 void Game_overlay::SetConfig(const Config& cfg)
@@ -311,11 +286,6 @@ void Game_overlay::SetConfig(const Config& cfg)
 void Game_overlay::BeginFrame() { impl_->BeginFrame(); }
 void Game_overlay::EndFrame() { impl_->EndFrame(); }
 
-void Game_overlay::AddLine(const OverlayLine& l, OverlayColor c, float t)
-{
-    DrawCmd cmd{}; cmd.type = DrawCmd::Line; cmd.color = c; cmd.thickness = t; cmd.line = l;
-    impl_->AddCmd(cmd);
-}
 void Game_overlay::AddRect(const OverlayRect& r, OverlayColor c, float t)
 {
     DrawCmd cmd{}; cmd.type = DrawCmd::Rect; cmd.color = c; cmd.thickness = t; cmd.rect = r;
@@ -326,16 +296,6 @@ void Game_overlay::FillRect(const OverlayRect& r, OverlayColor c)
     DrawCmd cmd{}; cmd.type = DrawCmd::RectFilled; cmd.color = c; cmd.rect = r;
     impl_->AddCmd(cmd);
 }
-void Game_overlay::AddCircle(const OverlayCircle& c0, OverlayColor c, float t)
-{
-    DrawCmd cmd{}; cmd.type = DrawCmd::Circle; cmd.color = c; cmd.thickness = t; cmd.circle = c0;
-    impl_->AddCmd(cmd);
-}
-void Game_overlay::FillCircle(const OverlayCircle& c0, OverlayColor c)
-{
-    DrawCmd cmd{}; cmd.type = DrawCmd::CircleFilled; cmd.color = c; cmd.circle = c0;
-    impl_->AddCmd(cmd);
-}
 void Game_overlay::AddText(float x, float y, const std::wstring& text,
     float sizePx, OverlayColor c, const std::wstring& font)
 {
@@ -343,10 +303,6 @@ void Game_overlay::AddText(float x, float y, const std::wstring& text,
     cmd.textPos = { x, y, sizePx }; cmd.fontName = font;
     impl_->AddCmd(cmd);
 }
-int  Game_overlay::LoadImageFromFile(const std::wstring& path) { return impl_->LoadImageFromFile(path); }
-void Game_overlay::UnloadImage(int id) { impl_->UnloadImage(id); }
-void Game_overlay::DrawImage(int id, float x, float y, float w, float h, float op) { impl_->DrawImage(id, x, y, w, h, op); }
-
 bool Game_overlay::Impl::Start()
 {
     if (running.load()) return true;
@@ -394,69 +350,6 @@ void Game_overlay::Impl::AddCmd(const DrawCmd& c)
 {
     std::lock_guard<std::mutex> lk(pendingMutex);
     pending.cmds.push_back(c);
-}
-
-HRESULT Game_overlay::Impl::EnsureWic()
-{
-    if (wic) return S_OK;
-    return CoCreateInstance(CLSID_WICImagingFactory, nullptr,
-        CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&wic));
-}
-
-int Game_overlay::Impl::LoadImageFromFile(const std::wstring& path)
-{
-    if (FAILED(EnsureWic())) return 0;
-
-    ComPtr<IWICBitmapDecoder> dec;
-    if (FAILED(wic->CreateDecoderFromFilename(path.c_str(), nullptr, GENERIC_READ,
-        WICDecodeMetadataCacheOnLoad, &dec))) return 0;
-
-    ComPtr<IWICBitmapFrameDecode> frame;
-    if (FAILED(dec->GetFrame(0, &frame))) return 0;
-
-    ComPtr<IWICFormatConverter> conv;
-    if (FAILED(wic->CreateFormatConverter(&conv))) return 0;
-
-    if (FAILED(conv->Initialize(frame.Get(), GUID_WICPixelFormat32bppPBGRA,
-        WICBitmapDitherTypeNone, nullptr, 0.f, WICBitmapPaletteTypeCustom)))
-        return 0;
-
-    if (!d2dCtx) return 0;
-
-    D2D1_BITMAP_PROPERTIES1 props =
-        D2D1::BitmapProperties1(
-            D2D1_BITMAP_OPTIONS_NONE,
-            D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM,
-                D2D1_ALPHA_MODE_PREMULTIPLIED),
-            96.f, 96.f);
-
-    ComPtr<ID2D1Bitmap1> bmp;
-    if (FAILED(d2dCtx->CreateBitmapFromWicBitmap(conv.Get(), &props, &bmp))) return 0;
-
-    auto sz = bmp->GetSize();
-    ImageRes ir;
-    ir.bmp = bmp;
-    ir.w = sz.width;
-    ir.h = sz.height;
-
-    std::lock_guard<std::mutex> il(imgMutex);
-    int id = nextImageId++;
-    images.emplace(id, std::move(ir));
-    return id;
-}
-
-void Game_overlay::Impl::UnloadImage(int id)
-{
-    std::lock_guard<std::mutex> il(imgMutex);
-    images.erase(id);
-}
-
-void Game_overlay::Impl::DrawImage(int id, float x, float y, float w, float h, float opacity)
-{
-    DrawCmd c{};
-    c.type = DrawCmd::Image;
-    c.image = { x, y, w, h, opacity, id };
-    AddCmd(c);
 }
 
 LRESULT CALLBACK Game_overlay::Impl::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -652,7 +545,7 @@ void Game_overlay::Impl::DestroyWindowAndDevices()
     dcompTarget.Reset();
     dcompDevice.Reset();
     dwFactory.Reset();
-    wic.Reset();
+    
     d3dCtx.Reset();
     d3d.Reset();
 
@@ -842,14 +735,6 @@ void Game_overlay::Impl::RenderOne()
         {
             switch (c.type)
             {
-            case DrawCmd::Line:
-                brush->SetColor(ToD2DColor(c.color));
-                d2dCtx->DrawLine(
-                    { c.line.x1, c.line.y1 },
-                    { c.line.x2, c.line.y2 },
-                    brush.Get(), c.thickness);
-                break;
-
             case DrawCmd::Rect:
                 brush->SetColor(ToD2DColor(c.color));
                 d2dCtx->DrawRectangle(
@@ -863,20 +748,6 @@ void Game_overlay::Impl::RenderOne()
                 d2dCtx->FillRectangle(
                     D2D1::RectF(c.rect.x, c.rect.y,
                         c.rect.x + c.rect.w, c.rect.y + c.rect.h),
-                    brush.Get());
-                break;
-
-            case DrawCmd::Circle:
-                brush->SetColor(ToD2DColor(c.color));
-                d2dCtx->DrawEllipse(
-                    D2D1::Ellipse({ c.circle.cx, c.circle.cy }, c.circle.r, c.circle.r),
-                    brush.Get(), c.thickness);
-                break;
-
-            case DrawCmd::CircleFilled:
-                brush->SetColor(ToD2DColor(c.color));
-                d2dCtx->FillEllipse(
-                    D2D1::Ellipse({ c.circle.cx, c.circle.cy }, c.circle.r, c.circle.r),
                     brush.Get());
                 break;
 
@@ -900,24 +771,6 @@ void Game_overlay::Impl::RenderOne()
                 }
             } break;
 
-            case DrawCmd::Image:
-            {
-                std::lock_guard<std::mutex> lk(imgMutex);
-                auto it = images.find(c.image.imageId);
-                if (it != images.end() && it->second.bmp)
-                {
-                    D2D1_RECT_F dst = D2D1::RectF(
-                        c.image.x, c.image.y,
-                        c.image.x + c.image.w,
-                        c.image.y + c.image.h);
-                    d2dCtx->DrawBitmap(
-                        it->second.bmp.Get(),
-                        &dst,
-                        c.image.opacity,
-                        D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
-                        nullptr);
-                }
-            } break;
             }
         }
     }
