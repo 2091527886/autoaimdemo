@@ -57,6 +57,8 @@ add_executable(aimassistant
   SystemTuner.cpp
   ObjDet.cpp
   ScreenCapturer.cpp
+  CaptureDXGI.cpp
+  CaptureWGC.cpp
   CapAsync.cpp
   DetAsync.cpp
   MouAsync.cpp

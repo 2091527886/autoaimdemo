@@ -27,6 +27,13 @@ private:
                                     double t_map_ms, double t_cvt_ms, double t_unmap_ms, double t_total_ms);
     void dbgTick();
 
+    // backend split (no logic change)
+    bool init_dxgi();
+    bool init_wgc();
+    bool cap_dxgi(cv::Mat& frame, const cv::Rect& crop_region);
+    bool cap_wgc(cv::Mat& frame, const cv::Rect& crop_region);
+    void rel_wgc();
+
 private:
     const Config& cfg;
 
