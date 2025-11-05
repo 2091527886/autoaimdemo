@@ -49,8 +49,6 @@ public:
     uint64_t aff_cap  = 0xC000;  // 捕获
     uint64_t aff_det  = 0xC000;  // 检测
     uint64_t aff_trk  = 0xC000;  // 跟踪
-    uint64_t aff_ctl  = 0xC000;  // 控制
-    uint64_t aff_mou  = 0xC000;  // 鼠标
     uint64_t aff_ovl  = 0xC000;  // 叠加/Overlay/OverlayAnim/Game_overlay
     uint64_t aff_lat  = 0xC000;  // CSV 写入
 
@@ -193,14 +191,6 @@ public:
     bool           mmcss_trk = true;           // 跟踪
     std::wstring   mmcss_trk_task = L"Games";
     AVRT_PRIORITY  mmcss_trk_prio = AVRT_PRIORITY_HIGH;
-
-    bool           mmcss_ctl = true;           // 控制/鼠标
-    std::wstring   mmcss_ctl_task = L"Pro Audio";
-    AVRT_PRIORITY  mmcss_ctl_prio = AVRT_PRIORITY_HIGH;
-
-    bool           mmcss_mou = true;           // 鼠标发送
-    std::wstring   mmcss_mou_task = L"Pro Audio";
-    AVRT_PRIORITY  mmcss_mou_prio = AVRT_PRIORITY_HIGH;
 
 
     bool           mmcss_ovl = true;           // 叠加绘制
