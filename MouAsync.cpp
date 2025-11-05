@@ -1,4 +1,6 @@
 #include "MouAsync.hpp"
+#include "SystemTuner.hpp"
+#include "Config.hpp"
 
 void MouAsync::start() {
     bool expected = false;
@@ -26,6 +28,9 @@ void MouAsync::put(int dx, int dy) {
 }
 
 void MouAsync::run() {
+    if (cfg_ && cfg_->enable_affinity && cfg_->aff_mou) {
+        setAffinity(cfg_->aff_mou, cfg_->opt_report && cfg_->opt_report_system);
+    }
     Mouse m; // lives in worker thread
     int seen = seq_.load(std::memory_order_acquire);
     while (go_.load(std::memory_order_relaxed)) {

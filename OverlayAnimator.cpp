@@ -31,8 +31,8 @@ LRESULT CALLBACK OverlayAnim::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
 }
 void OverlayAnim::run(const Config& cfg) {
     // 线程启动即绑定（如开启）
-    if (cfg.enable_affinity && cfg.affinity_overlay_mask) {
-        setAffinity(cfg.affinity_overlay_mask,
+    if (cfg.enable_affinity && cfg.aff_ovl) {
+        setAffinity(cfg.aff_ovl,
             cfg.opt_report && cfg.opt_report_system);
     }
     HINSTANCE hInst = GetModuleHandle(NULL);

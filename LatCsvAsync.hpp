@@ -8,11 +8,14 @@
 #include <cstdio>
 #include <windows.h>
 #include "Timing.hpp"
+#include "SystemTuner.hpp"
+#include "Config.hpp"
 
 // Minimal async CSV writer for per-frame latency; event-driven, non-blocking
 class LatCsvAsync {
 public:
     LatCsvAsync() = default;
+    explicit LatCsvAsync(const Config& cfg) : cfg_(&cfg) {}
     ~LatCsvAsync() { stop(); }
 
     LatCsvAsync(const LatCsvAsync&) = delete;
@@ -21,8 +24,12 @@ public:
     bool start(const std::string& path) {
         bool ex = false;
         if (!go_.compare_exchange_strong(ex, true)) return false;
+#if defined(_MSC_VER)
+        if (fopen_s(&fp_, path.c_str(), "w") != 0) { fp_ = nullptr; go_.store(false, std::memory_order_relaxed); return false; }
+#else
         fp_ = fopen(path.c_str(), "w");
         if (!fp_) { go_.store(false, std::memory_order_relaxed); return false; }
+#endif
         // header
         fprintf(fp_, "idx,cap_ms,det_ms,mou_ms,trk_ms,ctl_ms,ovl_ms,loop_ms\n");
         if (!ev_) ev_ = CreateEventW(nullptr, FALSE, FALSE, nullptr); // auto-reset
@@ -70,6 +77,10 @@ public:
 
 private:
     void run() {
+        // optional: set affinity for CSV writer
+        if (cfg_ && cfg_->enable_affinity && cfg_->aff_lat) {
+            setAffinity(cfg_->aff_lat, cfg_->opt_report && cfg_->opt_report_system);
+        }
         while (go_.load(std::memory_order_relaxed)) {
             if (ev_) WaitForSingleObject(ev_, INFINITE);
             if (!go_.load(std::memory_order_relaxed)) break;
@@ -105,6 +116,8 @@ private:
     std::mutex mx_;
     std::vector<FrameLat> q_;
     FILE* fp_ = nullptr;
+
+    const Config* cfg_ = nullptr;
 
     // aggregates for averages
     double sum_cap_ = 0.0, sum_det_ = 0.0, sum_mou_ = 0.0, sum_trk_ = 0.0, sum_ctl_ = 0.0, sum_ovl_ = 0.0, sum_loop_ = 0.0;

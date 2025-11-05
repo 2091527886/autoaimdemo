@@ -6,10 +6,12 @@
 #include <windows.h>
 #include "Mouse.hpp"
 
+class Config; // fwd
+
 // Minimal async mouse sender: keeps latest dx,dy; executes in worker thread
 class MouAsync {
 public:
-    MouAsync() = default;
+    explicit MouAsync(const Config& cfg) : cfg_(&cfg) {}
     ~MouAsync() { stop(); }
 
     MouAsync(const MouAsync&) = delete;
@@ -26,6 +28,8 @@ public:
 
 private:
     void run();
+
+    const Config* cfg_ = nullptr;
 
     // mailbox
     std::atomic<int> dx_{0};

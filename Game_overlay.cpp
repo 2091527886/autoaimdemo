@@ -1,6 +1,7 @@
 #include "Game_overlay.h"
 #include "Log.hpp"
 #include "Config.hpp"
+#include "SystemTuner.hpp"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -308,6 +309,10 @@ bool Game_overlay::Impl::Start()
     if (running.load()) return true;
     running = true;
     thread = std::thread([this] {
+        if (this->running.load()) {
+            // Optional: overlay-specific affinity
+            // We don't have Config here directly; affinity handled in OvlAsync or OverlayAnim.
+        }
         SetPerMonitorV2DpiAwareness();
         CoInitializeEx(nullptr, COINIT_MULTITHREADED);
         hinst = GetModuleHandleW(nullptr);
@@ -451,7 +456,11 @@ bool Game_overlay::Impl::CreateWindowAndDevices()
             } else {
                 DXGI_ADAPTER_DESC1 d{}; pick->GetDesc1(&d);
                 std::wstring n(d.Description);
-                lg::o() << P_I "OVL use GPU: " << std::string(n.begin(), n.end()) << lg::endl;
+                lg::o() << P_I "OVL use GPU: " << ([](const std::wstring& ws){
+                    int len = WideCharToMultiByte(CP_UTF8, 0, ws.c_str(), (int)ws.size(), nullptr, 0, nullptr, nullptr);
+                    std::string out; out.resize(std::max(0, len));
+                    if (len>0) WideCharToMultiByte(CP_UTF8, 0, ws.c_str(), (int)ws.size(), out.data(), len, nullptr, nullptr);
+                    return out; })(n) << lg::endl;
             }
         }
         if (FAILED(hr)) {

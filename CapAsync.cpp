@@ -48,6 +48,9 @@ void CapAsync::drain() {
 }
 
 void CapAsync::run() {
+    if (c.enable_affinity && c.aff_cap) {
+        setAffinity(c.aff_cap, c.opt_report && c.opt_report_system);
+    }
     HANDLE hMm = MmcssEnable(c.mmcss_cap, c.mmcss_cap_task.c_str(), c.mmcss_cap_prio);
     struct MmcssGuard { HANDLE h; ~MmcssGuard(){ MmcssDisable(h);} } _mmg{hMm};
 

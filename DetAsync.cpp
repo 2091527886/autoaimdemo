@@ -37,6 +37,9 @@ bool DetAsync::get(std::vector<Detection>& out, Timing& tm) {
 }
 
 void DetAsync::run() {
+    if (c.enable_affinity && c.aff_det) {
+        setAffinity(c.aff_det, c.opt_report && c.opt_report_system);
+    }
     HANDLE hMm = MmcssEnable(c.mmcss_det, c.mmcss_det_task.c_str(), c.mmcss_det_prio);
     struct MmcssGuard { HANDLE h; ~MmcssGuard(){ MmcssDisable(h);} } _mmg{hMm};
 

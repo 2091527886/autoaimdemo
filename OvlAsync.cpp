@@ -33,6 +33,9 @@ void OvlAsync::put(const std::vector<Detection>& ds, const cv::Rect& crop) {
 }
 
 void OvlAsync::run() {
+    if (c.enable_affinity && c.aff_ovl) {
+        setAffinity(c.aff_ovl, c.opt_report && c.opt_report_system);
+    }
     HANDLE hMm = MmcssEnable(c.mmcss_ovl, c.mmcss_ovl_task.c_str(), c.mmcss_ovl_prio);
     struct MmcssGuard { HANDLE h; ~MmcssGuard(){ MmcssDisable(h);} } _mmg{hMm};
 

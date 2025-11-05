@@ -48,45 +48,15 @@ public:
 
     // ---------- 亲和/环境（SetThreadAffinityMask） ----------
     bool     enable_affinity = true;       // 启用线程亲和
-    uint64_t affinity_main_mask = 0xC000;        // 主线程掩码
-    uint64_t affinity_overlay_mask = 0xC000;     // Overlay 线程掩码
-
-    // 从环境变量覆盖（可选）：AIMAFF_MAIN, AIMAFF_OVERLAY
-    void load_affinity_env() {
-        const std::string main_env = get_env_str("AIMAFF_MAIN");
-        if (!main_env.empty()) parse_aff_env(main_env.c_str(), affinity_main_mask);
-        const std::string overlay_env = get_env_str("AIMAFF_OVERLAY");
-        if (!overlay_env.empty()) parse_aff_env(overlay_env.c_str(), affinity_overlay_mask);
-    }
-    // 预留统一入口（当前仅亲和）
-    void fromEnv() { load_affinity_env(); }
-
-private:
-    static std::string get_env_str(const char* name) {
-#ifdef _WIN32
-        char* buf = nullptr; size_t len = 0;
-        if (_dupenv_s(&buf, &len, name) == 0 && buf) { std::string v(buf); free(buf); return v; }
-        return std::string();
-#else
-        const char* v = std::getenv(name);
-        return v ? std::string(v) : std::string();
-#endif
-    }
-    static void parse_aff_env(const char* s, uint64_t& outMask) {
-        outMask = 0;
-        while (*s==' '||*s=='\t') ++s;
-        if (s[0]=='0' && (s[1]=='x'||s[1]=='X')) { outMask = strtoull(s, nullptr, 16); return; }
-        uint64_t mask = 0; unsigned v = 0; bool innum=false;
-        for (const char* p=s; ; ++p) {
-            char c = *p;
-            if ((c>='0'&&c<='9')) { v = v*10 + (c-'0'); innum=true; continue; }
-            if (c==',' || c==' ' || c=='\t' || c=='\0') {
-                if (innum) { if (v<64) mask |= (1ull<<v); v=0; innum=false; }
-                if (c=='\0') break; else continue;
-            }
-        }
-        outMask = mask;
-    }
+    // 每模块亲和掩码（0 表示不绑定）
+    uint64_t aff_main = 0xC000;  // 主线程
+    uint64_t aff_cap  = 0xC000;  // 捕获
+    uint64_t aff_det  = 0xC000;  // 检测
+    uint64_t aff_trk  = 0xC000;  // 跟踪
+    uint64_t aff_ctl  = 0xC000;  // 控制
+    uint64_t aff_mou  = 0xC000;  // 鼠标
+    uint64_t aff_ovl  = 0xC000;  // 叠加/Overlay/OverlayAnim/Game_overlay
+    uint64_t aff_lat  = 0xC000;  // CSV 写入
 
 public:
     // ---------- 引擎/路径 ----------

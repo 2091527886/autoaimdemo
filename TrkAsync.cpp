@@ -33,6 +33,9 @@ bool TrkAsync::get(std::vector<Detection>& out) {
 }
 
 void TrkAsync::run() {
+    if (c.enable_affinity && c.aff_trk) {
+        setAffinity(c.aff_trk, c.opt_report && c.opt_report_system);
+    }
     HANDLE hMm = MmcssEnable(c.mmcss_trk, c.mmcss_trk_task.c_str(), c.mmcss_trk_prio);
     struct MmcssGuard { HANDLE h; ~MmcssGuard(){ MmcssDisable(h);} } _mmg{hMm};
 

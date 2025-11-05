@@ -102,14 +102,15 @@ public:
         cap(c),
         det(c),
         trk(c),
-        mou(),
+        mou(c),
         hk(c),
         crop((cap.w() - c.crop_size_px) / 2, (cap.h() - c.crop_size_px) / 2, c.crop_size_px, c.crop_size_px),
         ctr(c.crop_size_px / 2, c.crop_size_px / 2),
         vis(c.enable_visual),
         lat(static_cast<size_t>(std::max(1, c.log_latency_every_n))),
         fc(c),
-        ovl(c)
+        ovl(c),
+        latcsv(c)
     {
         if (c.lat_csv) latcsv.start(c.lat_csv_path);
 
@@ -387,11 +388,9 @@ int main() {
     SetConsoleCtrlHandler(CtrlHandler, TRUE);
 
     Config boot_cfg; // KEEP
-    // 从环境变量读取可选亲和配置
-    boot_cfg.fromEnv();
     boot_cfg.validate();
-    if (boot_cfg.enable_affinity && boot_cfg.affinity_main_mask) {
-        setAffinity(boot_cfg.affinity_main_mask,
+    if (boot_cfg.enable_affinity && boot_cfg.aff_main) {
+        setAffinity(boot_cfg.aff_main,
             boot_cfg.opt_report && boot_cfg.opt_report_system);
     }
 

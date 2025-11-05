@@ -49,6 +49,9 @@ void CtlAsync::put(const std::vector<Detection>& ds, bool smooth, bool single, d
 }
 
 void CtlAsync::run() {
+    if (c.enable_affinity && c.aff_ctl) {
+        setAffinity(c.aff_ctl, c.opt_report && c.opt_report_system);
+    }
     HANDLE hMm = MmcssEnable(c.mmcss_ctl, c.mmcss_ctl_task.c_str(), c.mmcss_ctl_prio);
     struct MmcssGuard { HANDLE h; ~MmcssGuard(){ MmcssDisable(h);} } _mmg{hMm};
 
