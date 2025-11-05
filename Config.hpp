@@ -41,7 +41,7 @@ public:
 
     // ---------- 帧率控制 ----------
     bool fps_lock = true;                   // 启用帧率锁
-    int  fps = 60;                         // 目标 FPS
+    int  fps = 90;                         // 目标 FPS
     long long fps_spin_us = 0;              // 微自旋补偿（us）
 
     // ---------- 亲和/环境（SetThreadAffinityMask） ----------
@@ -88,7 +88,7 @@ private:
 
 public:
     // ---------- 引擎/路径 ----------
-    std::string engine_path = "l.engine";
+    std::string engine_path = "m.engine";
     std::string resolve_engine_path() const { return engine_path; }
 
     // ---------- 截屏/检测区域 ----------
