@@ -203,6 +203,13 @@ public:
             bool smooth_pressed = hk.SmoothPressed();
             bool single = hk.SingleShotJustPressed();
 
+            // 计算本帧 PID dt（控制前），避免上一帧dt滞后
+            auto pid_now = std::chrono::high_resolution_clock::now();
+            double dt_pre = c.pid_use_measured_dt
+                ? std::max(0.001, std::chrono::duration<double>(pid_now - last_pid_ts).count())
+                : std::max(0.001, c.pid_fixed_dt_ms / 1000.0);
+            last_pid_ts = pid_now;
+
             // sync control+mouse on main thread
             auto tctl0 = std::chrono::high_resolution_clock::now();
             double ctl_cost_ms = 0.0;
@@ -215,7 +222,7 @@ public:
 
                 if (!target) {
                     px.reset(); py.reset();
-                    if (!smooth_pressed) { break; }
+                    if (!smooth_pressed || single) { break; }
                     if (!c.trk_pred_move) break;
                     Detection* pred_tgt = nullptr; double min_d = std::numeric_limits<double>::infinity();
                     for (auto& d : ds_copy) {
@@ -229,8 +236,8 @@ public:
                                  pred_tgt->box.y + (int)(pred_tgt->box.height * c.y_anchor_ratio));
                     double err_x = (double)(tp.x - ctr.x);
                     double err_y = (double)(tp.y - ctr.y);
-                    double ox = px.step(err_x, dt);
-                    double oy = py.step(err_y, dt);
+                    double ox = px.step(err_x, dt_pre);
+                    double oy = py.step(err_y, dt_pre);
                     int mx = (int)(ox * mfac);
                     int my = (int)(oy * mfac);
                     auto tmov0 = std::chrono::high_resolution_clock::now();
@@ -241,13 +248,13 @@ public:
                 }
 
                 if (!smooth_pressed) { px.reset(); py.reset(); }
-                if (smooth_pressed && target) {
+                if (smooth_pressed && target && !single) {
                     cv::Point tp(target->box.x + target->box.width/2,
                                  target->box.y + (int)(target->box.height * c.y_anchor_ratio));
                     double err_x = (double)(tp.x - ctr.x);
                     double err_y = (double)(tp.y - ctr.y);
-                    double ox = px.step(err_x, dt);
-                    double oy = py.step(err_y, dt);
+                    double ox = px.step(err_x, dt_pre);
+                    double oy = py.step(err_y, dt_pre);
                     int mx = (int)(ox * mfac);
                     int my = (int)(oy * mfac);
                     auto tmov0 = std::chrono::high_resolution_clock::now();
@@ -272,7 +279,7 @@ public:
             ctl_cost_ms = std::chrono::duration<double, std::milli>(tctl1 - tctl0).count();
 
             fl.mou_ms = mou_cost_ms;
-            fl.ctl_ms = ctl_cost_ms;
+            fl.ctl_ms = std::max(0.0, ctl_cost_ms - mou_cost_ms); // 去重：控制不含鼠标
             if (c.trk) { fl.trk_ms = trk.take_ms(); }
             if (c.ovl) { fl.ovl_ms = ovl.take_ms(); }
 
@@ -285,7 +292,7 @@ public:
             } else {
                 tm.loop_ms = proc_ms;
             }
-            // E2E≈max(loop,cap,det,io)
+            // E2E≈max(loop,cap,det,io)。注意：ctl_ms 不含 mou_ms，避免重复计时
             double loop_e2e = std::max({tm.loop_ms, fl.cap_ms, fl.det_ms, fl.mou_ms, fl.ctl_ms, fl.ovl_ms, fl.trk_ms});
             fl.loop_ms = loop_e2e;
             e2e_ms_last = loop_e2e;
@@ -294,11 +301,7 @@ public:
            if (c.lat_csv) { latcsv.put(fl); }
 
             
-            if (c.pid_use_measured_dt) {
-                dt = std::max(0.001, tm.loop_ms / 1000.0); // 锁FPS后为tgt，掉帧时为proc
-            } else {
-                dt = std::max(0.001, c.pid_fixed_dt_ms / 1000.0);
-            }
+            // dt 已在控制前计算为 dt_pre，这里仅保留统计
             stats();
 
             if (c.log_latency) {
@@ -331,7 +334,7 @@ public:
             }
 
             if (vis) {
-                draw(nullptr);
+                draw();
             }
             if (g_exit_req.load(std::memory_order_relaxed)) { lg::o() << lg::nl << P_I "Signal exit" << lg::endl; break; }
             char key = static_cast<char>(cv::waitKey(1));
@@ -358,10 +361,10 @@ private:
 
     }
 
-    void draw(const Detection* tgtBest) {
+    void draw() {
         for (const auto& det : ds) {
             // 显示全部；跟踪"*"；当前目标红框
-            cv::Scalar color = (&det == tgtBest) ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0);
+            cv::Scalar color = c.is_target(det.class_id) ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0);
             cv::rectangle(img, det.box, color, 2);
             std::string label = c.name_or_id(det.class_id) + (c.is_target(det.class_id) ? "*" : "") +
                                  " " + cv::format("%.2f", det.confidence);
@@ -428,7 +431,7 @@ private:
     size_t dropS = 0;     // vis cache
     double ovrS = 0.0;
 
-    double dt = 1.0/60.0;
+    std::chrono::high_resolution_clock::time_point last_pid_ts = std::chrono::high_resolution_clock::now();
 
     OvlAsync ovl;
 
