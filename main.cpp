@@ -479,11 +479,6 @@ int main() {
 
     Config boot_cfg;
     boot_cfg.validate();
-    if (boot_cfg.enable_affinity && boot_cfg.aff_main) {
-        setAffinity(boot_cfg.aff_main,
-            boot_cfg.opt_report && boot_cfg.opt_report_system);
-    }
-
     OverlayAnim overlay;
     // prio/MMCSS/overlay setup
     disablePowerThrottle();
@@ -493,9 +488,7 @@ int main() {
 
     
    
-    HANDLE hMmcss = MmcssEnable(boot_cfg.mmcss_main,
-                                            boot_cfg.mmcss_task.c_str(),
-                                            boot_cfg.mmcss_prio);
+    HANDLE hMmcss = nullptr; // MMCSS disabled
 
    // thread mem prio + disable boost
    if (boot_cfg.enable_thread_mem_prio) {
@@ -518,7 +511,7 @@ int main() {
         assistant.loop();
     }
     catch (const std::exception& e) {
-        MmcssDisable(hMmcss);
+        // MMCSS disabled; no revert needed
         lg::ml(P_F, std::string("Fatal: ") + e.what(), "Check issues.", "Press Enter to exit.");
         std::cin.get();
         g_exit_done.store(true, std::memory_order_relaxed);
@@ -526,7 +519,7 @@ int main() {
     }
     lg::o() << lg::nl << P_I "Done" << lg::endl;
     overlay.stop();
-    MmcssDisable(hMmcss);
+    // MMCSS disabled; no revert needed
     g_exit_done.store(true, std::memory_order_relaxed);
     return 0;
 }
