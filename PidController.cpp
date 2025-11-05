@@ -1,5 +1,6 @@
 #include "PidController.hpp"
 #include <cmath>
+#include <algorithm>
 
 PidController::PidController(double kp_in, double ki_in, double kd_in, double out_limit, double integ_limit)
     : kp(kp_in), ki(ki_in), kd(kd_in), out_lim(std::abs(out_limit)), i_lim(std::abs(integ_limit)) {}
