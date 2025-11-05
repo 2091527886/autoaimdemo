@@ -31,7 +31,9 @@ void MouAsync::run() {
     if (cfg_ && cfg_->enable_affinity && cfg_->aff_mou) {
         setAffinity(cfg_->aff_mou, cfg_->opt_report && cfg_->opt_report_system);
     }
-    Mouse m; // lives in worker thread
+    HANDLE hMm = MmcssEnable(cfg_ && cfg_->mmcss_mou, cfg_->mmcss_mou_task.c_str(), cfg_->mmcss_mou_prio);
+  struct MmcssGuard { HANDLE h; ~MmcssGuard(){ MmcssDisable(h);} } _mmg{hMm};
+  Mouse m; // lives in worker thread
     int seen = seq_.load(std::memory_order_acquire);
     while (go_.load(std::memory_order_relaxed)) {
         int s = seq_.load(std::memory_order_acquire);

@@ -39,7 +39,7 @@ public:
 
     // 帧率
     bool fps_lock = true;                   // 启用帧率锁
-    int  fps = 90;                         // 目标 FPS
+    int  fps = 60;                         // 目标 FPS
     long long fps_spin_us = 0;              // 微自旋补偿（us）
 
     // 亲和/环境
@@ -193,6 +193,11 @@ public:
     bool           mmcss_ctl = true;           // 控制/鼠标
     std::wstring   mmcss_ctl_task = L"Pro Audio";
     AVRT_PRIORITY  mmcss_ctl_prio = AVRT_PRIORITY_HIGH;
+
+    bool           mmcss_mou = true;           // 鼠标发送
+    std::wstring   mmcss_mou_task = L"Pro Audio";
+    AVRT_PRIORITY  mmcss_mou_prio = AVRT_PRIORITY_HIGH;
+
 
     bool           mmcss_ovl = true;           // 叠加绘制
     std::wstring   mmcss_ovl_task = L"Playback";
