@@ -81,8 +81,12 @@ public:
     const double pid_kd_y = 0.00600;
     const double pid_output_limit   = 400.0; // 每帧像素输出限幅
     const double pid_integral_limit = 300.0; // 积分限幅
-    const bool   pid_use_measured_dt = true; // 用实测 dt
-    const double pid_fixed_dt_ms     = 16.0; // 固定 dt（ms）
+    bool   pid_use_measured_dt = true;  // 用实测 dt
+    double pid_fixed_dt_ms     = 16.0;  // 固定 dt（ms）
+    bool   pid_dt_clamp = true;         // 是否对 dt 进行夹紧
+    double pid_dt_min_ms = 1.0;         // dt 下限（ms）
+    double pid_dt_max_ms = 10.0;        // dt 上限（ms）
+    bool   pid_aw_freeze = true;        // 输出饱和时冻结积分
 
     // 类别/标签
     std::vector<std::string> classes { "enemy","teammate" };
@@ -156,7 +160,7 @@ public:
     int       overlay_x = 0, overlay_y = 0; // 位置
 
     // 跟踪
-    bool  trk = true;            // 总开关（线程）
+    bool  trk = false;            // 总开关（线程）
     bool  trk_bt = true;         // 是否启用 ByteTrack（否则直通）
     bool  trk_kf = true;         // 是否启用 Kalman（预测/门控/状态输出）
     float trk_th = 0.6f;         // 高阈值

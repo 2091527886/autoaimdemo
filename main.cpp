@@ -135,8 +135,12 @@ public:
         // init PID
         px.setK(c.pid_kp_x, c.pid_ki_x, c.pid_kd_x);
         px.setLim(c.pid_output_limit, c.pid_integral_limit);
+        px.setDtClamp(c.pid_dt_clamp, c.pid_dt_min_ms, c.pid_dt_max_ms);
+        px.setAntiWindupFreeze(c.pid_aw_freeze);
         py.setK(c.pid_kp_y, c.pid_ki_y, c.pid_kd_y);
         py.setLim(c.pid_output_limit, c.pid_integral_limit);
+        py.setDtClamp(c.pid_dt_clamp, c.pid_dt_min_ms, c.pid_dt_max_ms);
+        py.setAntiWindupFreeze(c.pid_aw_freeze);
         if (c.ovl) { lg::o() << P_B "Overlay=ON" << lg::endl; ovl.start(); }
         else { lg::o() << P_B "Overlay=OFF" << lg::endl; }
     }
@@ -206,8 +210,15 @@ public:
             // 计算本帧 PID dt（控制前），避免上一帧dt滞后
             auto pid_now = std::chrono::high_resolution_clock::now();
             double dt_pre = c.pid_use_measured_dt
-                ? std::max(0.001, std::chrono::duration<double>(pid_now - last_pid_ts).count())
+                ? std::chrono::duration<double>(pid_now - last_pid_ts).count()
                 : std::max(0.001, c.pid_fixed_dt_ms / 1000.0);
+            // 可选夹紧（主循环侧）
+            if (c.pid_dt_clamp && c.pid_use_measured_dt) {
+                double lo = std::max(0.000001, c.pid_dt_min_ms / 1000.0);
+                double hi = std::max(lo, c.pid_dt_max_ms / 1000.0);
+                if (dt_pre < lo) dt_pre = lo;
+                if (dt_pre > hi) dt_pre = hi;
+            }
             last_pid_ts = pid_now;
 
             // sync control+mouse on main thread
