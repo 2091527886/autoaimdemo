@@ -4,7 +4,6 @@
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 
-// ---- SystemPriority.cpp ----
 void SetProcPrioHigh() {
     BOOL ok = SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
     lg::ok_or_werr(P_B, "ProcPrio(HIGH)", ok);
@@ -31,7 +30,6 @@ void SetProcPrioBoostDisabled(bool log) {
     SetProcPrioBoost(false, log);
 }
 
-// ---- ThreadAffinity.cpp ----
 bool setAffinity(uint64_t mask, bool log) {
     if (!mask) return false;
     DWORD_PTR pMask=0, sMask=0;
@@ -55,7 +53,6 @@ bool setAffinity(uint64_t mask, bool log) {
     return true;
 }
 
-// ---- PowerThrottling.cpp ----
 void disablePowerThrottle(bool log) {
    PROCESS_POWER_THROTTLING_STATE pState = {};
    pState.Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION;
@@ -81,7 +78,6 @@ void disablePowerThrottle(bool log) {
    }
 }
 
-// ---- MmcssUtil.cpp ----
 HANDLE MmcssEnable(bool enable, const wchar_t* task, AVRT_PRIORITY prio, DWORD* outIdx) {
     if (!enable) return nullptr;
     if (!task) task = L"Games";
@@ -104,7 +100,6 @@ void MmcssDisable(HANDLE h) {
     if (h) AvRevertMmThreadCharacteristics(h);
 }
 
-// ---- DxgiTuning.cpp ----
 void TuneDxgi(ID3D11Device* dev, int gpu_prio, int max_latency) {
     if (!dev) return;
     IDXGIDevice1* dxgi1 = nullptr;

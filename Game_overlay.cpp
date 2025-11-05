@@ -62,7 +62,7 @@ static D2D1_COLOR_F ToD2DColor(OverlayColor argb)
     return D2D1::ColorF(r, g, b, a);
 }
 
-// ---- GPU select helpers (overlay-local, env-driven) ----
+// GPU helpers (overlay-local)
 static std::wstring wenv(const wchar_t* k)
 {
     wchar_t buf[512];
@@ -137,7 +137,7 @@ static void log_adapters(const std::vector<GpuInfo>& v)
     }
 }
 
-// pick by Config fields set via SetConfig
+// pick by Config.SetConfig
 static ComPtr<IDXGIAdapter1> pick_adapter_cfg(const std::wstring& name,
                                               const std::wstring& luid,
                                               int idx,
@@ -311,7 +311,7 @@ bool Game_overlay::Impl::Start()
     thread = std::thread([this] {
         if (this->running.load()) {
             // Optional: overlay-specific affinity
-            // We don't have Config here directly; affinity handled in OvlAsync or OverlayAnim.
+            // affinity handled in OvlAsync/OverlayAnim
         }
         SetPerMonitorV2DpiAwareness();
         CoInitializeEx(nullptr, COINIT_MULTITHREADED);

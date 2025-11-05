@@ -8,29 +8,22 @@
 #include <thread>
 #include <atomic>
 #include <windows.h>
-// OpenCV
 
-// forward declare exit flag for use before its definition
 extern std::atomic<bool> g_exit_req;
 extern std::atomic<bool> g_exit_done;
 
 #include <opencv2/opencv.hpp>
-// Input Simulator (确保头文件在项目路径中)
 #include "Config.hpp"
 #include "Timing.hpp"
 #include "SystemTuner.hpp"
 #include "Reporting.hpp"
 #include "Detection.hpp"
 
-// --- 辅助宏 ---
-// --- 数据结构定义 ---
 
 
 
-// --- PID 控制器 (moved to PidController.hpp/.cpp) ---
 
 
-// --- 2. 鼠标控制器 (Mouse) ---
 #include "OverlayAnimator.hpp"
 #include "Mouse.hpp"
 #include "MouAsync.hpp"
@@ -43,13 +36,8 @@ extern std::atomic<bool> g_exit_done;
 #include "OvlAsync.hpp"
 #include "LatCsvAsync.hpp"
 
-// --- 3. 屏幕捕捉器 (ScreenCapturer) - 优化版本 ---
-// (moved to ScreenCapturer.hpp/.cpp)
 
-// --- 4. 目标检测器 (ObjDet) ---
-/* moved to ObjDet.hpp/.cpp */
 
-// --- 5. 核心协调器 (Aim) ---
 class Aim {
 public:
     // FPS 锁定/补偿控制（短名）
@@ -90,9 +78,9 @@ public:
                 ovr = 0.0;
                 return tgt_ms;
             } else {
-                ovr = proc_ms - tgt_ms; // 超出目标帧时间
+                ovr = proc_ms - tgt_ms;
                 drop++;
-                return proc_ms; // 不补偿，允许掉帧
+                return proc_ms;
             }
         }
     };
@@ -151,12 +139,12 @@ public:
             if (g_exit_req.load(std::memory_order_relaxed)) { lg::o() << lg::nl << P_I "Signal exit" << lg::endl; break; }
             auto loop_start_time = std::chrono::high_resolution_clock::now();
 
-            FrameLat fl; // 本帧延迟统计
+            FrameLat fl;
 
-            // 1) 截屏计时
+            
             bool got = cap.get(img);
             if (!got) {
-                // 失败路径：DXGI/WGC 主线程不等待，避免双重计时
+                // DXGI/WGC: 主线程不等待，避免双重计时
                 fl.cap_ms = cap.last_ms();
                 if (c.log_latency && !c.latency_on_capture_only) {
                     lat.push(fl);
@@ -164,18 +152,18 @@ public:
                 if (g_exit_req.load(std::memory_order_relaxed)) { lg::o() << lg::nl << P_I "Signal exit" << lg::endl; break; }
                 continue;
             }
-            // 成功取到帧：递增帧号并记录
+            
             c.frame_idx++; fl.idx = c.frame_idx;
             fl.cap_ms = cap.last_ms();
 
-            // 2) 异步检测：推入最新帧并尝试取回最新检测
+            
             det.put(img);
             std::vector<Detection> ds_new;
             Timing tm_new;
             bool has_new = det.get(ds_new, tm_new);
             if (has_new) {
                 ds = std::move(ds_new);
-                tm = tm_new; // 仅覆盖检测阶段计时字段（保持 loop_ms 后续计算）
+                tm = tm_new; // 覆盖检测阶段计时
                 det_ms_last = tm.infer_ms + tm.post_ms;
                 if (c.trk) {
                     trk.put(ds);
@@ -188,15 +176,15 @@ public:
             }
             fl.det_ms = det_ms_last;
 
-            // 3) 鼠标控制（异步线程统计耗时）
-            // 采集用户输入状态
+            
+            
             bool smooth_pressed = hk.SmoothPressed();
             bool single = hk.SingleShotJustPressed();
-            // 将选择+PID+单发异步化（保持逻辑不变）
+            
             ctl->put(ds, smooth_pressed, single, dt);
-            // 记录异步线程上一次实际驱动调用耗时
+            
             fl.mou_ms = mou.last_ms();
-            // 记录控制/跟踪/叠加耗时（如启用）
+            
             fl.ctl_ms = ctl->last_ms();
             if (c.trk) { fl.trk_ms = trk.last_ms(); }
             if (c.ovl) { fl.ovl_ms = ovl.last_ms(); }
@@ -210,15 +198,15 @@ public:
             } else {
                 tm.loop_ms = proc_ms;
             }
-            // 用于统计的近似端到端：计入截图等待/采集 + 推理
+            // E2E≈max(loop,cap,det)
             double loop_e2e = std::max({tm.loop_ms, fl.cap_ms, det_ms_last});
             fl.loop_ms = loop_e2e;
             e2e_ms_last = loop_e2e;
 
-           // 异步CSV写入（仅在成功帧）
+           // CSV async
            if (c.lat_csv) { latcsv.put(fl); }
 
-            // 计算 dt（秒）供 PID 使用
+            
             if (c.pid_use_measured_dt) {
                 dt = std::max(0.001, tm.loop_ms / 1000.0); // 锁FPS后为tgt，掉帧时为proc
             } else {
@@ -228,7 +216,7 @@ public:
 
             if (c.log_latency) {
                 lat.push(fl);
-                // 按相同节流频率输出 drop/ovr
+                // drop/ovr 节流
                 ++fcnt;
                 int n = std::max(1, c.log_latency_every_n);
                 if (fcnt % (size_t)n == 0) {
@@ -238,16 +226,16 @@ public:
                             << "drop=" << drop_now
                             << " | ovr=" << fc.ovr << "ms"
                             << lg::endl << lg::df;
-                    // 缓存到可视化
+                    // vis cache
                     dropS = drop_now;
                     ovrS = fc.ovr;
                     drop_prev = fc.drop;
                 }
             }
-            // 仅在主线程打印采集统计，避免并发输出
+            // 主线程输出采集统计
             cap.drain();
 
-            // 检测性能日志由主线程统一输出
+            
             if (!tm.trt_throughput.empty()) {
                 lg::ml(P_T, tm.trt_throughput, tm.trt_cpu_lat, tm.trt_gpu_lat);
                 tm.trt_throughput.clear();
@@ -285,7 +273,7 @@ private:
 
     void draw(const Detection* tgtBest) {
         for (const auto& det : ds) {
-            // 可视化：所有检测都显示；追踪类加星号，当前目标红框
+            // 显示全部；跟踪"*"；当前目标红框
             cv::Scalar color = (&det == tgtBest) ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0);
             cv::rectangle(img, det.box, color, 2);
             std::string label = c.name_or_id(det.class_id) + (c.is_target(det.class_id) ? "*" : "") +
@@ -293,13 +281,13 @@ private:
             cv::putText(img, label, cv::Point(det.box.x, det.box.y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 1);
         }
         if (tTot > 0) {
-            // 将可视化 FPS 改为 E2E（近似）
+            // FPS≈E2E
             double e2e = (e2e_ms_last > 0.0 ? e2e_ms_last : tTot);
             double smoothed_fps = 1000.0 / e2e;
             std::ostringstream stats_stream;
             stats_stream << lg::fx1 << "FPS: " << smoothed_fps << lg::df;
             cv::putText(img, stats_stream.str(), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 255), 2);
-            // 第二行紧凑：DET + DROP/OVR
+            // DET/DROP/OVR
             std::ostringstream line2;
             line2 << lg::fx1;
             if (det_ms_last > 0.0) {
@@ -341,26 +329,25 @@ private:
     double e2e_ms_last = 0.0;
     double tTot = 0.0;
     bool first = true;
-    // 延迟统计
+    // latency agg
     LatAgg lat;
 
-    // FPS 控制
+    // FPS
     FpsCtl fc;
-    size_t fcnt = 0;      // 打印节流计数
-    size_t drop_prev = 0; // 上次打印时累计掉帧数
-    size_t dropS = 0;     // 可视化缓存
+    size_t fcnt = 0;      // throttle cnt
+    size_t drop_prev = 0; // last drop sum
+    size_t dropS = 0;     // vis cache
     double ovrS = 0.0;
 
     double dt = 1.0/60.0;
 
     OvlAsync ovl;
 
-    // csv
+    // CSV
     LatCsvAsync latcsv;
 };
 
 
-// --- 主函数 ---
 std::atomic<bool> g_exit_req{false};
 std::atomic<bool> g_exit_done{false};
 static BOOL WINAPI CtrlHandler(DWORD type) {
@@ -373,7 +360,7 @@ static BOOL WINAPI CtrlHandler(DWORD type) {
     case CTRL_LOGOFF_EVENT:
     case CTRL_SHUTDOWN_EVENT:
         g_exit_req.store(true, std::memory_order_relaxed);
-        // give main loop some time to exit gracefully (flush CSV), then let OS proceed if not finished
+        // wait up to ~2s for graceful exit (CSV flush)
         for (int i = 0; i < 200; ++i) { // ~2s
             if (g_exit_done.load(std::memory_order_relaxed)) return TRUE;
             Sleep(10);
@@ -387,7 +374,7 @@ static BOOL WINAPI CtrlHandler(DWORD type) {
 int main() {
     SetConsoleCtrlHandler(CtrlHandler, TRUE);
 
-    Config boot_cfg; // KEEP
+    Config boot_cfg;
     boot_cfg.validate();
     if (boot_cfg.enable_affinity && boot_cfg.aff_main) {
         setAffinity(boot_cfg.aff_main,
@@ -395,25 +382,25 @@ int main() {
     }
 
     OverlayAnim overlay;
-    // Disable process/thread power throttling and background limits as early as possible
+    // prio/MMCSS/overlay setup
     disablePowerThrottle();
-    // Raise process and main thread priority early
+    
     SetProcPrioHigh();
     SetThreadPrioHighest();
 
-    // Enable MMCSS for main loop thread based on default Config values
+    
    
     HANDLE hMmcss = MmcssEnable(boot_cfg.mmcss_main,
                                             boot_cfg.mmcss_task.c_str(),
                                             boot_cfg.mmcss_prio);
 
-   // 提升主线程内存优先级 & 禁用进程级 PriorityBoost
+   // thread mem prio + disable boost
    if (boot_cfg.enable_thread_mem_prio) {
        SetThreadMemPrioNormal();
        SetProcPrioBoostDisabled();
    }
 
-    // Start tiny overlay animator (forces DWM updates) if enabled
+    // overlay anim if enabled
     if (boot_cfg.overlay_anim) {
         overlay.start(boot_cfg);
         metrics::SystemBootReporting::PrintOverlayBanner(boot_cfg, true);
