@@ -70,6 +70,9 @@ private:
     // frame-ready event (auto-reset)
     HANDLE ev = nullptr;
 
+    // ROI-set event (auto-reset)
+    HANDLE ev_roi = nullptr;
+
     // timing
     std::atomic<double> last_ms_{0.0};
 };

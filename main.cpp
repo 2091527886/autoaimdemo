@@ -155,16 +155,8 @@ public:
             // 1) 截屏计时
             bool got = cap.get(img);
             if (!got) {
-                // 失败路径：DXGI 继续等待；WGC 不再在主线程等待，避免双重计时
-                if (!cap.is_wgc()) {
-                    auto ws = std::chrono::high_resolution_clock::now();
-                    cap.wait((int)std::max(0.0, fc.tgt_ms));
-                    auto we = std::chrono::high_resolution_clock::now();
-                    fl.cap_ms = std::chrono::duration<double, std::milli>(we - ws).count();
-                } else {
-                    // WGC：CapAsync 已记录 wa；此处直接采用 last_ms()
-                    fl.cap_ms = cap.last_ms();
-                }
+                // 失败路径：DXGI/WGC 主线程不等待，避免双重计时
+                fl.cap_ms = cap.last_ms();
                 if (c.log_latency && !c.latency_on_capture_only) {
                     lat.push(fl);
                 }

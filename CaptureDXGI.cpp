@@ -41,7 +41,7 @@ bool ScreenCapturer::cap_dxgi(cv::Mat& frame, const cv::Rect& crop_region) {
     DXGI_OUTDUPL_FRAME_INFO frameInfo;
 
     auto t_acq_s = clock::now(); // aq
-    HRESULT hr = dup->AcquireNextFrame(cfg.capture_timeout_ms, &frameInfo, &pDesktopResource);
+    HRESULT hr = dup->AcquireNextFrame(cfg.capture_timeout_ms_dxgi, &frameInfo, &pDesktopResource);
     auto t_acq_e = clock::now();
     aq = std::chrono::duration<double, std::milli>(t_acq_e - t_acq_s).count();
 

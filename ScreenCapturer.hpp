@@ -27,6 +27,9 @@ public:
     bool is_wgc() const { return useWgc; }
     HANDLE hev() const { return fev; }
 
+    // Event-driven sync helper (DXGI)
+    void wait_vblank();
+
 private:
     bool serveCache(cv::Mat& dst);
     void reportTimes(double t_acquire_ms, double t_qi_ms, double t_copy_ms,

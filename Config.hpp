@@ -22,7 +22,9 @@ public:
     unsigned long long frame_idx = 0;
     // ---------- 基础/日志 ----------
     bool log_init_verbose = true;           // 初始化阶段日志
-    int  capture_timeout_ms = 16;           // AcquireNextFrame/TryGetNextFrame 超时（ms）
+    int  capture_timeout_ms = 16;           // 兼容旧字段（不再用于DXGI）
+    int  capture_timeout_ms_dxgi = 0;       // DXGI固定0以尽可能低延迟
+    int  capture_timeout_ms_wgc = 16;       // WGC保留原行为（不改TryGetNextFrame逻辑）
 
     // ---------- 捕获后端/显示器/GPU ----------
     // cap: 0=DXGI DDA, 1=WGC(Windows Graphics Capture)
@@ -231,8 +233,9 @@ public:
     AVRT_PRIORITY  mmcss_ovl_prio = AVRT_PRIORITY_NORMAL;
 
     // ---------- DXGI 设备优先级/延迟 ----------
-    int dxgi_gpu_prio = 3;                  // -1..7
-    int dxgi_max_latency = 2;               // 1..3 推荐
+   bool dxgi_wait_vblank = true;            // DXGI是否在捕获前等待VBlank（事件驱动）
+   int dxgi_gpu_prio = 3;                  // -1..7
+   int dxgi_max_latency = 2;               // 1..3 推荐
 
     // ---------- 辅助 ----------
     bool is_target(int cid) const {
@@ -247,6 +250,9 @@ public:
     void validate() {
         fps = std::max(1, fps);
         capture_timeout_ms = std::max(1, capture_timeout_ms);
+        // individual backend timeouts
+        capture_timeout_ms_dxgi = std::max(0, capture_timeout_ms_dxgi);
+        capture_timeout_ms_wgc  = std::max(1, capture_timeout_ms_wgc);
         log_latency_every_n = std::max(1, log_latency_every_n);
         capture_timing_every_n = std::max(1, capture_timing_every_n);
         perf_report_every_n = std::max(1, perf_report_every_n);

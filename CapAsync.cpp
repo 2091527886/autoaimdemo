@@ -7,6 +7,7 @@ void CapAsync::start() {
     bool expected = false;
     if (!go.compare_exchange_strong(expected, true)) return; // already running
     if (!ev) ev = CreateEventW(nullptr, FALSE, FALSE, nullptr); // auto-reset
+    if (!ev_roi) ev_roi = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     th = std::thread(&CapAsync::run, this);
 }
 
@@ -15,6 +16,7 @@ void CapAsync::stop() {
     if (go.compare_exchange_strong(expected, false)) {
         if (th.joinable()) th.join();
         if (ev) { CloseHandle(ev); ev = nullptr; }
+        if (ev_roi) { CloseHandle(ev_roi); ev_roi = nullptr; }
     }
 }
 
@@ -23,6 +25,7 @@ void CapAsync::set_roi(const cv::Rect& r) {
     rseq.fetch_add(1, std::memory_order_release);
     rcur = r;
     rseq.fetch_add(1, std::memory_order_release);
+   if (ev_roi) SetEvent(ev_roi);
 }
 
 bool CapAsync::get(cv::Mat& out) {
@@ -61,24 +64,28 @@ void CapAsync::run() {
             if (s1 == s2) break; // consistent
         }
         if (r.width <= 0 || r.height <= 0) {
-            std::this_thread::sleep_for(1ms);
+            if (ev_roi) WaitForSingleObject(ev_roi, INFINITE);
             continue;
         }
 
         double wa_ms = 0.0;
-        // If WGC backend, wait for frame event to avoid polling
+        // Event-driven pacing: WGC uses frame event; DXGI uses VBlank
         if (cap.is_wgc()) {
             HANDLE fe = cap.hev();
             if (fe) {
                 auto w0 = std::chrono::high_resolution_clock::now();
                 // finite wait to allow graceful stop
-                (void)WaitForSingleObject(fe, 5);
+                (void)WaitForSingleObject(fe, 1);
                 auto w1 = std::chrono::high_resolution_clock::now();
                 wa_ms = std::chrono::duration<double, std::milli>(w1 - w0).count();
                 cap.set_wait_ms(wa_ms);
                 if (!go.load(std::memory_order_relaxed)) break;
             }
         }
+
+       if (!cap.is_wgc() && c.dxgi_wait_vblank) {
+           // Event-driven via VBlank not available (disabled)
+       }
 
         auto t0 = std::chrono::high_resolution_clock::now();
         cv::Mat tmp;
