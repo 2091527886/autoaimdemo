@@ -61,8 +61,6 @@ add_executable(aimassistant
   CaptureWGC.cpp
   CapAsync.cpp
   DetAsync.cpp
-  MouAsync.cpp
-  CtlAsync.cpp
   ByteTrack.cpp
   TrkAsync.cpp
   Game_overlay.cpp

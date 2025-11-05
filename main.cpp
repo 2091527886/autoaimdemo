@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <sstream>
 #include <thread>
 #include <atomic>
@@ -26,8 +27,7 @@ extern std::atomic<bool> g_exit_done;
 
 #include "OverlayAnimator.hpp"
 #include "Mouse.hpp"
-#include "MouAsync.hpp"
-#include "CtlAsync.hpp"
+#include "PidController.hpp"
 #include "HotkeyManager.hpp"
 #include "ScreenCapturer.hpp"
 #include "CapAsync.hpp"
@@ -37,6 +37,24 @@ extern std::atomic<bool> g_exit_done;
 #include "LatCsvAsync.hpp"
 
 
+
+// helper pickers cloned from CtlAsync
+static Detection* pick_by_tid(std::vector<Detection>& ds, int tid) {
+    if (tid < 0) return nullptr;
+    for (auto& d : ds) if (d.track_id == tid) return &d;
+    return nullptr;
+}
+static Detection* pick_target(std::vector<Detection>& ds, const Config& c, const cv::Point& ctr) {
+    Detection* target = nullptr;
+    double min_dist_to_center = std::numeric_limits<double>::infinity();
+    for (auto& det : ds) {
+        if (!c.is_target(det.class_id)) continue;
+        cv::Point box_center(det.box.x + det.box.width / 2, det.box.y + det.box.height / 2);
+        double dist = std::hypot(box_center.x - ctr.x, box_center.y - ctr.y);
+        if (dist < min_dist_to_center) { min_dist_to_center = dist; target = &det; }
+    }
+    return target;
+}
 
 class Aim {
 public:
@@ -90,7 +108,6 @@ public:
         cap(c),
         det(c),
         trk(c),
-        mou(c),
         hk(c),
         crop((cap.w() - c.crop_size_px) / 2, (cap.h() - c.crop_size_px) / 2, c.crop_size_px, c.crop_size_px),
         ctr(c.crop_size_px / 2, c.crop_size_px / 2),
@@ -115,10 +132,11 @@ public:
         cap.start();
         det.start();
         if (c.trk) trk.start();
-        mou.start();
-        ctl = std::make_unique<CtlAsync>(c, mou);
-        ctl->set(ctr, mfac);
-        ctl->start();
+        // init PID
+        px.setK(c.pid_kp_x, c.pid_ki_x, c.pid_kd_x);
+        px.setLim(c.pid_output_limit, c.pid_integral_limit);
+        py.setK(c.pid_kp_y, c.pid_ki_y, c.pid_kd_y);
+        py.setLim(c.pid_output_limit, c.pid_integral_limit);
         if (c.ovl) { lg::o() << P_B "Overlay=ON" << lg::endl; ovl.start(); }
         else { lg::o() << P_B "Overlay=OFF" << lg::endl; }
     }
@@ -128,9 +146,7 @@ public:
         cap.stop();
         det.stop();
         if (c.trk) trk.stop();
-        if (ctl) ctl->stop();
         if (c.ovl) ovl.stop();
-        mou.stop();
         if (vis) cv::destroyAllWindows();
     }
 
@@ -186,12 +202,77 @@ public:
             
             bool smooth_pressed = hk.SmoothPressed();
             bool single = hk.SingleShotJustPressed();
-            
-            ctl->put(ds, smooth_pressed, single, dt);
-            
-            fl.mou_ms = mou.take_lag_ms();
-            
-            fl.ctl_ms = ctl->take_ms();
+
+            // sync control+mouse on main thread
+            auto tctl0 = std::chrono::high_resolution_clock::now();
+            double ctl_cost_ms = 0.0;
+            double mou_cost_ms = 0.0;
+            do {
+                auto ds_copy = ds; // for pick helpers
+                Detection* target = pick_by_tid(ds_copy, cur_tid_);
+                if (!target) target = pick_target(ds_copy, c, ctr);
+                if (target && target->track_id >= 0) cur_tid_ = target->track_id;
+
+                if (!target) {
+                    px.reset(); py.reset();
+                    if (!smooth_pressed) { break; }
+                    if (!c.trk_pred_move) break;
+                    Detection* pred_tgt = nullptr; double min_d = std::numeric_limits<double>::infinity();
+                    for (auto& d : ds_copy) {
+                        if (!d.is_pred) continue; if (!c.is_target(d.class_id)) continue;
+                        cv::Point bc(d.box.x + d.box.width/2, d.box.y + (int)(d.box.height * c.y_anchor_ratio));
+                        double dist = std::hypot(bc.x - ctr.x, bc.y - ctr.y);
+                        if (dist < min_d) { min_d = dist; pred_tgt = &d; }
+                    }
+                    if (!pred_tgt) break;
+                    cv::Point tp(pred_tgt->box.x + pred_tgt->box.width/2,
+                                 pred_tgt->box.y + (int)(pred_tgt->box.height * c.y_anchor_ratio));
+                    double err_x = (double)(tp.x - ctr.x);
+                    double err_y = (double)(tp.y - ctr.y);
+                    double ox = px.step(err_x, dt);
+                    double oy = py.step(err_y, dt);
+                    int mx = (int)(ox * mfac);
+                    int my = (int)(oy * mfac);
+                    auto tmov0 = std::chrono::high_resolution_clock::now();
+                    if (mx || my) mouse.Move(mx, my);
+                    auto tmov1 = std::chrono::high_resolution_clock::now();
+                    mou_cost_ms = std::chrono::duration<double, std::milli>(tmov1 - tmov0).count();
+                    break;
+                }
+
+                if (!smooth_pressed) { px.reset(); py.reset(); }
+                if (smooth_pressed && target) {
+                    cv::Point tp(target->box.x + target->box.width/2,
+                                 target->box.y + (int)(target->box.height * c.y_anchor_ratio));
+                    double err_x = (double)(tp.x - ctr.x);
+                    double err_y = (double)(tp.y - ctr.y);
+                    double ox = px.step(err_x, dt);
+                    double oy = py.step(err_y, dt);
+                    int mx = (int)(ox * mfac);
+                    int my = (int)(oy * mfac);
+                    auto tmov0 = std::chrono::high_resolution_clock::now();
+                    if (mx || my) mouse.Move(mx, my);
+                    auto tmov1 = std::chrono::high_resolution_clock::now();
+                    mou_cost_ms = std::chrono::duration<double, std::milli>(tmov1 - tmov0).count();
+                }
+                if (single && target) {
+                    cv::Point tp(target->box.x + target->box.width/2,
+                                 target->box.y + (int)(target->box.height * c.y_anchor_ratio));
+                    double dx = (double)(tp.x - ctr.x);
+                    double dy = (double)(tp.y - ctr.y);
+                    int mx = (int)(dx * mfac);
+                    int my = (int)(dy * mfac);
+                    auto tmov0 = std::chrono::high_resolution_clock::now();
+                    if (mx || my) mouse.Move(mx, my);
+                    auto tmov1 = std::chrono::high_resolution_clock::now();
+                    mou_cost_ms = std::chrono::duration<double, std::milli>(tmov1 - tmov0).count();
+                }
+            } while(0);
+            auto tctl1 = std::chrono::high_resolution_clock::now();
+            ctl_cost_ms = std::chrono::duration<double, std::milli>(tctl1 - tctl0).count();
+
+            fl.mou_ms = mou_cost_ms;
+            fl.ctl_ms = ctl_cost_ms;
             if (c.trk) { fl.trk_ms = trk.take_ms(); }
             if (c.ovl) { fl.ovl_ms = ovl.take_ms(); }
 
@@ -321,8 +402,10 @@ private:
     CapAsync cap;
     DetAsync det;
     TrkAsync trk;
-    MouAsync mou;
-    std::unique_ptr<CtlAsync> ctl;
+    // sync mouse+pid
+    Mouse mouse;
+    PidController px, py;
+    int cur_tid_ = -1;
     HotkeyManager hk;
     const cv::Rect crop;
     const cv::Point ctr;
