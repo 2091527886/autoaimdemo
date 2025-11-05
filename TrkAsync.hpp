@@ -16,6 +16,8 @@ public:
 
     // last tracking cost (ms)
     double last_ms() const { return last_ms_.load(std::memory_order_relaxed); }
+    // take-and-clear to avoid sticky value when no new tracking work in a frame
+    double take_ms() { return last_ms_.exchange(0.0, std::memory_order_relaxed); }
 
     TrkAsync(const TrkAsync&) = delete;
     TrkAsync& operator=(const TrkAsync&) = delete;
@@ -39,6 +41,7 @@ private:
     std::mutex mx;
 
     std::atomic<int> out_seq{-1};
+    std::atomic<int> out_seen_get{-1};
 
     std::atomic<bool> go{false};
     std::thread th;

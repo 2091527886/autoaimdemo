@@ -17,6 +17,8 @@ public:
 
     // last control-step cost (ms)
     double last_ms() const { return last_ms_.load(std::memory_order_relaxed); }
+    // take-and-clear to avoid sticky value on frames with no new control work
+    double take_ms() { return last_ms_.exchange(0.0, std::memory_order_relaxed); }
 
     void set(cv::Point ctr, double mfac) {
         ctr_ = ctr; mfac_ = mfac;

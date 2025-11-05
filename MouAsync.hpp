@@ -27,6 +27,8 @@ public:
     double last_ms() const { return last_call_ms_.load(std::memory_order_relaxed); }
     // end-to-end lag from put() to driver call completion (ms)
     double last_lag_ms() const { return last_lag_ms_.load(std::memory_order_relaxed); }
+    // take-and-clear: read lag once, then reset to 0 to avoid sticky values across frames
+    double take_lag_ms() { return last_lag_ms_.exchange(0.0, std::memory_order_relaxed); }
 
 private:
     void run();

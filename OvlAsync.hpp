@@ -16,6 +16,8 @@ public:
 
     // last overlay draw cost (ms)
     double last_ms() const { return last_ms_.load(std::memory_order_relaxed); }
+    // take-and-clear to avoid sticky value across frames with no new overlay work
+    double take_ms() { return last_ms_.exchange(0.0, std::memory_order_relaxed); }
 
     OvlAsync(const OvlAsync&) = delete;
     OvlAsync& operator=(const OvlAsync&) = delete;

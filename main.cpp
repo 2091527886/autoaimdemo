@@ -180,7 +180,7 @@ public:
                 }
                 if (c.ovl) ovl.put(ds, crop);
             }
-            fl.det_ms = det_ms_last;
+            fl.det_ms = has_new ? det_ms_last : 0.0;
 
             
             
@@ -189,17 +189,17 @@ public:
             
             ctl->put(ds, smooth_pressed, single, dt);
             
-            fl.mou_ms = mou.last_lag_ms();
+            fl.mou_ms = mou.take_lag_ms();
             
-            fl.ctl_ms = ctl->last_ms();
-            if (c.trk) { fl.trk_ms = trk.last_ms(); }
-            if (c.ovl) { fl.ovl_ms = ovl.last_ms(); }
+            fl.ctl_ms = ctl->take_ms();
+            if (c.trk) { fl.trk_ms = trk.take_ms(); }
+            if (c.ovl) { fl.ovl_ms = ovl.take_ms(); }
 
             auto loop_end_time = std::chrono::high_resolution_clock::now();
             double proc_ms = std::chrono::duration<double, std::milli>(loop_end_time - loop_start_time).count();
             if (c.fps_lock) {
-                double work_ms = std::max({proc_ms, fl.cap_ms, fl.det_ms, fl.mou_ms, fl.ctl_ms, fl.ovl_ms, fl.trk_ms});
-                double frame_ms = fc.end(work_ms);
+                // FPS 锁基于主循环真实耗时，避免被其他线程阶段统计值放大而误限速
+                double frame_ms = fc.end(proc_ms);
                 tm.loop_ms = frame_ms;
             } else {
                 tm.loop_ms = proc_ms;

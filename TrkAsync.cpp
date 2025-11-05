@@ -27,8 +27,11 @@ void TrkAsync::put(const std::vector<Detection>& ds) {
 bool TrkAsync::get(std::vector<Detection>& out) {
     int s = out_seq.load(std::memory_order_acquire);
     if (s < 0) return false;
+    int seen = out_seen_get.load(std::memory_order_acquire);
+    if (s == seen) return false; // no new result since last get
     std::lock_guard<std::mutex> lk(mx);
     out = out_ds;
+    out_seen_get.store(s, std::memory_order_release);
     return true;
 }
 
