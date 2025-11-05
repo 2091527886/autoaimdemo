@@ -23,11 +23,18 @@ public:
     // overwrite with latest rel move
     void put(int dx, int dy);
 
-    // last driver call cost (ms)
-    double last_ms() const { return last_ms_.load(std::memory_order_relaxed); }
+    // last driver call cost (ms) - kept for compatibility
+    double last_ms() const { return last_call_ms_.load(std::memory_order_relaxed); }
+    // end-to-end lag from put() to driver call completion (ms)
+    double last_lag_ms() const { return last_lag_ms_.load(std::memory_order_relaxed); }
 
 private:
     void run();
+
+    static inline long long now_ns() {
+        return std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    }
 
     const Config* cfg_ = nullptr;
 
@@ -35,9 +42,11 @@ private:
     std::atomic<int> dx_{0};
     std::atomic<int> dy_{0};
     std::atomic<int> seq_{0};
+    std::atomic<long long> put_ns_{0}; // timestamp of last put
 
     // stats
-    std::atomic<double> last_ms_{0.0};
+    std::atomic<double> last_call_ms_{0.0}; // driver call cost
+    std::atomic<double> last_lag_ms_{0.0};  // put->done lag
 
     // thread
     std::atomic<bool> go_{false};

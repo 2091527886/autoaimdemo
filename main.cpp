@@ -137,6 +137,12 @@ public:
     void loop() {
         while (true) {
             if (g_exit_req.load(std::memory_order_relaxed)) { lg::o() << lg::nl << P_I "Signal exit" << lg::endl; break; }
+            // event-driven pacing: wait up to target frame time for new frame (not counted in proc_ms)
+            int to = c.fps_lock ? (int)std::ceil(fc.tgt_ms) : 0;
+            if (!cap.wait(to)) {
+                if (g_exit_req.load(std::memory_order_relaxed)) { lg::o() << lg::nl << P_I "Signal exit" << lg::endl; break; }
+                continue;
+            }
             auto loop_start_time = std::chrono::high_resolution_clock::now();
 
             FrameLat fl;
@@ -183,7 +189,7 @@ public:
             
             ctl->put(ds, smooth_pressed, single, dt);
             
-            fl.mou_ms = mou.last_ms();
+            fl.mou_ms = mou.last_lag_ms();
             
             fl.ctl_ms = ctl->last_ms();
             if (c.trk) { fl.trk_ms = trk.last_ms(); }
@@ -192,14 +198,14 @@ public:
             auto loop_end_time = std::chrono::high_resolution_clock::now();
             double proc_ms = std::chrono::duration<double, std::milli>(loop_end_time - loop_start_time).count();
             if (c.fps_lock) {
-                double work_ms = std::max({proc_ms, fl.cap_ms, det_ms_last});
+                double work_ms = std::max({proc_ms, fl.cap_ms, fl.det_ms, fl.mou_ms, fl.ctl_ms, fl.ovl_ms, fl.trk_ms});
                 double frame_ms = fc.end(work_ms);
                 tm.loop_ms = frame_ms;
             } else {
                 tm.loop_ms = proc_ms;
             }
-            // E2E≈max(loop,cap,det)
-            double loop_e2e = std::max({tm.loop_ms, fl.cap_ms, det_ms_last});
+            // E2E≈max(loop,cap,det,io)
+            double loop_e2e = std::max({tm.loop_ms, fl.cap_ms, fl.det_ms, fl.mou_ms, fl.ctl_ms, fl.ovl_ms, fl.trk_ms});
             fl.loop_ms = loop_e2e;
             e2e_ms_last = loop_e2e;
 
