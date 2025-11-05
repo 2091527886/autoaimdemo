@@ -76,11 +76,9 @@ void CapAsync::run() {
         if (cap.is_wgc()) {
             HANDLE fe = cap.hev();
             if (fe) {
-                auto w0 = std::chrono::high_resolution_clock::now();
-                // finite wait to allow graceful stop
-                (void)WaitForSingleObject(fe, 1);
-                auto w1 = std::chrono::high_resolution_clock::now();
-                wa_ms = std::chrono::duration<double, std::milli>(w1 - w0).count();
+                // Non-blocking: drain if signaled, do not wait
+                (void)WaitForSingleObject(fe, 0);
+                wa_ms = 0.0; // no added wait latency
                 cap.set_wait_ms(wa_ms);
                 if (!go.load(std::memory_order_relaxed)) break;
             }
