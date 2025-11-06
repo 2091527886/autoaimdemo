@@ -27,9 +27,6 @@ public:
     bool is_wgc() const { return useWgc; }
     HANDLE hev() const { return fev; }
 
-    // Event-driven sync helper (DXGI)
-    void wait_vblank();
-
 private:
     bool serveCache(cv::Mat& dst);
     void reportTimes(double t_acquire_ms, double t_qi_ms, double t_copy_ms,
@@ -44,7 +41,7 @@ private:
     void rel_wgc();
 
 public:
-    // WGC wait accounting (set by CapAsync before capture)
+    // WGC wait accounting (no external setter needed in main-thread mode)
     void set_wait_ms(double ms) { last_wait_ms_.store(ms, std::memory_order_relaxed); }
     double get_wait_ms() const { return last_wait_ms_.load(std::memory_order_relaxed); }
 

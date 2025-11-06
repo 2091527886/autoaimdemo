@@ -57,7 +57,6 @@ add_executable(aimassistant
   ScreenCapturer.cpp
   CaptureDXGI.cpp
   CaptureWGC.cpp
-  CapAsync.cpp
   ByteTrack.cpp
   TrkAsync.cpp
   Game_overlay.cpp

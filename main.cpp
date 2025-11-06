@@ -29,7 +29,6 @@ extern std::atomic<bool> g_exit_done;
 #include "AimAlgo.hpp"
 #include "HotkeyManager.hpp"
 #include "ScreenCapturer.hpp"
-#include "CapAsync.hpp"
 #include "ObjDet.hpp"
 #include "TrkAsync.hpp"
 #include "OvlAsync.hpp"
@@ -104,7 +103,7 @@ public:
 
     Aim()
         : c(),
-        cap(c),
+        cap(c, c.crop_size_px, c.crop_size_px),
         od(c),
         trk(c),
         hk(c),
@@ -127,8 +126,7 @@ public:
             cv::namedWindow(c.window_title, cv::WINDOW_AUTOSIZE);
         }
         lg::o() << "Detect center " << c.crop_size_px << "x" << c.crop_size_px << lg::endl;
-        cap.set_roi(crop);
-        cap.start();
+        // no async ROI/start; capture on main thread
         /* inference on main thread: no det.start() */
         if (c.trk) trk.start();
         // init AimAlgo (PropAlgo-based)
@@ -139,7 +137,6 @@ public:
 
     ~Aim() {
         if (c.lat_csv) latcsv.stop();
-        cap.stop();
         /* inference on main thread: no det.stop() */
         if (c.trk) trk.stop();
         if (c.ovl) ovl.stop();
@@ -149,30 +146,26 @@ public:
     void loop() {
         while (true) {
             if (g_exit_req.load(std::memory_order_relaxed)) { lg::o() << lg::nl << P_I "Signal exit" << lg::endl; break; }
-            // event-driven pacing: wait up to target frame time for new frame (not counted in proc_ms)
-            int to = c.fps_lock ? (int)std::ceil(fc.tgt_ms) : 0;
-            if (!cap.wait(to)) {
-                if (g_exit_req.load(std::memory_order_relaxed)) { lg::o() << lg::nl << P_I "Signal exit" << lg::endl; break; }
-                continue;
-            }
+            // no event pacing; capture on main thread
             auto loop_start_time = std::chrono::high_resolution_clock::now();
 
             FrameLat fl;
 
-            
-            bool got = cap.get(img);
+            // capture on main thread
+            auto tcap0 = std::chrono::high_resolution_clock::now();
+            bool got = cap.capture(img, crop);
+            auto tcap1 = std::chrono::high_resolution_clock::now();
+            double cap_ms = std::chrono::duration<double, std::milli>(tcap1 - tcap0).count();
             if (!got) {
-                // DXGI/WGC: 主线程不等待，避免双重计时
-                fl.cap_ms = cap.last_ms();
+                fl.cap_ms = cap_ms;
                 if (c.log_latency && !c.latency_on_capture_only) {
                     lat.push(fl);
                 }
                 if (g_exit_req.load(std::memory_order_relaxed)) { lg::o() << lg::nl << P_I "Signal exit" << lg::endl; break; }
                 continue;
             }
-            
             c.frame_idx++; fl.idx = c.frame_idx;
-            fl.cap_ms = cap.last_ms();
+            fl.cap_ms = cap_ms;
 
             // inference on main thread
             od.detect(img, ds, c, tm);
@@ -322,7 +315,7 @@ public:
                 }
             }
             // 主线程输出采集统计
-            cap.drain();
+            cap.reporter.drain();
 
             
             if (!tm.trt_throughput.empty()) {
@@ -401,7 +394,7 @@ private:
     }
 
     Config c;
-    CapAsync cap;
+    ScreenCapturer cap;
     ObjDet od;
     TrkAsync trk;
     // sync mouse+algo

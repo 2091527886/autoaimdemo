@@ -20,8 +20,6 @@ public:
     // 基础/日志
     bool log_init_verbose = true;           // 初始化阶段日志
     int  capture_timeout_ms_dxgi = 0;       // DXGI固定0以尽可能低延迟
-    int  capture_timeout_ms_wgc = 0;        // WGC默认非阻塞（0 表示完全非阻塞）
-
     // 捕获/GPU
     // cap: 0=DXGI DDA, 1=WGC(Windows Graphics Capture)
     int  cap = 0;
@@ -46,7 +44,6 @@ public:
     bool     enable_affinity = true;       // 启用线程亲和
     // 每模块亲和掩码（0 表示不绑定）
     uint64_t aff_main = (1ull<<10);      // 主线程 -> CPU#10
-    uint64_t aff_cap  = (1ull<<11);      // 捕获   -> CPU#11
     uint64_t aff_trk  = (1ull<<14);      // 跟踪   -> CPU#14
     uint64_t aff_ovl  = (1ull<<15);      // 叠加   -> CPU#15
     uint64_t aff_lat  = (1ull<<10);      // CSV 写入-> CPU#10（轻量，与主线程共用）
@@ -167,10 +164,6 @@ public:
     bool enable_thread_mem_prio = false;
 
     // 模块线程（按需启用，不使用环境变量；短名、可读）
-    bool           mmcss_cap = true;           // 捕获
-    std::wstring   mmcss_cap_task = L"Capture";
-    AVRT_PRIORITY  mmcss_cap_prio = AVRT_PRIORITY_HIGH;
-
     bool           mmcss_trk = true;           // 跟踪
     std::wstring   mmcss_trk_task = L"Games";
     AVRT_PRIORITY  mmcss_trk_prio = AVRT_PRIORITY_HIGH;
@@ -181,7 +174,6 @@ public:
     AVRT_PRIORITY  mmcss_ovl_prio = AVRT_PRIORITY_NORMAL;
 
     // DXGI
-   bool dxgi_wait_vblank = true;            // DXGI是否在捕获前等待VBlank（事件驱动）
    int dxgi_gpu_prio = 3;                  // -1..7
    int dxgi_max_latency = 2;               // 1..3 推荐
 
@@ -214,8 +206,6 @@ private:
     void v_basic() {
         fps = std::max(1, fps);
         capture_timeout_ms_dxgi = std::max(0, capture_timeout_ms_dxgi);
-        // WGC: allow 0 to mean fully non-blocking
-        capture_timeout_ms_wgc  = std::max(0, capture_timeout_ms_wgc);
         log_latency_every_n = std::max(1, log_latency_every_n);
         capture_timing_every_n = std::max(1, capture_timing_every_n);
         perf_report_every_n = std::max(1, perf_report_every_n);

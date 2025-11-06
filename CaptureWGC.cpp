@@ -108,7 +108,7 @@ bool ScreenCapturer::cap_wgc(cv::Mat& frame, const cv::Rect& crop_region) {
     auto frm = wgc->pool.TryGetNextFrame(); // timeout controlled via event pacing (1ms)
     auto t_acq_e = clock::now();
     t_acquire_ms = std::chrono::duration<double, std::milli>(t_acq_e - t_acq_s).count();
-    // For WGC, treat second field as 'wa' (wait for frame event) collected in CapAsync
+    // For WGC, treat second field as 'wa' (wait for frame event) - async collector removed; main-thread mode
     double t_wait_ms = get_wait_ms();
 
     if (!frm) {

@@ -104,12 +104,6 @@ ScreenCapturer::~ScreenCapturer() {
     SafeRelease(&dev);
 }
 
-void ScreenCapturer::wait_vblank() {
-    if (!useWgc && out) {
-        out->WaitForVBlank();
-    }
-}
-
 void ScreenCapturer::dbgTick() {
     static size_t n = 0;
     if (!cfg.capture_debug) return;
