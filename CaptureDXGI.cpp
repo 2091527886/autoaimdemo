@@ -26,12 +26,13 @@ bool ScreenCapturer::init_dxgi() {
 }
 
 bool ScreenCapturer::cap_dxgi(cv::Mat& frame, const cv::Rect& crop_region) {
+    const bool do_tim = cfg.capture_timing && cfg.timing;
     using clock = std::chrono::high_resolution_clock;
-    auto t_total_start = clock::now();
+    auto t_total_start = do_tim ? clock::now() : clock::time_point{};
     double aq = 0.0, qi = 0.0, cp = 0.0, mp = 0.0, cv = 0.0, up = 0.0, tt = 0.0;
 
     auto report_if_fail = [&]() {
-        if (cfg.capture_timing && !cfg.capture_timing_on_success) {
+        if (do_tim && !cfg.capture_timing_on_success) {
             tt = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
             reportTimes(aq, qi, cp, mp, cv, up, tt);
         }
@@ -40,10 +41,10 @@ bool ScreenCapturer::cap_dxgi(cv::Mat& frame, const cv::Rect& crop_region) {
     IDXGIResource* pDesktopResource = nullptr;
     DXGI_OUTDUPL_FRAME_INFO frameInfo;
 
-    auto t_acq_s = clock::now(); // aq
+    auto t_acq_s = do_tim ? clock::now() : clock::time_point{}; // aq
     HRESULT hr = dup->AcquireNextFrame(cfg.capture_timeout_ms_dxgi, &frameInfo, &pDesktopResource);
-    auto t_acq_e = clock::now();
-    aq = std::chrono::duration<double, std::milli>(t_acq_e - t_acq_s).count();
+    auto t_acq_e = do_tim ? clock::now() : t_acq_s;
+    if (do_tim) aq = std::chrono::duration<double, std::milli>(t_acq_e - t_acq_s).count();
 
     if (hr == DXGI_ERROR_WAIT_TIMEOUT) {
         if (serveCache(frame)) {
@@ -70,10 +71,10 @@ bool ScreenCapturer::cap_dxgi(cv::Mat& frame, const cv::Rect& crop_region) {
     }
 
     ID3D11Texture2D* pAcquiredDesktopImage = nullptr;
-    auto t_qi_s = clock::now();
+    auto t_qi_s = do_tim ? clock::now() : clock::time_point{};
     hr = pDesktopResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&pAcquiredDesktopImage);
-    auto t_qi_e = clock::now();
-    qi = std::chrono::duration<double, std::milli>(t_qi_e - t_qi_s).count();
+    auto t_qi_e = do_tim ? clock::now() : t_qi_s;
+    if (do_tim) qi = std::chrono::duration<double, std::milli>(t_qi_e - t_qi_s).count();
     SafeRelease(&pDesktopResource);
     if (FAILED(hr)) {
         if (cfg.capture_timing && !cfg.capture_timing_on_success) {
@@ -117,10 +118,10 @@ bool ScreenCapturer::cap_dxgi(cv::Mat& frame, const cv::Rect& crop_region) {
     const size_t curr = idx % kStageN;
     const size_t prev = (idx + kStageN - 1) % kStageN;
 
-    auto t_copy_s = clock::now();
+    auto t_copy_s = do_tim ? clock::now() : clock::time_point{};
     ctx->CopySubresourceRegion(stage[curr], 0, 0, 0, 0, pAcquiredDesktopImage, 0, &sourceRegion);
-    auto t_copy_e = clock::now();
-    cp = std::chrono::duration<double, std::milli>(t_copy_e - t_copy_s).count();
+    auto t_copy_e = do_tim ? clock::now() : t_copy_s;
+    if (do_tim) cp = std::chrono::duration<double, std::milli>(t_copy_e - t_copy_s).count();
 
     ctx->End(copyQ[curr]);
 
@@ -150,10 +151,10 @@ bool ScreenCapturer::cap_dxgi(cv::Mat& frame, const cv::Rect& crop_region) {
     }
 
     D3D11_MAPPED_SUBRESOURCE mappedResource;
-    auto t_map_s = clock::now();
+    auto t_map_s = do_tim ? clock::now() : clock::time_point{};
     hr = ctx->Map(stage[prev], 0, D3D11_MAP_READ, D3D11_MAP_FLAG_DO_NOT_WAIT, &mappedResource);
-    auto t_map_e = clock::now();
-    mp = std::chrono::duration<double, std::milli>(t_map_e - t_map_s).count();
+    auto t_map_e = do_tim ? clock::now() : t_map_s;
+    if (do_tim) mp = std::chrono::duration<double, std::milli>(t_map_e - t_map_s).count();
     if (hr == DXGI_ERROR_WAS_STILL_DRAWING) {
         ++statStillDraw;
         bool served = serveCache(frame);
@@ -180,16 +181,16 @@ bool ScreenCapturer::cap_dxgi(cv::Mat& frame, const cv::Rect& crop_region) {
     }
 
     cv::Mat bgra_frame(crop_region.height, crop_region.width, CV_8UC4, mappedResource.pData, mappedResource.RowPitch);
-    auto t_cvt_s = clock::now();
+    auto t_cvt_s = do_tim ? clock::now() : clock::time_point{};
     cv::cvtColor(bgra_frame, frame, cv::COLOR_BGRA2BGR);
     frame.copyTo(cache);
-    auto t_cvt_e = clock::now();
-    cv = std::chrono::duration<double, std::milli>(t_cvt_e - t_cvt_s).count();
+    auto t_cvt_e = do_tim ? clock::now() : t_cvt_s;
+    if (do_tim) cv = std::chrono::duration<double, std::milli>(t_cvt_e - t_cvt_s).count();
 
-    auto t_unmap_s = clock::now();
+    auto t_unmap_s = do_tim ? clock::now() : clock::time_point{};
     ctx->Unmap(stage[prev], 0);
-    auto t_unmap_e = clock::now();
-    up = std::chrono::duration<double, std::milli>(t_unmap_e - t_unmap_s).count();
+    auto t_unmap_e = do_tim ? clock::now() : t_unmap_s;
+    if (do_tim) up = std::chrono::duration<double, std::milli>(t_unmap_e - t_unmap_s).count();
 
     tt = std::chrono::duration<double, std::milli>(t_unmap_e - t_total_start).count();
     idx++;

@@ -100,20 +100,21 @@ void ScreenCapturer::rel_wgc() {
 }
 
 bool ScreenCapturer::cap_wgc(cv::Mat& frame, const cv::Rect& crop_region) {
+    const bool do_tim = cfg.capture_timing && cfg.timing;
     using clock = std::chrono::high_resolution_clock;
-    auto t_total_start = clock::now();
+    auto t_total_start = do_tim ? clock::now() : clock::time_point{};
     double t_acquire_ms = 0.0, t_qi_ms = 0.0, t_copy_ms = 0.0, t_map_ms = 0.0, t_cvt_ms = 0.0, t_unmap_ms = 0.0, t_total_ms = 0.0;
 
-    auto t_acq_s = clock::now();
+    auto t_acq_s = do_tim ? clock::now() : clock::time_point{};
     auto frm = wgc->pool.TryGetNextFrame(); // timeout controlled via event pacing (1ms)
-    auto t_acq_e = clock::now();
-    t_acquire_ms = std::chrono::duration<double, std::milli>(t_acq_e - t_acq_s).count();
+    auto t_acq_e = do_tim ? clock::now() : t_acq_s;
+    if (do_tim) t_acquire_ms = std::chrono::duration<double, std::milli>(t_acq_e - t_acq_s).count();
     // For WGC, treat second field as 'wa' (wait for frame event) - async collector removed; main-thread mode
     double t_wait_ms = get_wait_ms();
 
     if (!frm) {
         bool served = serveCache(frame);
-        if (!served && cfg.capture_timing && !cfg.capture_timing_on_success) {
+        if (!served && do_tim && !cfg.capture_timing_on_success) {
             t_total_ms = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
             // Map to WGC labels: gf=t_acquire_ms, wa=t_wait_ms
             reportTimes(t_acquire_ms, t_wait_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
@@ -131,10 +132,10 @@ bool ScreenCapturer::cap_wgc(cv::Mat& frame, const cv::Rect& crop_region) {
     const size_t curr = idx % kStageN;
     const size_t prev = (idx + kStageN - 1) % kStageN;
 
-    auto t_copy_s = clock::now();
+    auto t_copy_s = do_tim ? clock::now() : clock::time_point{};
     ctx->CopySubresourceRegion(stage[curr], 0, 0, 0, 0, tex.get(), 0, &src);
-    auto t_copy_e = clock::now();
-    t_copy_ms = std::chrono::duration<double, std::milli>(t_copy_e - t_copy_s).count(); // cp
+    auto t_copy_e = do_tim ? clock::now() : t_copy_s;
+    if (do_tim) t_copy_ms = std::chrono::duration<double, std::milli>(t_copy_e - t_copy_s).count(); // cp
 
     ctx->End(copyQ[curr]);
 
@@ -161,10 +162,10 @@ bool ScreenCapturer::cap_wgc(cv::Mat& frame, const cv::Rect& crop_region) {
     }
 
     D3D11_MAPPED_SUBRESOURCE mr;
-    auto t_map_s = clock::now();
+    auto t_map_s = do_tim ? clock::now() : clock::time_point{};
     HRESULT hrm = ctx->Map(stage[prev], 0, D3D11_MAP_READ, D3D11_MAP_FLAG_DO_NOT_WAIT, &mr);
-    auto t_map_e = clock::now();
-    t_map_ms = std::chrono::duration<double, std::milli>(t_map_e - t_map_s).count(); // mp
+    auto t_map_e = do_tim ? clock::now() : t_map_s;
+    if (do_tim) t_map_ms = std::chrono::duration<double, std::milli>(t_map_e - t_map_s).count(); // mp
     if (hrm == DXGI_ERROR_WAS_STILL_DRAWING) {
         ++statStillDraw;
         bool served = serveCache(frame);
@@ -190,20 +191,20 @@ bool ScreenCapturer::cap_wgc(cv::Mat& frame, const cv::Rect& crop_region) {
     }
 
     cv::Mat bgra(crop_region.height, crop_region.width, CV_8UC4, mr.pData, mr.RowPitch);
-    auto t_cvt_s = clock::now();
+    auto t_cvt_s = do_tim ? clock::now() : clock::time_point{};
     cv::cvtColor(bgra, frame, cv::COLOR_BGRA2BGR);
     frame.copyTo(cache);
-    auto t_cvt_e = clock::now();
-    t_cvt_ms = std::chrono::duration<double, std::milli>(t_cvt_e - t_cvt_s).count(); // cv
+    auto t_cvt_e = do_tim ? clock::now() : t_cvt_s;
+    if (do_tim) t_cvt_ms = std::chrono::duration<double, std::milli>(t_cvt_e - t_cvt_s).count(); // cv
 
-    auto t_unmap_s = clock::now();
+    auto t_unmap_s = do_tim ? clock::now() : clock::time_point{};
     ctx->Unmap(stage[prev], 0);
-    auto t_unmap_e = clock::now();
-    t_unmap_ms = std::chrono::duration<double, std::milli>(t_unmap_e - t_unmap_s).count(); // up
+    auto t_unmap_e = do_tim ? clock::now() : t_unmap_s;
+    if (do_tim) t_unmap_ms = std::chrono::duration<double, std::milli>(t_unmap_e - t_unmap_s).count(); // up
 
-    double t_total_ms_loc = std::chrono::duration<double, std::milli>(t_unmap_e - t_total_start).count();
+    double t_total_ms_loc = do_tim ? std::chrono::duration<double, std::milli>(t_unmap_e - t_total_start).count() : 0.0;
     idx++;
-    if (cfg.capture_timing) reportTimes(t_acquire_ms, t_wait_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms_loc); // gf, wa, cp, mp, cv, up, tt
+    if (do_tim) reportTimes(t_acquire_ms, t_wait_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms_loc); // gf, wa, cp, mp, cv, up, tt
     ++statOk;
     dbgTick();
     return true;

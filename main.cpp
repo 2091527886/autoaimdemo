@@ -30,18 +30,12 @@ extern std::atomic<bool> g_exit_done;
 #include "HotkeyManager.hpp"
 #include "ScreenCapturer.hpp"
 #include "ObjDet.hpp"
-#include "TrkAsync.hpp"
 #include "OvlAsync.hpp"
 #include "LatCsvAsync.hpp"
 
 
 
-// helper pickers cloned from CtlAsync
-static Detection* pick_by_tid(std::vector<Detection>& ds, int tid) {
-    if (tid < 0) return nullptr;
-    for (auto& d : ds) if (d.track_id == tid) return &d;
-    return nullptr;
-}
+// helpers
 static Detection* pick_target(std::vector<Detection>& ds, const Config& c, const cv::Point& ctr) {
     Detection* target = nullptr;
     double min_dist_to_center = std::numeric_limits<double>::infinity();
@@ -105,7 +99,6 @@ public:
         : c(),
         cap(c, c.crop_size_px, c.crop_size_px),
         od(c),
-        trk(c),
         hk(c),
         crop((cap.w() - c.crop_size_px) / 2, (cap.h() - c.crop_size_px) / 2, c.crop_size_px, c.crop_size_px),
         ctr(c.crop_size_px / 2, c.crop_size_px / 2),
@@ -115,7 +108,7 @@ public:
         ovl(c),
         latcsv(c)
     {
-        if (c.lat_csv) latcsv.start(c.lat_csv_path);
+        if (c.timing && c.lat_csv) latcsv.start(c.lat_csv_path);
 
         if (cap.w() < c.crop_size_px || cap.h() < c.crop_size_px) {
             throw std::runtime_error("Screen resolution is smaller than configured crop_size_px.");
@@ -128,7 +121,7 @@ public:
         lg::o() << "Detect center " << c.crop_size_px << "x" << c.crop_size_px << lg::endl;
         // no async ROI/start; capture on main thread
         /* inference on main thread: no det.start() */
-        if (c.trk) trk.start();
+        
         // init AimAlgo (PropAlgo-based)
         algo.setConfig(c);
         if (c.ovl) { lg::o() << P_B "Overlay=ON" << lg::endl; ovl.start(); }
@@ -136,9 +129,9 @@ public:
     }
 
     ~Aim() {
-        if (c.lat_csv) latcsv.stop();
+        if (c.timing && c.lat_csv) latcsv.stop();
         /* inference on main thread: no det.stop() */
-        if (c.trk) trk.stop();
+        
         if (c.ovl) ovl.stop();
         if (vis) cv::destroyAllWindows();
     }
@@ -152,13 +145,13 @@ public:
             FrameLat fl;
 
             // capture on main thread
-            auto tcap0 = std::chrono::high_resolution_clock::now();
+            auto tcap0 = (c.timing ? std::chrono::high_resolution_clock::now() : std::chrono::high_resolution_clock::time_point{});
             bool got = cap.capture(img, crop);
-            auto tcap1 = std::chrono::high_resolution_clock::now();
-            double cap_ms = std::chrono::duration<double, std::milli>(tcap1 - tcap0).count();
+            auto tcap1 = (c.timing ? std::chrono::high_resolution_clock::now() : tcap0);
+            double cap_ms = c.timing ? std::chrono::duration<double, std::milli>(tcap1 - tcap0).count() : 0.0;
             if (!got) {
                 fl.cap_ms = cap_ms;
-                if (c.log_latency && !c.latency_on_capture_only) {
+                if (c.timing && c.log_latency && !c.latency_on_capture_only) {
                     lat.push(fl);
                 }
                 if (g_exit_req.load(std::memory_order_relaxed)) { lg::o() << lg::nl << P_I "Signal exit" << lg::endl; break; }
@@ -169,14 +162,7 @@ public:
 
             // inference on main thread
             od.detect(img, ds, c, tm);
-            det_ms_last = tm.infer_ms + tm.post_ms;
-            if (c.trk) {
-                trk.put(ds);
-                std::vector<Detection> ds_trk;
-                if (trk.get(ds_trk)) {
-                    if (!ds_trk.empty()) ds = std::move(ds_trk);
-                }
-            }
+            det_ms_last = c.timing ? (tm.infer_ms + tm.post_ms) : 0.0;
             if (c.ovl) ovl.put(ds, crop);
             fl.det_ms = det_ms_last;
 
@@ -199,41 +185,15 @@ public:
             double dt_pre = 0.0; // 按需赋值
 
             // sync control+mouse on main thread
-            auto tctl0 = std::chrono::high_resolution_clock::now();
+            auto tctl0 = (c.timing ? std::chrono::high_resolution_clock::now() : std::chrono::high_resolution_clock::time_point{});
             double ctl_cost_ms = 0.0;
             double mou_cost_ms = 0.0;
             do {
                 auto ds_copy = ds; // for pick helpers
-                Detection* target = pick_by_tid(ds_copy, cur_tid_);
-                if (!target) target = pick_target(ds_copy, c, ctr);
-                if (target && target->track_id >= 0) cur_tid_ = target->track_id;
+                Detection* target = pick_target(ds_copy, c, ctr);
 
                 if (!target) {
                     algo.reset();
-                    if (!smooth_pressed || single) { break; }
-                    if (!c.trk_pred_move) break;
-                    Detection* pred_tgt = nullptr; double min_d = std::numeric_limits<double>::infinity();
-                    for (auto& d : ds_copy) {
-                        if (!d.is_pred) continue; if (!c.is_target(d.class_id)) continue;
-                        cv::Point bc(d.box.x + d.box.width/2, d.box.y + (int)(d.box.height * c.y_anchor_ratio));
-                        double dist = std::hypot(bc.x - ctr.x, bc.y - ctr.y);
-                        if (dist < min_d) { min_d = dist; pred_tgt = &d; }
-                    }
-                    if (!pred_tgt) break;
-                    cv::Point tp(pred_tgt->box.x + pred_tgt->box.width/2,
-                                 pred_tgt->box.y + (int)(pred_tgt->box.height * c.y_anchor_ratio));
-                    double err_x = (double)(tp.x - ctr.x);
-                    double err_y = (double)(tp.y - ctr.y);
-                    dt_pre = calc_dt();
-                    auto pr = algo.step(err_x, err_y, dt_pre);
-                    double ox = pr.first;
-                    double oy = pr.second;
-                    int mx = (int)(ox * mfac);
-                    int my = (int)(oy * mfac);
-                    auto tmov0 = std::chrono::high_resolution_clock::now();
-                    if (mx || my) mouse.Move(mx, my);
-                    auto tmov1 = std::chrono::high_resolution_clock::now();
-                    mou_cost_ms = std::chrono::duration<double, std::milli>(tmov1 - tmov0).count();
                     break;
                 }
 
@@ -249,10 +209,10 @@ public:
                     double oy = pr.second;
                     int mx = (int)(ox * mfac);
                     int my = (int)(oy * mfac);
-                    auto tmov0 = std::chrono::high_resolution_clock::now();
+                    auto tmov0 = (c.timing ? std::chrono::high_resolution_clock::now() : std::chrono::high_resolution_clock::time_point{});
                     if (mx || my) mouse.Move(mx, my);
-                    auto tmov1 = std::chrono::high_resolution_clock::now();
-                    mou_cost_ms = std::chrono::duration<double, std::milli>(tmov1 - tmov0).count();
+                    auto tmov1 = (c.timing ? std::chrono::high_resolution_clock::now() : tmov0);
+                    mou_cost_ms = c.timing ? std::chrono::duration<double, std::milli>(tmov1 - tmov0).count() : 0.0;
                 }
                 if (single && target) {
                     cv::Point tp(target->box.x + target->box.width/2,
@@ -261,19 +221,18 @@ public:
                     double dy = (double)(tp.y - ctr.y);
                     int mx = (int)(dx * mfac);
                     int my = (int)(dy * mfac);
-                    auto tmov0 = std::chrono::high_resolution_clock::now();
+                    auto tmov0 = (c.timing ? std::chrono::high_resolution_clock::now() : std::chrono::high_resolution_clock::time_point{});
                     if (mx || my) mouse.Move(mx, my);
-                    auto tmov1 = std::chrono::high_resolution_clock::now();
-                    mou_cost_ms = std::chrono::duration<double, std::milli>(tmov1 - tmov0).count();
+                    auto tmov1 = (c.timing ? std::chrono::high_resolution_clock::now() : tmov0);
+                    mou_cost_ms = c.timing ? std::chrono::duration<double, std::milli>(tmov1 - tmov0).count() : 0.0;
                 }
             } while(0);
-            auto tctl1 = std::chrono::high_resolution_clock::now();
-            ctl_cost_ms = std::chrono::duration<double, std::milli>(tctl1 - tctl0).count();
+            auto tctl1 = (c.timing ? std::chrono::high_resolution_clock::now() : tctl0);
+            ctl_cost_ms = c.timing ? std::chrono::duration<double, std::milli>(tctl1 - tctl0).count() : 0.0;
 
             fl.mou_ms = mou_cost_ms;
             fl.ctl_ms = std::max(0.0, ctl_cost_ms - mou_cost_ms); // 去重：控制不含鼠标
-            if (c.trk) { fl.trk_ms = trk.take_ms(); }
-            if (c.ovl) { fl.ovl_ms = ovl.take_ms(); }
+            if (c.timing && c.ovl) { fl.ovl_ms = ovl.take_ms(); }
 
             auto loop_end_time = std::chrono::high_resolution_clock::now();
             double proc_ms = std::chrono::duration<double, std::milli>(loop_end_time - loop_start_time).count();
@@ -285,18 +244,18 @@ public:
                 tm.loop_ms = proc_ms;
             }
             // E2E≈max(loop,cap,det,io)。注意：ctl_ms 不含 mou_ms，避免重复计时
-            double loop_e2e = std::max({tm.loop_ms, fl.cap_ms, fl.det_ms, fl.mou_ms, fl.ctl_ms, fl.ovl_ms, fl.trk_ms});
+            if (c.timing) { double loop_e2e = std::max({tm.loop_ms, fl.cap_ms, fl.det_ms, fl.mou_ms, fl.ctl_ms, fl.ovl_ms});
             fl.loop_ms = loop_e2e;
-            e2e_ms_last = loop_e2e;
+            e2e_ms_last = loop_e2e; }
 
            // CSV async
-           if (c.lat_csv) { latcsv.put(fl); }
+           if (c.timing && c.lat_csv) { latcsv.put(fl); }
 
             
             // dt 按需计算（在执行算法前获取），此处仅保留统计输出
-            stats();
+            if (c.timing) stats();
 
-            if (c.log_latency) {
+            if (c.timing && c.log_latency) {
                 lat.push(fl);
                 // drop/ovr 节流
                 ++fcnt;
@@ -315,10 +274,10 @@ public:
                 }
             }
             // 主线程输出采集统计
-            cap.reporter.drain();
+            if (c.timing) cap.reporter.drain();
 
             
-            if (!tm.trt_throughput.empty()) {
+            if (c.timing && !tm.trt_throughput.empty()) {
                 lg::ml(P_T, tm.trt_throughput, tm.trt_cpu_lat, tm.trt_gpu_lat);
                 tm.trt_throughput.clear();
                 tm.trt_cpu_lat.clear();
@@ -396,11 +355,9 @@ private:
     Config c;
     ScreenCapturer cap;
     ObjDet od;
-    TrkAsync trk;
     // sync mouse+algo
     Mouse mouse;
     AimAlgo algo;
-    int cur_tid_ = -1;
     HotkeyManager hk;
     const cv::Rect crop;
     const cv::Point ctr;

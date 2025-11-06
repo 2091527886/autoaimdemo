@@ -13,6 +13,9 @@
 
 class Config {
 public:
+    // 计时总开关（关闭则尽量不做统计计时）
+    bool timing = true;
+public:
     // 计时CSV/帧号
     bool lat_csv = true;
     std::string lat_csv_path = "latency.csv";
@@ -44,7 +47,6 @@ public:
     bool     enable_affinity = true;       // 启用线程亲和
     // 每模块亲和掩码（0 表示不绑定）
     uint64_t aff_main = (1ull<<10);      // 主线程 -> CPU#10
-    uint64_t aff_trk  = (1ull<<14);      // 跟踪   -> CPU#14
     uint64_t aff_ovl  = (1ull<<15);      // 叠加   -> CPU#15
     uint64_t aff_lat  = (1ull<<10);      // CSV 写入-> CPU#10（轻量，与主线程共用）
 
@@ -142,20 +144,6 @@ public:
     int ovl_only = -1;
 
     // 跟踪
-    bool  trk = false;            // 总开关（线程）
-    bool  trk_bt = true;         // 是否启用 ByteTrack（否则直通）
-    bool  trk_kf = true;         // 是否启用 Kalman（预测/门控/状态输出）
-    float trk_th = 0.6f;         // 高阈值
-    float trk_th_lo = 0.1f;      // 低阈值
-    float trk_iou = 0.6f;        // IoU 阈值（更严格，减少错配）
-    int   trk_max_age = 30;      // 轨迹最大丢失帧数
-    int   trk_min_hits = 3;      // 确认命中次数
-    bool  trk_pred_move = true;  // 丢失时是否按预测移动（默认关闭，减少飘）
-    bool  trk_cls_match = true;  // 关联是否要求类别一致
-    double trk_maha = 9.49;      // 马氏距离门限（4DOF 95%≈9.49）
-    bool  trk_out_nms = true;    // 输出前进行轨迹级NMS
-    float trk_out_nms_iou = 0.7f; // 输出NMS IoU 阈值
-
     // 线程调度
     // 主线程
     bool mmcss_main = true;
@@ -164,10 +152,6 @@ public:
     bool enable_thread_mem_prio = false;
 
     // 模块线程（按需启用，不使用环境变量；短名、可读）
-    bool           mmcss_trk = true;           // 跟踪
-    std::wstring   mmcss_trk_task = L"Games";
-    AVRT_PRIORITY  mmcss_trk_prio = AVRT_PRIORITY_HIGH;
-
 
     bool           mmcss_ovl = true;           // 叠加绘制
     std::wstring   mmcss_ovl_task = L"Playback";
@@ -190,7 +174,6 @@ public:
     void validate() {
         v_basic();
         v_overlay();
-        v_trk();
         v_dxgi();
         // 合理范围软约束（不改 const 值，仅在此处校验）
         if (!(conf_thresh >= 0.0f && conf_thresh <= 1.0f)) {
@@ -226,16 +209,6 @@ private:
     }
 
     // 跟踪参数夹紧
-    void v_trk() {
-        trk_th     = std::clamp(trk_th, 0.0f, 1.0f);
-        trk_th_lo  = std::clamp(trk_th_lo, 0.0f, trk_th);
-        trk_iou    = std::clamp(trk_iou, 0.0f, 1.0f);
-        trk_max_age = std::max(1, trk_max_age);
-        trk_min_hits = std::max(0, trk_min_hits);
-        trk_maha = std::max(0.0, trk_maha);
-        trk_out_nms_iou = std::clamp(trk_out_nms_iou, 0.0f, 1.0f);
-    }
-
     // DXGI 范围
     void v_dxgi() {
         dxgi_max_latency = std::max(1, dxgi_max_latency);

@@ -31,7 +31,7 @@ public:
         if (!fp_) { go_.store(false, std::memory_order_relaxed); return false; }
 #endif
         // header
-        fprintf(fp_, "idx,cap_ms,det_ms,mou_ms,trk_ms,ctl_ms,ovl_ms,loop_ms\n");
+        fprintf(fp_, "idx,cap_ms,det_ms,mou_ms,ctl_ms,ovl_ms,loop_ms\n");
         if (!ev_) ev_ = CreateEventW(nullptr, FALSE, FALSE, nullptr); // auto-reset
         th_ = std::thread(&LatCsvAsync::run, this);
         return true;
@@ -47,8 +47,8 @@ public:
             if (fp_) {
                 if (cnt_ > 0) {
                     double n = static_cast<double>(cnt_);
-                    fprintf(fp_, "-1,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
-                        sum_cap_/n, sum_det_/n, sum_mou_/n, sum_trk_/n, sum_ctl_/n, sum_ovl_/n, sum_loop_/n);
+                    fprintf(fp_, "-1,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
+                        sum_cap_/n, sum_det_/n, sum_mou_/n, sum_ctl_/n, sum_ovl_/n, sum_loop_/n);
                 }
                 fflush(fp_);
                 fclose(fp_);
@@ -66,7 +66,6 @@ public:
             sum_cap_ += f.cap_ms;
             sum_det_ += f.det_ms;
             sum_mou_ += f.mou_ms;
-            sum_trk_ += f.trk_ms;
             sum_ctl_ += f.ctl_ms;
             sum_ovl_ += f.ovl_ms;
             sum_loop_ += f.loop_ms;
@@ -92,9 +91,9 @@ private:
             if (fp_) {
                 for (const auto& f : cur) {
                     // keep csv short & readable
-                    fprintf(fp_, "%llu,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
+                    fprintf(fp_, "%llu,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
                         (unsigned long long)f.idx,
-                        f.cap_ms, f.det_ms, f.mou_ms, f.trk_ms, f.ctl_ms, f.ovl_ms, f.loop_ms);
+                        f.cap_ms, f.det_ms, f.mou_ms, f.ctl_ms, f.ovl_ms, f.loop_ms);
                 }
                 fflush(fp_);
             }
@@ -102,9 +101,9 @@ private:
         // drain leftover if any (keep q_ for stop() to also flush and then print avg)
         if (fp_) {
             for (const auto& f : q_) {
-                fprintf(fp_, "%llu,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
+                fprintf(fp_, "%llu,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
                     (unsigned long long)f.idx,
-                    f.cap_ms, f.det_ms, f.mou_ms, f.trk_ms, f.ctl_ms, f.ovl_ms, f.loop_ms);
+                    f.cap_ms, f.det_ms, f.mou_ms, f.ctl_ms, f.ovl_ms, f.loop_ms);
             }
             fflush(fp_);
         }
@@ -120,6 +119,6 @@ private:
     const Config* cfg_ = nullptr;
 
     // aggregates for averages
-    double sum_cap_ = 0.0, sum_det_ = 0.0, sum_mou_ = 0.0, sum_trk_ = 0.0, sum_ctl_ = 0.0, sum_ovl_ = 0.0, sum_loop_ = 0.0;
+    double sum_cap_ = 0.0, sum_det_ = 0.0, sum_mou_ = 0.0, sum_ctl_ = 0.0, sum_ovl_ = 0.0, sum_loop_ = 0.0;
     unsigned long long cnt_ = 0;
 };

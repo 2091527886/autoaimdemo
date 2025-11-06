@@ -25,7 +25,6 @@ struct FrameLat {
     double cap_ms = 0.0;
     double det_ms  = 0.0;
     double mou_ms   = 0.0;
-    double trk_ms   = 0.0;
     double ctl_ms   = 0.0;
     double ovl_ms   = 0.0;
     double loop_ms    = 0.0;
@@ -50,7 +49,6 @@ private:
         auto [cap_avg, cap_min, cap_max] = stat([](const FrameLat& f){ return f.cap_ms; });
         auto [det_avg, det_min, det_max] = stat([](const FrameLat& f){ return f.det_ms;  });
         auto [mou_avg, mou_min, mou_max] = stat([](const FrameLat& f){ return f.mou_ms;   });
-        auto [trk_avg, trk_min, trk_max] = stat([](const FrameLat& f){ return f.trk_ms;   });
         auto [ctl_avg, ctl_min, ctl_max] = stat([](const FrameLat& f){ return f.ctl_ms;   });
         auto [ovl_avg, ovl_min, ovl_max] = stat([](const FrameLat& f){ return f.ovl_ms;   });
         auto [loo_avg, loo_min, loo_max] = stat([](const FrameLat& f){ return f.loop_ms;    });
@@ -60,7 +58,7 @@ private:
                   << " | cap " << cap_avg << "/" << cap_min << "/" << cap_max
                   << " | det " << det_avg << "/" << det_min << "/" << det_max
                   << " | mou " << mou_avg << "/" << mou_min << "/" << mou_max
-                  << " | trk " << trk_avg << "/" << trk_min << "/" << trk_max
+ 
                   << " | ctl " << ctl_avg << "/" << ctl_min << "/" << ctl_max
                   << " | ovl " << ovl_avg << "/" << ovl_min << "/" << ovl_max
                   << " | loop " << loo_avg << "/" << loo_min << "/" << loo_max

@@ -85,10 +85,6 @@ void OvlAsync::run() {
             }
             auto col = ARGB((uint8_t)c.ovl_a,(uint8_t)rr,(uint8_t)gg,(uint8_t)bb);
             gover.AddRect({x,y,w,h}, col, (float)c.ovl_thick);
-            if (d.track_id >= 0) {
-                std::wstring txt = L"#" + std::to_wstring(d.track_id);
-                gover.AddText(x, std::max(0.0f, y - 12.0f), txt, 14.0f, ARGB(255,255,255,255));
-            }
         }
         gover.EndFrame();
         auto t1 = std::chrono::high_resolution_clock::now();

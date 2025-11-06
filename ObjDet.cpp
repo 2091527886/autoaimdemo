@@ -67,36 +67,58 @@ void ObjDet::detect(const cv::Mat& img,
                             Timing& tm)
 {
     out.clear();
-    auto t0 = std::chrono::high_resolution_clock::now();
 
-    trtyolo::Image input(const_cast<unsigned char*>(img.data), img.cols, img.rows, static_cast<size_t>(img.step));
-    trtyolo::DetectRes res = model_->predict(input);
+    if (cfg.timing) {
+        auto t0 = std::chrono::high_resolution_clock::now();
+        trtyolo::Image input(const_cast<unsigned char*>(img.data), img.cols, img.rows, static_cast<size_t>(img.step));
+        trtyolo::DetectRes res = model_->predict(input);
+        auto t1 = std::chrono::high_resolution_clock::now();
+        tm.infer_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+        auto t2 = std::chrono::high_resolution_clock::now();
 
-    auto t1 = std::chrono::high_resolution_clock::now();
-    tm.infer_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
-    auto t2 = std::chrono::high_resolution_clock::now();
-
-    if (res.num > 0 && res.boxes.size() == static_cast<size_t>(res.num)) {
-        for (int i = 0; i < res.num; ++i) {
-            float score = (i < (int)res.scores.size() ? res.scores[i] : 0.0f);
-            if (score < cfg.conf_thresh) continue;
-            int cls = (i < (int)res.classes.size() ? res.classes[i] : -1);
-            const auto& b = res.boxes[i];
-            int x = std::max(0, static_cast<int>(std::floor(b.left)));
-            int y = std::max(0, static_cast<int>(std::floor(b.top)));
-            int w = std::max(0, static_cast<int>(std::round(b.right - b.left)));
-            int h = std::max(0, static_cast<int>(std::round(b.bottom - b.top)));
-            w = std::min(w, img.cols - x);
-            h = std::min(h, img.rows - y);
-            if (w > 0 && h > 0)
-                out.emplace_back(Detection{ cv::Rect(x, y, w, h), score, cls });
+        if (res.num > 0 && res.boxes.size() == static_cast<size_t>(res.num)) {
+            for (int i = 0; i < res.num; ++i) {
+                float score = (i < (int)res.scores.size() ? res.scores[i] : 0.0f);
+                if (score < cfg.conf_thresh) continue;
+                int cls = (i < (int)res.classes.size() ? res.classes[i] : -1);
+                const auto& b = res.boxes[i];
+                int x = std::max(0, static_cast<int>(std::floor(b.left)));
+                int y = std::max(0, static_cast<int>(std::floor(b.top)));
+                int w = std::max(0, static_cast<int>(std::round(b.right - b.left)));
+                int h = std::max(0, static_cast<int>(std::round(b.bottom - b.top)));
+                w = std::min(w, img.cols - x);
+                h = std::min(h, img.rows - y);
+                if (w > 0 && h > 0)
+                    out.emplace_back(Detection{ cv::Rect(x, y, w, h), score, cls });
+            }
         }
+
+        auto t3 = std::chrono::high_resolution_clock::now();
+        tm.post_ms = std::chrono::duration<double, std::milli>(t3 - t2).count();
+    } else {
+        trtyolo::Image input(const_cast<unsigned char*>(img.data), img.cols, img.rows, static_cast<size_t>(img.step));
+        trtyolo::DetectRes res = model_->predict(input);
+        if (res.num > 0 && res.boxes.size() == static_cast<size_t>(res.num)) {
+            for (int i = 0; i < res.num; ++i) {
+                float score = (i < (int)res.scores.size() ? res.scores[i] : 0.0f);
+                if (score < cfg.conf_thresh) continue;
+                int cls = (i < (int)res.classes.size() ? res.classes[i] : -1);
+                const auto& b = res.boxes[i];
+                int x = std::max(0, static_cast<int>(std::floor(b.left)));
+                int y = std::max(0, static_cast<int>(std::floor(b.top)));
+                int w = std::max(0, static_cast<int>(std::round(b.right - b.left)));
+                int h = std::max(0, static_cast<int>(std::round(b.bottom - b.top)));
+                w = std::min(w, img.cols - x);
+                h = std::min(h, img.rows - y);
+                if (w > 0 && h > 0)
+                    out.emplace_back(Detection{ cv::Rect(x, y, w, h), score, cls });
+            }
+        }
+        tm.infer_ms = 0.0;
+        tm.post_ms = 0.0;
     }
 
-    auto t3 = std::chrono::high_resolution_clock::now();
-    tm.post_ms = std::chrono::duration<double, std::milli>(t3 - t2).count();
-
-    if (cfg.perf_report && perf_.ShouldReport()) {
+    if (cfg.timing && cfg.perf_report && perf_.ShouldReport()) {
         auto report = model_->performanceReport();
         const std::string& tp = std::get<0>(report);
         if (!tp.empty()) {
