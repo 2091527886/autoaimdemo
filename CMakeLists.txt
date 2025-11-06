@@ -61,8 +61,6 @@ add_executable(aimassistant
   TrkAsync.cpp
   Game_overlay.cpp
   OvlAsync.cpp
-  LatCsvAsync.cpp
-  PropAlgo.cpp
   AimAlgo.hpp
 )
 

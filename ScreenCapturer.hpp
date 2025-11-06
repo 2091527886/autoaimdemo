@@ -23,10 +23,6 @@ public:
     int w() const { return width; }
     int h() const { return height; }
 
-    // expose backend mode and WGC frame event (read-only)
-    bool is_wgc() const { return useWgc; }
-    HANDLE hev() const { return fev; }
-
 private:
     bool serveCache(cv::Mat& dst);
     void reportTimes(double t_acquire_ms, double t_qi_ms, double t_copy_ms,
