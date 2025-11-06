@@ -145,13 +145,6 @@ public:
     // 仅显示某一类（-1 显示全部；>=0 仅该 class_id）
     int ovl_only = -1;
 
-    // Overlay 动画
-    bool      overlay_anim = false;
-    long long overlay_interval_100ns = 110; // 定时器间隔（100ns）
-    long long overlay_spin_us = 2;          // 自旋补偿（us）
-    int       overlay_px = 2;               // 像素大小
-    int       overlay_x = 0, overlay_y = 0; // 位置
-
     // 跟踪
     bool  trk = false;            // 总开关（线程）
     bool  trk_bt = true;         // 是否启用 ByteTrack（否则直通）
@@ -232,9 +225,6 @@ private:
         capture_timing_every_n = std::max(1, capture_timing_every_n);
         perf_report_every_n = std::max(1, perf_report_every_n);
         opt_report_every_n = std::max(1, opt_report_every_n);
-        overlay_interval_100ns = std::max(1ll, overlay_interval_100ns);
-        overlay_spin_us = std::max(0ll, overlay_spin_us);
-        overlay_px = std::max(1, overlay_px);
         // 捕获后端
         cap = (cap==1)?1:0;
         cap_out = std::max(0, cap_out);

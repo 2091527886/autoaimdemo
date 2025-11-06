@@ -25,7 +25,6 @@ extern std::atomic<bool> g_exit_done;
 
 
 
-#include "OverlayAnimator.hpp"
 #include "Mouse.hpp"
 #include "AimAlgo.hpp"
 #include "HotkeyManager.hpp"
@@ -475,7 +474,6 @@ int main() {
 
     Config boot_cfg;
     boot_cfg.validate();
-    OverlayAnim overlay;
     // prio/MMCSS/overlay setup
     disablePowerThrottle();
     
@@ -492,13 +490,8 @@ int main() {
        SetProcPrioBoostDisabled();
    }
 
-    // overlay anim if enabled
-    if (boot_cfg.overlay_anim) {
-        overlay.start(boot_cfg);
-        metrics::SystemBootReporting::PrintOverlayBanner(boot_cfg, true);
-    } else {
-        metrics::SystemBootReporting::PrintOverlayBanner(boot_cfg, false);
-    }
+    // overlay (Game overlay) banner based on ovl flag
+    metrics::SystemBootReporting::PrintOverlayBanner(boot_cfg, boot_cfg.ovl);
 
     metrics::SystemBootReporting::PrintSchedulingBanner(boot_cfg, hMmcss);
 
@@ -514,7 +507,6 @@ int main() {
         return -1;
     }
     lg::o() << lg::nl << P_I "Done" << lg::endl;
-    overlay.stop();
     // MMCSS disabled; no revert needed
     g_exit_done.store(true, std::memory_order_relaxed);
     return 0;

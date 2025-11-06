@@ -51,7 +51,6 @@ endif()
 # 2) 可执行目标
 add_executable(aimassistant
   main.cpp
-  OverlayAnimator.cpp
   Mouse.cpp
   SystemTuner.cpp
   ObjDet.cpp

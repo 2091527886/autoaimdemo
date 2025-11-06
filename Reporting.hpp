@@ -136,10 +136,10 @@ struct SystemBootReporting {
     static void PrintOverlayBanner(const Config& cfg, bool started) {
         if (!cfg.opt_report || !cfg.opt_report_system) return;
         if (started) {
-            lg::o() << P_B "Overlay=ON (px=" << cfg.overlay_px
-                      << ", int=" << cfg.overlay_interval_100ns << "x100ns, spin="
-                      << cfg.overlay_spin_us << "us, pos="
-                      << cfg.overlay_x << "," << cfg.overlay_y << ")" << lg::endl;
+            lg::o() << P_B "Overlay=ON (fps=" << cfg.ovl_fps
+                      << ", a=" << cfg.ovl_a
+                      << ", rgb=" << cfg.ovl_r << "," << cfg.ovl_g << "," << cfg.ovl_b
+                      << ", th=" << cfg.ovl_thick << ")" << lg::endl;
         } else {
             lg::o() << P_B "Overlay=OFF" << lg::endl;
         }
