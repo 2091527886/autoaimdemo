@@ -68,13 +68,13 @@ public:
     // 瞄准/视角
     const double y_anchor_ratio = 0.6;      // 目标Y锚定比例
     const double px_per_360     = 3600;     // 每360°所需鼠标计数（由脚本计算，CS=1、PF=1、Aim=1，base≈0.1）
-    const double hfov_deg       = 106.639128;     // 水平FOV（垂直80°、1920x1200 -> 水平≈106.639128°）
+    const double hfov_deg       = 85.461056;     // 水平FOV（垂直60°、1920x1200 -> 水平≈85.461056°）
 
     // PID
-    const double pid_kp_x = 0.54;
+    const double pid_kp_x = 0.14;
     const double pid_ki_x = 0.001;
     const double pid_kd_x = 0.00600;
-    const double pid_kp_y = 0.54;
+    const double pid_kp_y = 0.14;
     const double pid_ki_y = 0.001;
     const double pid_kd_y = 0.00600;
     const double pid_output_limit   = 400.0; // 每帧像素输出限幅
