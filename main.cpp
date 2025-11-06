@@ -30,7 +30,7 @@ extern std::atomic<bool> g_exit_done;
 #include "HotkeyManager.hpp"
 #include "ScreenCapturer.hpp"
 #include "CapAsync.hpp"
-#include "DetAsync.hpp"
+#include "ObjDet.hpp"
 #include "TrkAsync.hpp"
 #include "OvlAsync.hpp"
 #include "LatCsvAsync.hpp"
@@ -105,7 +105,7 @@ public:
     Aim()
         : c(),
         cap(c),
-        det(c),
+        od(c),
         trk(c),
         hk(c),
         crop((cap.w() - c.crop_size_px) / 2, (cap.h() - c.crop_size_px) / 2, c.crop_size_px, c.crop_size_px),
@@ -129,7 +129,7 @@ public:
         lg::o() << "Detect center " << c.crop_size_px << "x" << c.crop_size_px << lg::endl;
         cap.set_roi(crop);
         cap.start();
-        det.start();
+        /* inference on main thread: no det.start() */
         if (c.trk) trk.start();
         // init AimAlgo (PropAlgo-based)
         algo.setConfig(c);
@@ -140,7 +140,7 @@ public:
     ~Aim() {
         if (c.lat_csv) latcsv.stop();
         cap.stop();
-        det.stop();
+        /* inference on main thread: no det.stop() */
         if (c.trk) trk.stop();
         if (c.ovl) ovl.stop();
         if (vis) cv::destroyAllWindows();
@@ -174,25 +174,18 @@ public:
             c.frame_idx++; fl.idx = c.frame_idx;
             fl.cap_ms = cap.last_ms();
 
-            
-            det.put(img);
-            std::vector<Detection> ds_new;
-            Timing tm_new;
-            bool has_new = det.get(ds_new, tm_new);
-            if (has_new) {
-                ds = std::move(ds_new);
-                tm = tm_new; // 覆盖检测阶段计时
-                det_ms_last = tm.infer_ms + tm.post_ms;
-                if (c.trk) {
-                    trk.put(ds);
-                    std::vector<Detection> ds_trk;
-                    if (trk.get(ds_trk)) {
-                        if (!ds_trk.empty()) ds = std::move(ds_trk); // only replace when tracker has confirmed outputs
-                    }
+            // inference on main thread
+            od.detect(img, ds, c, tm);
+            det_ms_last = tm.infer_ms + tm.post_ms;
+            if (c.trk) {
+                trk.put(ds);
+                std::vector<Detection> ds_trk;
+                if (trk.get(ds_trk)) {
+                    if (!ds_trk.empty()) ds = std::move(ds_trk);
                 }
-                if (c.ovl) ovl.put(ds, crop);
             }
-            fl.det_ms = has_new ? det_ms_last : 0.0;
+            if (c.ovl) ovl.put(ds, crop);
+            fl.det_ms = det_ms_last;
 
             
             
@@ -409,7 +402,7 @@ private:
 
     Config c;
     CapAsync cap;
-    DetAsync det;
+    ObjDet od;
     TrkAsync trk;
     // sync mouse+algo
     Mouse mouse;

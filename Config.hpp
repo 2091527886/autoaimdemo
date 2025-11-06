@@ -47,7 +47,6 @@ public:
     // 每模块亲和掩码（0 表示不绑定）
     uint64_t aff_main = (1ull<<10);      // 主线程 -> CPU#10
     uint64_t aff_cap  = (1ull<<11);      // 捕获   -> CPU#11
-    uint64_t aff_det  = (1ull<<12) | (1ull<<13); // 检测 -> CPU#12-13（较重）
     uint64_t aff_trk  = (1ull<<14);      // 跟踪   -> CPU#14
     uint64_t aff_ovl  = (1ull<<15);      // 叠加   -> CPU#15
     uint64_t aff_lat  = (1ull<<10);      // CSV 写入-> CPU#10（轻量，与主线程共用）
@@ -171,10 +170,6 @@ public:
     bool           mmcss_cap = true;           // 捕获
     std::wstring   mmcss_cap_task = L"Capture";
     AVRT_PRIORITY  mmcss_cap_prio = AVRT_PRIORITY_HIGH;
-
-    bool           mmcss_det = true;           // 检测
-    std::wstring   mmcss_det_task = L"Games";
-    AVRT_PRIORITY  mmcss_det_prio = AVRT_PRIORITY_NORMAL;
 
     bool           mmcss_trk = true;           // 跟踪
     std::wstring   mmcss_trk_task = L"Games";
