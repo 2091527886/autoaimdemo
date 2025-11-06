@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <utility>
 #include <sstream>
 #include <thread>
 #include <atomic>
@@ -34,16 +35,23 @@ extern std::atomic<bool> g_exit_done;
 
 
 // helpers
-static Detection* pick_target(std::vector<Detection>& ds, const Config& c, const cv::Point& ctr) {
+static Detection* pick_target(const std::vector<Detection>& ds, const Config& c, const cv::Point& ctr) {
     Detection* target = nullptr;
     double min_dist_to_center = std::numeric_limits<double>::infinity();
-    for (auto& det : ds) {
+    for (const auto& det : ds) {
         if (!c.is_target(det.class_id)) continue;
         cv::Point box_center(det.box.x + det.box.width / 2, det.box.y + det.box.height / 2);
         double dist = std::hypot(box_center.x - ctr.x, box_center.y - ctr.y);
-        if (dist < min_dist_to_center) { min_dist_to_center = dist; target = &det; }
+        if (dist < min_dist_to_center) { min_dist_to_center = dist; target = const_cast<Detection*>(&det); }
     }
     return target;
+}
+
+// 计算目标相对中心的误差（像素）。y 使用 y_anchor_ratio。
+static inline std::pair<double,double> calc_err(const Detection& d, const Config& c, const cv::Point& ctr) {
+    cv::Point tp(d.box.x + d.box.width/2,
+                 d.box.y + static_cast<int>(d.box.height * c.y_anchor_ratio));
+    return { double(tp.x - ctr.x), double(tp.y - ctr.y) };
 }
 
 class Aim {
@@ -118,23 +126,28 @@ public:
 
     void loop() {
         while (true) {
-            if (g_exit_req.load(std::memory_order_relaxed)) { lg::o() << lg::nl << P_I "Signal exit" << lg::endl; break; }
+            if (g_exit_req.load(std::memory_order_relaxed)) { break; }
             // no event pacing; capture on main thread
             auto loop_start_time = std::chrono::high_resolution_clock::now();
 
             FrameLat fl;
 
             // capture on main thread
-            auto tcap0 = (c.timing ? std::chrono::high_resolution_clock::now() : std::chrono::high_resolution_clock::time_point{});
-            bool got = cap.capture(img, crop);
-            auto tcap1 = (c.timing ? std::chrono::high_resolution_clock::now() : tcap0);
-            double cap_ms = c.timing ? std::chrono::duration<double, std::milli>(tcap1 - tcap0).count() : 0.0;
+            double cap_ms = 0.0;
+            bool got = false;
+            if (c.timing) {
+                auto tcap0 = std::chrono::high_resolution_clock::now();
+                got = cap.capture(img, crop);
+                auto tcap1 = std::chrono::high_resolution_clock::now();
+                cap_ms = std::chrono::duration<double, std::milli>(tcap1 - tcap0).count();
+            } else {
+                got = cap.capture(img, crop);
+            }
             if (!got) {
                 fl.cap_ms = cap_ms;
                 if (c.timing && c.log_latency && !c.latency_on_capture_only) {
                     lat.push(fl);
                 }
-                if (g_exit_req.load(std::memory_order_relaxed)) { lg::o() << lg::nl << P_I "Signal exit" << lg::endl; break; }
                 continue;
             }
             c.frame_idx++; fl.idx = c.frame_idx;
@@ -162,51 +175,38 @@ public:
                     return std::max(0.001, 16.0 / 1000.0);
                 }
             };
-            double dt_pre = 0.0; // 按需赋值
 
             // sync control+mouse on main thread
             auto tctl0 = (c.timing ? std::chrono::high_resolution_clock::now() : std::chrono::high_resolution_clock::time_point{});
             double ctl_cost_ms = 0.0;
             double mou_cost_ms = 0.0;
-            do {
-                auto ds_copy = ds; // for pick helpers
-                Detection* target = pick_target(ds_copy, c, ctr);
+            {
+                Detection* target = pick_target(ds, c, ctr);
+                if (!target) { algo.reset(); }
+                else {
+                    if (!smooth_pressed) { algo.reset(); }
 
-                if (!target) {
-                    algo.reset();
-                    break;
-                }
+                    int mx = 0, my = 0;
+                    if (single) {
+                        auto [dx, dy] = calc_err(*target, c, ctr);
+                        mx = (int)(dx * mfac);
+                        my = (int)(dy * mfac);
+                    } else if (smooth_pressed) {
+                        auto [ex, ey] = calc_err(*target, c, ctr);
+                        double dt = calc_dt();
+                        auto pr = algo.step(ex, ey, dt);
+                        mx = (int)(pr.first  * mfac);
+                        my = (int)(pr.second * mfac);
+                    }
 
-                if (!smooth_pressed) { algo.reset(); }
-                if (smooth_pressed && target && !single) {
-                    cv::Point tp(target->box.x + target->box.width/2,
-                                 target->box.y + (int)(target->box.height * c.y_anchor_ratio));
-                    double err_x = (double)(tp.x - ctr.x);
-                    double err_y = (double)(tp.y - ctr.y);
-                    dt_pre = calc_dt();
-                    auto pr = algo.step(err_x, err_y, dt_pre);
-                    double ox = pr.first;
-                    double oy = pr.second;
-                    int mx = (int)(ox * mfac);
-                    int my = (int)(oy * mfac);
-                    auto tmov0 = (c.timing ? std::chrono::high_resolution_clock::now() : std::chrono::high_resolution_clock::time_point{});
-                    if (mx || my) mouse.Move(mx, my);
-                    auto tmov1 = (c.timing ? std::chrono::high_resolution_clock::now() : tmov0);
-                    mou_cost_ms = c.timing ? std::chrono::duration<double, std::milli>(tmov1 - tmov0).count() : 0.0;
+                    if (mx || my) {
+                        auto tmov0 = (c.timing ? std::chrono::high_resolution_clock::now() : std::chrono::high_resolution_clock::time_point{});
+                        mouse.Move(mx, my);
+                        auto tmov1 = (c.timing ? std::chrono::high_resolution_clock::now() : tmov0);
+                        mou_cost_ms = c.timing ? std::chrono::duration<double, std::milli>(tmov1 - tmov0).count() : 0.0;
+                    }
                 }
-                if (single && target) {
-                    cv::Point tp(target->box.x + target->box.width/2,
-                                 target->box.y + (int)(target->box.height * c.y_anchor_ratio));
-                    double dx = (double)(tp.x - ctr.x);
-                    double dy = (double)(tp.y - ctr.y);
-                    int mx = (int)(dx * mfac);
-                    int my = (int)(dy * mfac);
-                    auto tmov0 = (c.timing ? std::chrono::high_resolution_clock::now() : std::chrono::high_resolution_clock::time_point{});
-                    if (mx || my) mouse.Move(mx, my);
-                    auto tmov1 = (c.timing ? std::chrono::high_resolution_clock::now() : tmov0);
-                    mou_cost_ms = c.timing ? std::chrono::duration<double, std::milli>(tmov1 - tmov0).count() : 0.0;
-                }
-            } while(0);
+            }
             auto tctl1 = (c.timing ? std::chrono::high_resolution_clock::now() : tctl0);
             ctl_cost_ms = c.timing ? std::chrono::duration<double, std::milli>(tctl1 - tctl0).count() : 0.0;
 
@@ -218,8 +218,7 @@ public:
             double proc_ms = std::chrono::duration<double, std::milli>(loop_end_time - loop_start_time).count();
             if (c.fps_lock) {
                 // FPS 锁基于主循环真实耗时，避免被其他线程阶段统计值放大而误限速
-                double frame_ms = fc.end();
-                tm.loop_ms = frame_ms;
+                tm.loop_ms = fc.end();
             } else {
                 tm.loop_ms = proc_ms;
             }
@@ -265,8 +264,8 @@ public:
             if (vis) {
                 draw();
             }
-            if (g_exit_req.load(std::memory_order_relaxed)) { lg::o() << lg::nl << P_I "Signal exit" << lg::endl; break; }
             char key = static_cast<char>(cv::waitKey(1));
+            if (g_exit_req.load(std::memory_order_relaxed)) { break; }
             if (key == 27) { // ESC
                 lg::o() << lg::nl << P_I "ESC, exit" << lg::endl;
                 break;
