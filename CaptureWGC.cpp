@@ -42,7 +42,6 @@ struct ScreenCapturer::WgcCtx {
     winrt::Windows::Graphics::Capture::GraphicsCaptureItem item{ nullptr };
     winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool pool{ nullptr };
     winrt::Windows::Graphics::Capture::GraphicsCaptureSession sess{ nullptr };
-    winrt::event_token tok{};
 };
 
 
@@ -77,23 +76,12 @@ bool ScreenCapturer::init_wgc() {
     wgc->sess.IsCursorCaptureEnabled(cfg.cap_cursor);
     wgc->sess.IsBorderRequired(cfg.cap_border);
 
-    // Create auto-reset frame event
-    if (!fev) fev = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-
-    // Subscribe FrameArrived -> SetEvent(fev)
-    wgc->tok = wgc->pool.FrameArrived([this](auto&&, auto&&){
-        if (fev) SetEvent(fev);
-    });
-
     wgc->sess.StartCapture();
     return true;
 }
 
 void ScreenCapturer::rel_wgc() {
     if (wgc) {
-        if (wgc->pool && wgc->tok.value) {
-            wgc->pool.FrameArrived(wgc->tok);
-        }
         // session/pool will be released with wgc destruction
         delete wgc; wgc = nullptr;
     }
@@ -109,15 +97,12 @@ bool ScreenCapturer::cap_wgc(cv::Mat& frame, const cv::Rect& crop_region) {
     auto frm = wgc->pool.TryGetNextFrame(); // timeout controlled via event pacing (1ms)
     auto t_acq_e = do_tim ? clock::now() : t_acq_s;
     if (do_tim) t_acquire_ms = std::chrono::duration<double, std::milli>(t_acq_e - t_acq_s).count();
-    // For WGC, treat second field as 'wa' (wait for frame event) - async collector removed; main-thread mode
-    double t_wait_ms = get_wait_ms();
 
     if (!frm) {
         bool served = serveCache(frame);
         if (!served && do_tim && !cfg.capture_timing_on_success) {
             t_total_ms = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
-            // Map to WGC labels: gf=t_acquire_ms, wa=t_wait_ms
-            reportTimes(t_acquire_ms, t_wait_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+            reportTimes(t_acquire_ms, 0.0, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
         }
         return served;
     }
@@ -142,7 +127,7 @@ bool ScreenCapturer::cap_wgc(cv::Mat& frame, const cv::Rect& crop_region) {
     BOOL copy_done = FALSE;
     HRESULT qhr = ctx->GetData(copyQ[prev], &copy_done, sizeof(copy_done), 0);
     if (qhr != S_OK || !copy_done) {
-        ++statEvtWait;
+        ++statCopyPend;
         bool served = serveCache(frame);
         if (served) ++statCacheRe;
         t_total_ms = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
@@ -204,7 +189,7 @@ bool ScreenCapturer::cap_wgc(cv::Mat& frame, const cv::Rect& crop_region) {
 
     double t_total_ms_loc = do_tim ? std::chrono::duration<double, std::milli>(t_unmap_e - t_total_start).count() : 0.0;
     idx++;
-    if (do_tim) reportTimes(t_acquire_ms, t_wait_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms_loc); // gf, wa, cp, mp, cv, up, tt
+    if (do_tim) reportTimes(t_acquire_ms, 0.0, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms_loc);
     ++statOk;
     dbgTick();
     return true;

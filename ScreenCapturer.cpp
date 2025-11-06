@@ -94,7 +94,6 @@ ScreenCapturer::~ScreenCapturer() {
     if (useWgc) {
         rel_wgc();
     }
-    if (fev) { CloseHandle(fev); fev = nullptr; }
     SafeRelease(&dup);
     SafeRelease(&out1);
     SafeRelease(&out);
@@ -111,7 +110,7 @@ void ScreenCapturer::dbgTick() {
     int m = std::max(1, cfg.capture_debug_every_n);
     if (n % static_cast<size_t>(m) == 0) {
         lg::o() << P_C "dbg ds=" << statSkipDirty
-                << " ew=" << statEvtWait
+                << " ew=" << statCopyPend
                 << " sd=" << statStillDraw
                 << " cr=" << statCacheRe
                 << " ok=" << statOk << lg::endl;
@@ -143,6 +142,6 @@ void ScreenCapturer::reportTimes(double t_acquire_ms, double t_qi_ms, double t_c
                                     double t_map_ms, double t_cvt_ms, double t_unmap_ms, double t_total_ms) {
     reporter.ReportStepTimings(
         t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms,
-        statSkipDirty, statEvtWait, statStillDraw, statCacheRe, statOk
+        statSkipDirty, statCopyPend, statStillDraw, statCacheRe, statOk
     );
 }

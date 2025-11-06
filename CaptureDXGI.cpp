@@ -131,7 +131,7 @@ bool ScreenCapturer::cap_dxgi(cv::Mat& frame, const cv::Rect& crop_region) {
     BOOL copy_done = FALSE;
     HRESULT qhr = ctx->GetData(copyQ[prev], &copy_done, sizeof(copy_done), 0);
     if (qhr != S_OK || !copy_done) {
-        ++statEvtWait;
+        ++statCopyPend;
         bool served = serveCache(frame);
         if (served) ++statCacheRe;
         tt = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();

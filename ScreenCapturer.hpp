@@ -37,9 +37,6 @@ private:
     void rel_wgc();
 
 public:
-    // WGC wait accounting (no external setter needed in main-thread mode)
-    void set_wait_ms(double ms) { last_wait_ms_.store(ms, std::memory_order_relaxed); }
-    double get_wait_ms() const { return last_wait_ms_.load(std::memory_order_relaxed); }
 
 private:
     const Config& cfg;
@@ -51,7 +48,7 @@ private:
     cv::Mat cache;
 
     size_t statSkipDirty = 0;
-    size_t statEvtWait = 0;
+    size_t statCopyPend = 0;
     size_t statStillDraw = 0;
     size_t statCacheRe = 0;
     size_t statOk = 0;
@@ -71,12 +68,9 @@ private:
     struct WgcCtx;
     WgcCtx* wgc = nullptr;
     bool useWgc = false;
-    HANDLE fev = nullptr; // WGC frame event (auto-reset)
 
     int width = 0;
     int height = 0;
 
-    // last WGC wait time (ms)
-    std::atomic<double> last_wait_ms_{0.0};
 };
 
