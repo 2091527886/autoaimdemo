@@ -17,8 +17,6 @@ public:
     bool timing = true;
 public:
     // 计时CSV/帧号
-    bool lat_csv = true;
-    std::string lat_csv_path = "latency.csv";
     unsigned long long frame_idx = 0;
     // 基础/日志
     bool log_init_verbose = true;           // 初始化阶段日志
@@ -46,8 +44,6 @@ public:
     // 每模块亲和掩码（0 表示不绑定）
     uint64_t aff_main = (1ull<<10);      // 主线程 -> CPU#10
     uint64_t aff_ovl  = (1ull<<15);      // 叠加   -> CPU#15
-    uint64_t aff_lat  = (1ull<<10);      // CSV 写入-> CPU#10（轻量，与主线程共用）
-
 public:
     // 引擎/路径
     std::string engine_path = "m.engine";

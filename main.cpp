@@ -31,8 +31,6 @@ extern std::atomic<bool> g_exit_done;
 #include "ScreenCapturer.hpp"
 #include "ObjDet.hpp"
 #include "OvlAsync.hpp"
-#include "LatCsvAsync.hpp"
-
 
 
 // helpers
@@ -90,10 +88,8 @@ public:
         vis(c.enable_visual),
         lat(static_cast<size_t>(std::max(1, c.log_latency_every_n))),
         fc(c),
-        ovl(c),
-        latcsv(c)
+        ovl(c)
     {
-        if (c.timing && c.lat_csv) latcsv.start(c.lat_csv_path);
 
         if (cap.w() < c.crop_size_px || cap.h() < c.crop_size_px) {
             throw std::runtime_error("Screen resolution is smaller than configured crop_size_px.");
@@ -114,7 +110,6 @@ public:
     }
 
     ~Aim() {
-        if (c.timing && c.lat_csv) latcsv.stop();
         /* inference on main thread: no det.stop() */
         
         if (c.ovl) ovl.stop();
@@ -234,8 +229,6 @@ public:
             e2e_ms_last = loop_e2e; }
 
            // CSV async
-           if (c.timing && c.lat_csv) { latcsv.put(fl); }
-
             
             // dt 按需计算（在执行算法前获取），此处仅保留统计输出
             if (c.timing) stats();
@@ -369,8 +362,6 @@ private:
 
     OvlAsync ovl;
 
-    // CSV
-    LatCsvAsync latcsv;
 };
 
 
@@ -386,7 +377,7 @@ static BOOL WINAPI CtrlHandler(DWORD type) {
     case CTRL_LOGOFF_EVENT:
     case CTRL_SHUTDOWN_EVENT:
         g_exit_req.store(true, std::memory_order_relaxed);
-        // wait up to ~2s for graceful exit (CSV flush)
+        // wait up to ~2s for graceful exit
         for (int i = 0; i < 200; ++i) { // ~2s
             if (g_exit_done.load(std::memory_order_relaxed)) return TRUE;
             Sleep(10);
