@@ -53,7 +53,6 @@ add_executable(aimassistant
   main.cpp
   OverlayAnimator.cpp
   Mouse.cpp
-  PidController.cpp
   SystemTuner.cpp
   ObjDet.cpp
   ScreenCapturer.cpp
@@ -67,6 +66,7 @@ add_executable(aimassistant
   OvlAsync.cpp
   LatCsvAsync.cpp
   PropAlgo.cpp
+  AimAlgo.hpp
 )
 
 # 启用 Release 高优化/LTO/AVX

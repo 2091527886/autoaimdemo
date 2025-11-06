@@ -27,8 +27,7 @@ extern std::atomic<bool> g_exit_done;
 
 #include "OverlayAnimator.hpp"
 #include "Mouse.hpp"
-#include "PidController.hpp"
-#include "PropAlgo.hpp"
+#include "AimAlgo.hpp"
 #include "HotkeyManager.hpp"
 #include "ScreenCapturer.hpp"
 #include "CapAsync.hpp"
@@ -133,24 +132,8 @@ public:
         cap.start();
         det.start();
         if (c.trk) trk.start();
-        // init PID
-        px.setK(c.pid_kp_x, c.pid_ki_x, c.pid_kd_x);
-        px.setLim(c.pid_output_limit, c.pid_integral_limit);
-        px.setDtClamp(c.pid_dt_clamp, c.pid_dt_min_ms, c.pid_dt_max_ms);
-        px.setAntiWindupFreeze(c.pid_aw_freeze);
-        py.setK(c.pid_kp_y, c.pid_ki_y, c.pid_kd_y);
-        py.setLim(c.pid_output_limit, c.pid_integral_limit);
-        py.setDtClamp(c.pid_dt_clamp, c.pid_dt_min_ms, c.pid_dt_max_ms);
-        py.setAntiWindupFreeze(c.pid_aw_freeze);
-        // init PropAlgo
-        prop_x.setK(c.prop_k_x);
-        prop_x.setLim(c.prop_out_limit);
-        prop_x.setTc(c.prop_tc_ms);
-        prop_x.setDz(c.prop_dead_px);
-        prop_y.setK(c.prop_k_y);
-        prop_y.setLim(c.prop_out_limit);
-        prop_y.setTc(c.prop_tc_ms);
-        prop_y.setDz(c.prop_dead_px);
+        // init AimAlgo (PropAlgo-based)
+        algo.setConfig(c);
         if (c.ovl) { lg::o() << P_B "Overlay=ON" << lg::endl; ovl.start(); }
         else { lg::o() << P_B "Overlay=OFF" << lg::endl; }
     }
@@ -217,30 +200,18 @@ public:
             bool smooth_pressed = hk.SmoothPressed();
             bool single = hk.SingleShotJustPressed();
 
-            // 计算本帧 PID dt（控制前），避免上一帧dt滞后
-            double dt_pre = 0.0;
-            // 统一为 PID/Prop 算法准备 dt
-            bool need_dt = c.pid || c.prop_use_dt;
-            if (need_dt) {
-                auto now = std::chrono::high_resolution_clock::now();
-                if (c.pid && c.pid_use_measured_dt) {
-                    dt_pre = std::chrono::duration<double>(now - last_pid_ts).count();
-                    if (c.pid_dt_clamp) {
-                        double lo = std::max(0.000001, c.pid_dt_min_ms / 1000.0);
-                        double hi = std::max(lo, c.pid_dt_max_ms / 1000.0);
-                        if (dt_pre < lo) dt_pre = lo;
-                        if (dt_pre > hi) dt_pre = hi;
-                    }
-                } else if (c.prop_use_dt) {
-                    // Prop 使用实测 dt（不额外夹紧）
-                    dt_pre = std::chrono::duration<double>(now - last_pid_ts).count();
+            // 延后计算 dt：仅在即将执行算法时按需计算
+            auto calc_dt = [&](){
+                if (c.prop_use_dt) {
+                    auto now = std::chrono::high_resolution_clock::now();
+                    double d = std::chrono::duration<double>(now - last_dt_ts).count();
+                    last_dt_ts = now;
+                    return d;
                 } else {
-                    // 固定 dt：PID 使用固定值，否则 ~16ms
-                    double base_ms = c.pid ? c.pid_fixed_dt_ms : 16.0;
-                    dt_pre = std::max(0.001, base_ms / 1000.0);
+                    return std::max(0.001, 16.0 / 1000.0);
                 }
-                last_pid_ts = now;
-            }
+            };
+            double dt_pre = 0.0; // 按需赋值
 
             // sync control+mouse on main thread
             auto tctl0 = std::chrono::high_resolution_clock::now();
@@ -253,7 +224,7 @@ public:
                 if (target && target->track_id >= 0) cur_tid_ = target->track_id;
 
                 if (!target) {
-                    px.reset(); py.reset(); prop_x.reset(); prop_y.reset();
+                    algo.reset();
                     if (!smooth_pressed || single) { break; }
                     if (!c.trk_pred_move) break;
                     Detection* pred_tgt = nullptr; double min_d = std::numeric_limits<double>::infinity();
@@ -268,17 +239,10 @@ public:
                                  pred_tgt->box.y + (int)(pred_tgt->box.height * c.y_anchor_ratio));
                     double err_x = (double)(tp.x - ctr.x);
                     double err_y = (double)(tp.y - ctr.y);
-                    double ox = 0.0, oy = 0.0;
-                    if (c.pid) {
-                        ox = px.step(err_x, dt_pre);
-                        oy = py.step(err_y, dt_pre);
-                    } else if (c.prop) {
-                        ox = prop_x.step(err_x, dt_pre);
-                        oy = prop_y.step(err_y, dt_pre);
-                    } else {
-                        ox = c.pid_kp_x * err_x;
-                        oy = c.pid_kp_y * err_y;
-                    }
+                    dt_pre = calc_dt();
+                    auto pr = algo.step(err_x, err_y, dt_pre);
+                    double ox = pr.first;
+                    double oy = pr.second;
                     int mx = (int)(ox * mfac);
                     int my = (int)(oy * mfac);
                     auto tmov0 = std::chrono::high_resolution_clock::now();
@@ -288,23 +252,16 @@ public:
                     break;
                 }
 
-                if (!smooth_pressed) { px.reset(); py.reset(); prop_x.reset(); prop_y.reset(); }
+                if (!smooth_pressed) { algo.reset(); }
                 if (smooth_pressed && target && !single) {
                     cv::Point tp(target->box.x + target->box.width/2,
                                  target->box.y + (int)(target->box.height * c.y_anchor_ratio));
                     double err_x = (double)(tp.x - ctr.x);
                     double err_y = (double)(tp.y - ctr.y);
-                    double ox = 0.0, oy = 0.0;
-                    if (c.pid) {
-                        ox = px.step(err_x, dt_pre);
-                        oy = py.step(err_y, dt_pre);
-                    } else if (c.prop) {
-                        ox = prop_x.step(err_x, dt_pre);
-                        oy = prop_y.step(err_y, dt_pre);
-                    } else {
-                        ox = c.pid_kp_x * err_x;
-                        oy = c.pid_kp_y * err_y;
-                    }
+                    dt_pre = calc_dt();
+                    auto pr = algo.step(err_x, err_y, dt_pre);
+                    double ox = pr.first;
+                    double oy = pr.second;
                     int mx = (int)(ox * mfac);
                     int my = (int)(oy * mfac);
                     auto tmov0 = std::chrono::high_resolution_clock::now();
@@ -351,7 +308,7 @@ public:
            if (c.lat_csv) { latcsv.put(fl); }
 
             
-            // dt 已在控制前计算为 dt_pre，这里仅保留统计
+            // dt 按需计算（在执行算法前获取），此处仅保留统计输出
             stats();
 
             if (c.log_latency) {
@@ -455,10 +412,9 @@ private:
     CapAsync cap;
     DetAsync det;
     TrkAsync trk;
-    // sync mouse+pid
+    // sync mouse+algo
     Mouse mouse;
-    PidController px, py;
-    PropAlgo prop_x, prop_y;
+    AimAlgo algo;
     int cur_tid_ = -1;
     HotkeyManager hk;
     const cv::Rect crop;
@@ -482,7 +438,7 @@ private:
     size_t dropS = 0;     // vis cache
     double ovrS = 0.0;
 
-    std::chrono::high_resolution_clock::time_point last_pid_ts = std::chrono::high_resolution_clock::now();
+    std::chrono::high_resolution_clock::time_point last_dt_ts = std::chrono::high_resolution_clock::now();
 
     OvlAsync ovl;
 

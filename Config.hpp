@@ -70,22 +70,7 @@ public:
     const double px_per_360     = 3600;     // 每360°所需鼠标计数（由脚本计算，CS=1、PF=1、Aim=1，base≈0.1）
     const double hfov_deg       = 85.461056;     // 水平FOV（垂直60°、1920x1200 -> 水平≈85.461056°）
 
-    // PID（默认关闭，保留参数便于切换）
-    const double pid_kp_x = 0.16;
-    const double pid_ki_x = 0.00;
-    const double pid_kd_x = 0.0000;
-    const double pid_kp_y = 0.16;
-    const double pid_ki_y = 0.00;
-    const double pid_kd_y = 0.0000;
-    const double pid_output_limit   = 400.0; // 每帧像素输出限幅
-    const double pid_integral_limit = 300.0; // 积分限幅
-    bool   pid_use_measured_dt = true;  // 用实测 dt
-    double pid_fixed_dt_ms     = 16.0;  // 固定 dt（ms）
-    bool   pid_dt_clamp = true;         // 是否对 dt 进行夹紧
-    double pid_dt_min_ms = 0.0;         // dt 下限（ms）
-    double pid_dt_max_ms = 18.0;        // dt 上限（ms）
-    bool   pid_aw_freeze = false;        // 输出饱和时冻结积分
-    bool   pid = false;                  // PID 总开关（默认关闭）
+    // 移除 PID（完全由 PropAlgo 替代）
 
     // PropAlgo（比例 + 平滑）
     bool   prop = true;                  // 默认启用
