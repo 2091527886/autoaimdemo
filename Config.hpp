@@ -44,7 +44,7 @@ public:
     long long fps_spin_us = 0;              // 微自旋补偿（us）
 
     // 亲和/环境
-    bool     enable_affinity = true;       // 启用线程亲和
+    bool     enable_affinity = false;      // 启用线程亲和（默认关）
     // 每模块亲和掩码（0 表示不绑定）
     uint64_t aff_main = (1ull<<10);      // 主线程 -> CPU#10
     uint64_t aff_ovl  = (1ull<<15);      // 叠加   -> CPU#15
@@ -146,14 +146,14 @@ public:
     // 跟踪
     // 线程调度
     // 主线程
-    bool mmcss_main = true;
+    bool mmcss_main = false;  // 默认关
     std::wstring mmcss_task = L"Capture";
     AVRT_PRIORITY mmcss_prio = AVRT_PRIORITY_HIGH;
     bool enable_thread_mem_prio = false;
 
     // 模块线程（按需启用，不使用环境变量；短名、可读）
 
-    bool           mmcss_ovl = true;           // 叠加绘制
+    bool           mmcss_ovl = false;          // 叠加绘制（默认关）
     std::wstring   mmcss_ovl_task = L"Playback";
     AVRT_PRIORITY  mmcss_ovl_prio = AVRT_PRIORITY_NORMAL;
 
