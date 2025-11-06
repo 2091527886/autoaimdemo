@@ -59,7 +59,7 @@ public:
 
     // 截屏/检测区域
     const int   crop_size_px   = 640;       // 居中正方形
-    const float conf_thresh    = 0.85f;      // 检测阈值
+    const float conf_thresh    = 0.7f;      // 检测阈值
 
     // 操作/热键
     const int aim_key       = VK_RBUTTON;   // 按住平滑
@@ -85,6 +85,7 @@ public:
     double pid_dt_min_ms = 0.0;         // dt 下限（ms）
     double pid_dt_max_ms = 18.0;        // dt 上限（ms）
     bool   pid_aw_freeze = false;        // 输出饱和时冻结积分
+    bool   pid = true;                   // PID 总开关
 
     // 类别/标签
     std::vector<std::string> classes { "enemy","teammate" };

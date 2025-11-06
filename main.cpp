@@ -208,18 +208,21 @@ public:
             bool single = hk.SingleShotJustPressed();
 
             // 计算本帧 PID dt（控制前），避免上一帧dt滞后
-            auto pid_now = std::chrono::high_resolution_clock::now();
-            double dt_pre = c.pid_use_measured_dt
-                ? std::chrono::duration<double>(pid_now - last_pid_ts).count()
-                : std::max(0.001, c.pid_fixed_dt_ms / 1000.0);
-            // 可选夹紧（主循环侧）
-            if (c.pid_dt_clamp && c.pid_use_measured_dt) {
-                double lo = std::max(0.000001, c.pid_dt_min_ms / 1000.0);
-                double hi = std::max(lo, c.pid_dt_max_ms / 1000.0);
-                if (dt_pre < lo) dt_pre = lo;
-                if (dt_pre > hi) dt_pre = hi;
+            double dt_pre = 0.0;
+            if (c.pid) {
+                auto pid_now = std::chrono::high_resolution_clock::now();
+                dt_pre = c.pid_use_measured_dt
+                    ? std::chrono::duration<double>(pid_now - last_pid_ts).count()
+                    : std::max(0.001, c.pid_fixed_dt_ms / 1000.0);
+                // 可选夹紧（主循环侧）
+                if (c.pid_dt_clamp && c.pid_use_measured_dt) {
+                    double lo = std::max(0.000001, c.pid_dt_min_ms / 1000.0);
+                    double hi = std::max(lo, c.pid_dt_max_ms / 1000.0);
+                    if (dt_pre < lo) dt_pre = lo;
+                    if (dt_pre > hi) dt_pre = hi;
+                }
+                last_pid_ts = pid_now;
             }
-            last_pid_ts = pid_now;
 
             // sync control+mouse on main thread
             auto tctl0 = std::chrono::high_resolution_clock::now();
@@ -247,8 +250,8 @@ public:
                                  pred_tgt->box.y + (int)(pred_tgt->box.height * c.y_anchor_ratio));
                     double err_x = (double)(tp.x - ctr.x);
                     double err_y = (double)(tp.y - ctr.y);
-                    double ox = px.step(err_x, dt_pre);
-                    double oy = py.step(err_y, dt_pre);
+                    double ox = c.pid ? px.step(err_x, dt_pre) : c.pid_kp_x * err_x;
+                    double oy = c.pid ? py.step(err_y, dt_pre) : c.pid_kp_y * err_y;
                     int mx = (int)(ox * mfac);
                     int my = (int)(oy * mfac);
                     auto tmov0 = std::chrono::high_resolution_clock::now();
@@ -264,8 +267,8 @@ public:
                                  target->box.y + (int)(target->box.height * c.y_anchor_ratio));
                     double err_x = (double)(tp.x - ctr.x);
                     double err_y = (double)(tp.y - ctr.y);
-                    double ox = px.step(err_x, dt_pre);
-                    double oy = py.step(err_y, dt_pre);
+                    double ox = c.pid ? px.step(err_x, dt_pre) : c.pid_kp_x * err_x;
+                    double oy = c.pid ? py.step(err_y, dt_pre) : c.pid_kp_y * err_y;
                     int mx = (int)(ox * mfac);
                     int my = (int)(oy * mfac);
                     auto tmov0 = std::chrono::high_resolution_clock::now();
