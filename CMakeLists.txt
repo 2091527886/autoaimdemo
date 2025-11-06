@@ -66,6 +66,7 @@ add_executable(aimassistant
   Game_overlay.cpp
   OvlAsync.cpp
   LatCsvAsync.cpp
+  PropAlgo.cpp
 )
 
 # 启用 Release 高优化/LTO/AVX

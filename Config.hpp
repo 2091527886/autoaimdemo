@@ -70,7 +70,7 @@ public:
     const double px_per_360     = 3600;     // 每360°所需鼠标计数（由脚本计算，CS=1、PF=1、Aim=1，base≈0.1）
     const double hfov_deg       = 85.461056;     // 水平FOV（垂直60°、1920x1200 -> 水平≈85.461056°）
 
-    // PID
+    // PID（默认关闭，保留参数便于切换）
     const double pid_kp_x = 0.16;
     const double pid_ki_x = 0.00;
     const double pid_kd_x = 0.0000;
@@ -85,7 +85,16 @@ public:
     double pid_dt_min_ms = 0.0;         // dt 下限（ms）
     double pid_dt_max_ms = 18.0;        // dt 上限（ms）
     bool   pid_aw_freeze = false;        // 输出饱和时冻结积分
-    bool   pid = true;                   // PID 总开关
+    bool   pid = false;                  // PID 总开关（默认关闭）
+
+    // PropAlgo（比例 + 平滑）
+    bool   prop = true;                  // 默认启用
+    double prop_k_x = 0.16;
+    double prop_k_y = 0.16;
+    double prop_out_limit = 400.0;       // 每帧像素限幅
+    double prop_tc_ms = 6.0;             // 一阶低通时间常数（ms）
+    double prop_dead_px = 0.5;           // 误差死区（像素）
+    bool   prop_use_dt = true;           // 使用实测 dt
 
     // 类别/标签
     std::vector<std::string> classes { "enemy","teammate" };

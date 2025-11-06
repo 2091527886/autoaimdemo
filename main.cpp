@@ -28,6 +28,7 @@ extern std::atomic<bool> g_exit_done;
 #include "OverlayAnimator.hpp"
 #include "Mouse.hpp"
 #include "PidController.hpp"
+#include "PropAlgo.hpp"
 #include "HotkeyManager.hpp"
 #include "ScreenCapturer.hpp"
 #include "CapAsync.hpp"
@@ -141,6 +142,15 @@ public:
         py.setLim(c.pid_output_limit, c.pid_integral_limit);
         py.setDtClamp(c.pid_dt_clamp, c.pid_dt_min_ms, c.pid_dt_max_ms);
         py.setAntiWindupFreeze(c.pid_aw_freeze);
+        // init PropAlgo
+        prop_x.setK(c.prop_k_x);
+        prop_x.setLim(c.prop_out_limit);
+        prop_x.setTc(c.prop_tc_ms);
+        prop_x.setDz(c.prop_dead_px);
+        prop_y.setK(c.prop_k_y);
+        prop_y.setLim(c.prop_out_limit);
+        prop_y.setTc(c.prop_tc_ms);
+        prop_y.setDz(c.prop_dead_px);
         if (c.ovl) { lg::o() << P_B "Overlay=ON" << lg::endl; ovl.start(); }
         else { lg::o() << P_B "Overlay=OFF" << lg::endl; }
     }
@@ -209,19 +219,27 @@ public:
 
             // 计算本帧 PID dt（控制前），避免上一帧dt滞后
             double dt_pre = 0.0;
-            if (c.pid) {
-                auto pid_now = std::chrono::high_resolution_clock::now();
-                dt_pre = c.pid_use_measured_dt
-                    ? std::chrono::duration<double>(pid_now - last_pid_ts).count()
-                    : std::max(0.001, c.pid_fixed_dt_ms / 1000.0);
-                // 可选夹紧（主循环侧）
-                if (c.pid_dt_clamp && c.pid_use_measured_dt) {
-                    double lo = std::max(0.000001, c.pid_dt_min_ms / 1000.0);
-                    double hi = std::max(lo, c.pid_dt_max_ms / 1000.0);
-                    if (dt_pre < lo) dt_pre = lo;
-                    if (dt_pre > hi) dt_pre = hi;
+            // 统一为 PID/Prop 算法准备 dt
+            bool need_dt = c.pid || c.prop_use_dt;
+            if (need_dt) {
+                auto now = std::chrono::high_resolution_clock::now();
+                if (c.pid && c.pid_use_measured_dt) {
+                    dt_pre = std::chrono::duration<double>(now - last_pid_ts).count();
+                    if (c.pid_dt_clamp) {
+                        double lo = std::max(0.000001, c.pid_dt_min_ms / 1000.0);
+                        double hi = std::max(lo, c.pid_dt_max_ms / 1000.0);
+                        if (dt_pre < lo) dt_pre = lo;
+                        if (dt_pre > hi) dt_pre = hi;
+                    }
+                } else if (c.prop_use_dt) {
+                    // Prop 使用实测 dt（不额外夹紧）
+                    dt_pre = std::chrono::duration<double>(now - last_pid_ts).count();
+                } else {
+                    // 固定 dt：PID 使用固定值，否则 ~16ms
+                    double base_ms = c.pid ? c.pid_fixed_dt_ms : 16.0;
+                    dt_pre = std::max(0.001, base_ms / 1000.0);
                 }
-                last_pid_ts = pid_now;
+                last_pid_ts = now;
             }
 
             // sync control+mouse on main thread
@@ -235,7 +253,7 @@ public:
                 if (target && target->track_id >= 0) cur_tid_ = target->track_id;
 
                 if (!target) {
-                    px.reset(); py.reset();
+                    px.reset(); py.reset(); prop_x.reset(); prop_y.reset();
                     if (!smooth_pressed || single) { break; }
                     if (!c.trk_pred_move) break;
                     Detection* pred_tgt = nullptr; double min_d = std::numeric_limits<double>::infinity();
@@ -250,8 +268,17 @@ public:
                                  pred_tgt->box.y + (int)(pred_tgt->box.height * c.y_anchor_ratio));
                     double err_x = (double)(tp.x - ctr.x);
                     double err_y = (double)(tp.y - ctr.y);
-                    double ox = c.pid ? px.step(err_x, dt_pre) : c.pid_kp_x * err_x;
-                    double oy = c.pid ? py.step(err_y, dt_pre) : c.pid_kp_y * err_y;
+                    double ox = 0.0, oy = 0.0;
+                    if (c.pid) {
+                        ox = px.step(err_x, dt_pre);
+                        oy = py.step(err_y, dt_pre);
+                    } else if (c.prop) {
+                        ox = prop_x.step(err_x, dt_pre);
+                        oy = prop_y.step(err_y, dt_pre);
+                    } else {
+                        ox = c.pid_kp_x * err_x;
+                        oy = c.pid_kp_y * err_y;
+                    }
                     int mx = (int)(ox * mfac);
                     int my = (int)(oy * mfac);
                     auto tmov0 = std::chrono::high_resolution_clock::now();
@@ -261,14 +288,23 @@ public:
                     break;
                 }
 
-                if (!smooth_pressed) { px.reset(); py.reset(); }
+                if (!smooth_pressed) { px.reset(); py.reset(); prop_x.reset(); prop_y.reset(); }
                 if (smooth_pressed && target && !single) {
                     cv::Point tp(target->box.x + target->box.width/2,
                                  target->box.y + (int)(target->box.height * c.y_anchor_ratio));
                     double err_x = (double)(tp.x - ctr.x);
                     double err_y = (double)(tp.y - ctr.y);
-                    double ox = c.pid ? px.step(err_x, dt_pre) : c.pid_kp_x * err_x;
-                    double oy = c.pid ? py.step(err_y, dt_pre) : c.pid_kp_y * err_y;
+                    double ox = 0.0, oy = 0.0;
+                    if (c.pid) {
+                        ox = px.step(err_x, dt_pre);
+                        oy = py.step(err_y, dt_pre);
+                    } else if (c.prop) {
+                        ox = prop_x.step(err_x, dt_pre);
+                        oy = prop_y.step(err_y, dt_pre);
+                    } else {
+                        ox = c.pid_kp_x * err_x;
+                        oy = c.pid_kp_y * err_y;
+                    }
                     int mx = (int)(ox * mfac);
                     int my = (int)(oy * mfac);
                     auto tmov0 = std::chrono::high_resolution_clock::now();
@@ -422,6 +458,7 @@ private:
     // sync mouse+pid
     Mouse mouse;
     PidController px, py;
+    PropAlgo prop_x, prop_y;
     int cur_tid_ = -1;
     HotkeyManager hk;
     const cv::Rect crop;
