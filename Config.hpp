@@ -45,7 +45,7 @@ public:
     // 亲和/环境
     bool     enable_affinity = true;       // 启用线程亲和
     // 每模块亲和掩码（0 表示不绑定）
-    uint64_t aff_main = 0xC000;  // 主线程
+    uint64_t aff_main = 0;  // 主线程
     uint64_t aff_cap  = 0xC000;  // 捕获
     uint64_t aff_det  = 0xC000;  // 检测
     uint64_t aff_trk  = 0xC000;  // 跟踪
@@ -59,7 +59,7 @@ public:
 
     // 截屏/检测区域
     const int   crop_size_px   = 640;       // 居中正方形
-    const float conf_thresh    = 0.6f;      // 检测阈值
+    const float conf_thresh    = 0.85f;      // 检测阈值
 
     // 操作/热键
     const int aim_key       = VK_RBUTTON;   // 按住平滑
@@ -71,20 +71,20 @@ public:
     const double hfov_deg       = 85.461056;     // 水平FOV（垂直60°、1920x1200 -> 水平≈85.461056°）
 
     // PID
-    const double pid_kp_x = 0.14;
-    const double pid_ki_x = 0.001;
-    const double pid_kd_x = 0.00600;
-    const double pid_kp_y = 0.14;
-    const double pid_ki_y = 0.001;
-    const double pid_kd_y = 0.00600;
+    const double pid_kp_x = 0.16;
+    const double pid_ki_x = 0.00;
+    const double pid_kd_x = 0.0000;
+    const double pid_kp_y = 0.16;
+    const double pid_ki_y = 0.00;
+    const double pid_kd_y = 0.0000;
     const double pid_output_limit   = 400.0; // 每帧像素输出限幅
     const double pid_integral_limit = 300.0; // 积分限幅
     bool   pid_use_measured_dt = true;  // 用实测 dt
     double pid_fixed_dt_ms     = 16.0;  // 固定 dt（ms）
     bool   pid_dt_clamp = true;         // 是否对 dt 进行夹紧
-    double pid_dt_min_ms = 1.0;         // dt 下限（ms）
-    double pid_dt_max_ms = 10.0;        // dt 上限（ms）
-    bool   pid_aw_freeze = true;        // 输出饱和时冻结积分
+    double pid_dt_min_ms = 0.0;         // dt 下限（ms）
+    double pid_dt_max_ms = 18.0;        // dt 上限（ms）
+    bool   pid_aw_freeze = false;        // 输出饱和时冻结积分
 
     // 类别/标签
     std::vector<std::string> classes { "enemy","teammate" };
@@ -175,7 +175,7 @@ public:
     // 线程调度
     // 主线程
     bool mmcss_main = true;
-    std::wstring mmcss_task = L"Games";
+    std::wstring mmcss_task = L"Capture";
     AVRT_PRIORITY mmcss_prio = AVRT_PRIORITY_HIGH;
     bool enable_thread_mem_prio = false;
 
