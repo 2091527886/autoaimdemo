@@ -41,8 +41,6 @@ public:
     // 帧率
     bool fps_lock = true;                   // 启用帧率锁
     int  fps = 60;                         // 目标 FPS
-    long long fps_spin_us = 0;              // 微自旋补偿（us）
-
     // 亲和/环境
     bool     enable_affinity = false;      // 启用线程亲和（默认关）
     // 每模块亲和掩码（0 表示不绑定）

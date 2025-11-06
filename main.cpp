@@ -53,47 +53,32 @@ public:
     // FPS 锁定/补偿控制（短名）
     struct FpsCtl {
         double tgt_ms = 8.0;
-        long long spin_us = 0;
         size_t drop = 0;
         double ovr = 0.0;
-        HANDLE ht = nullptr;
+        std::chrono::steady_clock::time_point next_tp{};
+        std::chrono::steady_clock::duration per{};
         explicit FpsCtl(const Config& cfg) {
             tgt_ms = 1000.0 / std::max(1, cfg.fps);
-            spin_us = cfg.fps_spin_us;
-            ht = CreateWaitableTimerExW(NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
-            if (!ht) ht = CreateWaitableTimerW(NULL, FALSE, NULL);
+            per = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                std::chrono::duration<double, std::milli>(tgt_ms));
+            next_tp = std::chrono::steady_clock::now() + per;
         }
-        ~FpsCtl() { if (ht) CloseHandle(ht); }
-        double end(double proc_ms) {
-            if (proc_ms <= tgt_ms) {
-                double rem = tgt_ms - proc_ms;
-                double sl = rem - (double)spin_us / 1000.0;
-                if (sl > 0.0) {
-                    if (ht) {
-                        LARGE_INTEGER due; long long q100ns = (long long)(sl * 10000.0);
-                        if (q100ns < 1) q100ns = 1; due.QuadPart = -q100ns;
-                        if (SetWaitableTimer(ht, &due, 0, nullptr, nullptr, FALSE)) {
-                            WaitForSingleObject(ht, INFINITE);
-                        } else {
-                            std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(sl));
-                        }
-                    } else {
-                        std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(sl));
-                    }
-                }
-                if (spin_us > 0) {
-                    auto se = std::chrono::high_resolution_clock::now() + std::chrono::microseconds((long long)spin_us);
-                    while (std::chrono::high_resolution_clock::now() < se) { YieldProcessor(); }
-                }
+        double end() {
+            using clk = std::chrono::steady_clock;
+            auto now = clk::now();
+            if (now < next_tp) {
+                std::this_thread::sleep_until(next_tp);
                 ovr = 0.0;
+                next_tp += per;
                 return tgt_ms;
-            } else {
-                ovr = proc_ms - tgt_ms;
-                drop++;
-                return proc_ms;
             }
+            // lagging: compute overshoot and catch up phase without sleeping
+            ovr = std::chrono::duration<double, std::milli>(now - next_tp).count();
+            while (next_tp <= now) { next_tp += per; ++drop; }
+            return tgt_ms;
         }
     };
+
 
     Aim()
         : c(),
@@ -238,7 +223,7 @@ public:
             double proc_ms = std::chrono::duration<double, std::milli>(loop_end_time - loop_start_time).count();
             if (c.fps_lock) {
                 // FPS 锁基于主循环真实耗时，避免被其他线程阶段统计值放大而误限速
-                double frame_ms = fc.end(proc_ms);
+                double frame_ms = fc.end();
                 tm.loop_ms = frame_ms;
             } else {
                 tm.loop_ms = proc_ms;
