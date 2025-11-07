@@ -655,7 +655,6 @@ void Game_overlay::Impl::RenderOne()
     if (!visible.load())
     {
         ShowWindow(hwnd, SW_HIDE);
-        Sleep(10);
         return;
     }
     else
@@ -669,10 +668,6 @@ void Game_overlay::Impl::RenderOne()
     if (skip_empty && (!dl || dl->cmds.empty()))
     {
         ShowWindow(hwnd, SW_HIDE);
-        ComPtr<IDXGISwapChain2> sc2; swapChain.As(&sc2);
-        HANDLE h = sc2 ? sc2->GetFrameLatencyWaitableObject() : nullptr;
-        DWORD ms = (DWORD)std::max(1, idle_sleep_ms);
-        if (h) WaitForSingleObject(h, ms); else Sleep(ms);
         return;
     }
     else
@@ -756,6 +751,6 @@ void Game_overlay::Impl::RenderOne()
         phr = swapChain->Present(0, 0);
     }
     if (phr == DXGI_STATUS_OCCLUDED || phr == DXGI_ERROR_ACCESS_LOST) {
-        Sleep(100);
+        return;
     }
 }

@@ -161,34 +161,10 @@ public:
             // inference on main thread
             od.detect(img, ds, c, tm);
             det_ms_last = c.timing ? (tm.infer_ms + tm.post_ms) : 0.0;
-            // overlay draw on main thread
+            // overlay draw on main thread (moved below)
             double ovl_ms = 0.0;
-            if (c.ovl) {
-                auto t0 = (c.timing ? std::chrono::high_resolution_clock::now() : std::chrono::high_resolution_clock::time_point{});
-                gover.BeginFrame();
-                for (const auto& d : ds) {
-                    if (c.ovl_only >= 0 && d.class_id != c.ovl_only) continue;
-                    float x = (float)(crop.x + d.box.x);
-                    float y = (float)(crop.y + d.box.y);
-                    float w = (float)d.box.width;
-                    float h = (float)d.box.height;
-                    int cid = d.class_id;
-                    int rr = c.ovl_r, gg = c.ovl_g, bb = c.ovl_b;
-                    if (c.ovl_cls && cid >= 0) {
-                        if (cid < (int)c.ovl_cr.size()) rr = c.ovl_cr[cid];
-                        if (cid < (int)c.ovl_cg.size()) gg = c.ovl_cg[cid];
-                        if (cid < (int)c.ovl_cb.size()) bb = c.ovl_cb[cid];
-                    }
-                    auto col = ARGB((uint8_t)c.ovl_a,(uint8_t)rr,(uint8_t)gg,(uint8_t)bb);
-                    gover.AddRect({x,y,w,h}, col, (float)c.ovl_thick);
-                }
-                gover.EndFrame();
-                gover.Tick();
-                auto t1 = (c.timing ? std::chrono::high_resolution_clock::now() : std::chrono::high_resolution_clock::time_point{});
-                ovl_ms = c.timing ? std::chrono::duration<double, std::milli>(t1 - t0).count() : 0.0;
-            }
+            // [overlay moved below]
             fl.det_ms = det_ms_last;
-            fl.ovl_ms = ovl_ms;
 
             
             
@@ -243,7 +219,33 @@ public:
 
             fl.mou_ms = mou_cost_ms;
             fl.ctl_ms = std::max(0.0, ctl_cost_ms - mou_cost_ms); // 去重：控制不含鼠标
-            // fl.ovl_ms already measured above
+
+            // overlay draw on main thread (now after mouse movement)
+            if (c.ovl) {
+                auto t0 = (c.timing ? std::chrono::high_resolution_clock::now() : std::chrono::high_resolution_clock::time_point{});
+                gover.BeginFrame();
+                for (const auto& d : ds) {
+                    if (c.ovl_only >= 0 && d.class_id != c.ovl_only) continue;
+                    float x = (float)(crop.x + d.box.x);
+                    float y = (float)(crop.y + d.box.y);
+                    float w = (float)d.box.width;
+                    float h = (float)d.box.height;
+                    int cid = d.class_id;
+                    int rr = c.ovl_r, gg = c.ovl_g, bb = c.ovl_b;
+                    if (c.ovl_cls && cid >= 0) {
+                        if (cid < (int)c.ovl_cr.size()) rr = c.ovl_cr[cid];
+                        if (cid < (int)c.ovl_cg.size()) gg = c.ovl_cg[cid];
+                        if (cid < (int)c.ovl_cb.size()) bb = c.ovl_cb[cid];
+                    }
+                    auto col = ARGB((uint8_t)c.ovl_a,(uint8_t)rr,(uint8_t)gg,(uint8_t)bb);
+                    gover.AddRect({x,y,w,h}, col, (float)c.ovl_thick);
+                }
+                gover.EndFrame();
+                gover.Tick();
+                auto t1 = (c.timing ? std::chrono::high_resolution_clock::now() : std::chrono::high_resolution_clock::time_point{});
+                ovl_ms = c.timing ? std::chrono::duration<double, std::milli>(t1 - t0).count() : 0.0;
+            }
+            fl.ovl_ms = ovl_ms;
 
             auto loop_end_time = std::chrono::high_resolution_clock::now();
             double proc_ms = std::chrono::duration<double, std::milli>(loop_end_time - loop_start_time).count();
