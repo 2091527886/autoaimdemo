@@ -228,7 +228,6 @@ struct Game_overlay::Impl
     int  max_latency = 1;
 
     bool skip_empty = true;
-    int  idle_sleep_ms = 50;
 
     // small window
     bool small_window = true;
@@ -273,7 +272,6 @@ void Game_overlay::SetConfig(const Config& cfg)
     impl_->max_latency = cfg.ovl_max_latency;
 
     impl_->skip_empty     = cfg.ovl_skip_empty;
-    impl_->idle_sleep_ms  = cfg.ovl_idle_sleep_ms;
     impl_->small_window   = cfg.ovl_small_window;
     impl_->cfg_win_x      = cfg.ovl_win_x;
     impl_->cfg_win_y      = cfg.ovl_win_y;

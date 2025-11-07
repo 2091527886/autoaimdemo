@@ -114,7 +114,6 @@ public:
 
     // Overlay 空闲节流
     bool         ovl_skip_empty = false;       // 无绘制命令时跳过渲染与Present
-    int          ovl_idle_sleep_ms = 1;      // 空闲时休眠毫秒数
 
     // Overlay 小窗口
     bool         ovl_small_window = true;     // 启用小窗口，默认使用裁剪尺寸
