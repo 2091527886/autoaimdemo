@@ -215,8 +215,6 @@ struct Game_overlay::Impl
 
     std::atomic<bool> running{ false };
     std::atomic<bool> visible{ true };
-    std::atomic<unsigned> maxFps{ 0 };
-
     std::mutex pendingMutex;
     DrawList pending;
     std::shared_ptr<DrawList> current;
@@ -249,7 +247,7 @@ struct Game_overlay::Impl
     static LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
     bool    CreateWindowAndDevices();
     void    DestroyWindowAndDevices();
-    void    RenderLoop(); // legacy
+    // RenderLoop removed (single-threaded)
     void    RenderOne();
 
     HRESULT CreateTextFormat(const std::wstring& font, float size, IDWriteTextFormat** out);
@@ -264,8 +262,6 @@ bool Game_overlay::Start() { return impl_->Start(); }
 void Game_overlay::Stop() { impl_->Stop(); }
 bool Game_overlay::IsRunning() const { return impl_->running.load(); }
 void Game_overlay::UseVirtualScreen() { impl_->UseVirtualScreen(); }
-void Game_overlay::SetMaxFPS(unsigned f) { impl_->maxFps.store(f); }
-
 void Game_overlay::SetConfig(const Config& cfg)
 {
     // copy subset for overlay gpu/vsync/latency
@@ -650,22 +646,6 @@ HRESULT Game_overlay::Impl::CreateTextFormat(
     textFormatCache.emplace(key, fmt);
     *out = fmt.Detach();
     return S_OK;
-}
-
-// RenderLoop removed: driving from caller thread
-// legacy no-op to keep linkage if referenced accidentally
-void Game_overlay::Impl::RenderLoop()
-{
-    running = true;
-
-    // no-op: single-threaded mode uses Tick() from caller
-    MSG msg{};
-    while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
-        if (msg.message == WM_QUIT) { running = false; break; }
-        TranslateMessage(&msg);
-        DispatchMessageW(&msg);
-    }
-    // Presenting done by RenderOne() via Tick()
 }
 
 void Game_overlay::Impl::RenderOne()

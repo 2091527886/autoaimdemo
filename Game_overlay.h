@@ -32,8 +32,6 @@ public:
 
     void UseVirtualScreen();
 
-    void SetMaxFPS(unsigned fps);
-
     // Provide config for GPU/vsync/latency
     void SetConfig(const Config& cfg);
 

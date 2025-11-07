@@ -111,11 +111,9 @@ public:
         algo.setConfig(c);
         // overlay moved to main thread
         if (c.ovl) {
-            lg::o() << P_B "Overlay=ON (fps=" << c.ovl_fps
-                    << ", a=" << c.ovl_a << ", rgb=" << c.ovl_r << "," << c.ovl_g << "," << c.ovl_b
+            lg::o() << P_B "Overlay=ON (a=" << c.ovl_a << ", rgb=" << c.ovl_r << "," << c.ovl_g << "," << c.ovl_b
                     << ", th=" << c.ovl_thick << ")" << lg::endl;
             gover.UseVirtualScreen();
-            gover.SetMaxFPS((unsigned)std::max(1, c.ovl_fps));
             gover.SetConfig(c);
             bool ok = gover.Start();
             lg::ok_or_werr(P_B, "Overlay.Start", ok);
@@ -441,6 +439,7 @@ int main() {
        SetProcPrioBoostDisabled();
    }
 
+   // thread mem prio + disable boost
     // overlay (Game overlay) banner based on ovl flag
     metrics::SystemBootReporting::PrintOverlayBanner(boot_cfg, boot_cfg.ovl);
 

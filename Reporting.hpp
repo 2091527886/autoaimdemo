@@ -26,7 +26,7 @@ public:
             lg::o() << P_B "Capture: "
                       << "ds=ON"
                       << " | stg=" << stagingCount
-                      << " | evt=ON"
+                      << " | evt=OFF"
                       << " | map=DNW"
                       << " | cr=ON"
                       << lg::endl;
@@ -105,7 +105,7 @@ public:
                 lg::o() << lg::fx1
                           << lg::ovr(P_CO, total)
                           << " | ds="  << stat_dirty_skips_       << " (" << pct(stat_dirty_skips_)       << "%)"
-                          << " | evt=" << stat_event_not_ready_   << " (" << pct(stat_event_not_ready_)   << "%)"
+                          << " | ev=" << stat_event_not_ready_   << " (" << pct(stat_event_not_ready_)   << "%)"
                           << " | sd="  << stat_map_still_drawing_ << " (" << pct(stat_map_still_drawing_) << "%)"
                           << " | cr="  << stat_cache_reused_      << " (" << pct(stat_cache_reused_)      << "%)"
                           << " | ok="  << stat_success_           << " (" << pct(stat_success_)           << "%)"
@@ -136,8 +136,7 @@ struct SystemBootReporting {
     static void PrintOverlayBanner(const Config& cfg, bool started) {
         if (!cfg.opt_report || !cfg.opt_report_system) return;
         if (started) {
-            lg::o() << P_B "Overlay=ON (fps=" << cfg.ovl_fps
-                      << ", a=" << cfg.ovl_a
+            lg::o() << P_B "Overlay=ON (a=" << cfg.ovl_a
                       << ", rgb=" << cfg.ovl_r << "," << cfg.ovl_g << "," << cfg.ovl_b
                       << ", th=" << cfg.ovl_thick << ")" << lg::endl;
         } else {

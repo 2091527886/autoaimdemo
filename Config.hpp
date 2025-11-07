@@ -96,7 +96,6 @@ public:
 
     // Overlay 绘制
     bool      ovl = true;              // 默认启用
-    int       ovl_fps = 60;           // 刷新上限
     int       ovl_a = 160;             // 颜色 ARGB
     int       ovl_r = 0;
     int       ovl_g = 255;
@@ -114,8 +113,8 @@ public:
     int          ovl_max_latency = 1;         // 最大帧延迟(1..3)，<=0 表示不控制
 
     // Overlay 空闲节流
-    bool         ovl_skip_empty = true;       // 无绘制命令时跳过渲染与Present
-    int          ovl_idle_sleep_ms = 50;      // 空闲时休眠毫秒数
+    bool         ovl_skip_empty = false;       // 无绘制命令时跳过渲染与Present
+    int          ovl_idle_sleep_ms = 1;      // 空闲时休眠毫秒数
 
     // Overlay 小窗口
     bool         ovl_small_window = true;     // 启用小窗口，默认使用裁剪尺寸
@@ -140,7 +139,6 @@ public:
     std::wstring mmcss_task = L"Capture";
     AVRT_PRIORITY mmcss_prio = AVRT_PRIORITY_HIGH;
     bool enable_thread_mem_prio = false;
-
     // 模块线程（按需启用，不使用环境变量；短名、可读）
 
 
