@@ -213,7 +213,6 @@ struct Game_overlay::Impl
     ComPtr<IDCompositionTarget>    dcompTarget;
     ComPtr<IDCompositionVisual>    dcompRoot;
 
-    std::thread thread;
     std::atomic<bool> running{ false };
     std::atomic<bool> visible{ true };
     std::atomic<unsigned> maxFps{ 0 };
@@ -250,7 +249,7 @@ struct Game_overlay::Impl
     static LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
     bool    CreateWindowAndDevices();
     void    DestroyWindowAndDevices();
-    void    RenderLoop();
+    void    RenderLoop(); // legacy
     void    RenderOne();
 
     HRESULT CreateTextFormat(const std::wstring& font, float size, IDWriteTextFormat** out);
@@ -288,6 +287,7 @@ void Game_overlay::SetConfig(const Config& cfg)
 
 void Game_overlay::BeginFrame() { impl_->BeginFrame(); }
 void Game_overlay::EndFrame() { impl_->EndFrame(); }
+void Game_overlay::Tick() { impl_->RenderOne(); }
 
 void Game_overlay::AddRect(const OverlayRect& r, OverlayColor c, float t)
 {
@@ -310,23 +310,15 @@ bool Game_overlay::Impl::Start()
 {
     if (running.load()) return true;
     running = true;
-    thread = std::thread([this] {
-        if (this->running.load()) {
-            // Note: overlay-specific affinity removed
-            // affinity handled in main thread (no OvlAsync)
-        }
-        SetPerMonitorV2DpiAwareness();
-        CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-        hinst = GetModuleHandleW(nullptr);
-        if (!CreateWindowAndDevices()) {
-            running = false;
-            CoUninitialize();
-            return;
-        }
-        RenderLoop();
-        DestroyWindowAndDevices();
+    // single-threaded: init on caller thread
+    SetPerMonitorV2DpiAwareness();
+    CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    hinst = GetModuleHandleW(nullptr);
+    if (!CreateWindowAndDevices()) {
+        running = false;
         CoUninitialize();
-        });
+        return false;
+    }
     return true;
 }
 
@@ -334,7 +326,8 @@ void Game_overlay::Impl::Stop()
 {
     if (!running.exchange(false)) return;
     if (hwnd) PostMessageW(hwnd, WM_CLOSE, 0, 0);
-    if (thread.joinable()) thread.join();
+    DestroyWindowAndDevices();
+    CoUninitialize();
 }
 
 void Game_overlay::Impl::BeginFrame()
@@ -659,42 +652,20 @@ HRESULT Game_overlay::Impl::CreateTextFormat(
     return S_OK;
 }
 
+// RenderLoop removed: driving from caller thread
+// legacy no-op to keep linkage if referenced accidentally
 void Game_overlay::Impl::RenderLoop()
 {
     running = true;
 
-    HANDLE frameWait = nullptr;
-    ComPtr<IDXGISwapChain2> sc2; if (swapChain) swapChain.As(&sc2);
-    if (sc2) frameWait = sc2->GetFrameLatencyWaitableObject();
-
+    // no-op: single-threaded mode uses Tick() from caller
     MSG msg{};
-    while (running.load())
-    {
-        while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE))
-        {
-            if (msg.message == WM_QUIT)
-            {
-                running = false;
-                break;
-            }
-            TranslateMessage(&msg);
-            DispatchMessageW(&msg);
-        }
-        if (!running.load()) break;
-
-        unsigned cap = maxFps.load();
-        DWORD timeout = (cap > 0) ? (1000u / cap) : INFINITE;
-        if (frameWait)
-        {
-            WaitForSingleObject(frameWait, timeout);
-        }
-        else if (cap > 0)
-        {
-            Sleep(timeout);
-        }
-
-        RenderOne();
+    while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+        if (msg.message == WM_QUIT) { running = false; break; }
+        TranslateMessage(&msg);
+        DispatchMessageW(&msg);
     }
+    // Presenting done by RenderOne() via Tick()
 }
 
 void Game_overlay::Impl::RenderOne()

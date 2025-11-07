@@ -22,6 +22,8 @@ public:
 
     void BeginFrame();
     void EndFrame();
+    // Single-threaded render pump: process window messages and present one frame
+    void Tick();
 
     void AddRect(const OverlayRect& rc, OverlayColor color, float thickness = 1.0f);
     void FillRect(const OverlayRect& rc, OverlayColor color);

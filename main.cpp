@@ -185,6 +185,7 @@ public:
                     gover.AddRect({x,y,w,h}, col, (float)c.ovl_thick);
                 }
                 gover.EndFrame();
+                gover.Tick();
                 auto t1 = (c.timing ? std::chrono::high_resolution_clock::now() : std::chrono::high_resolution_clock::time_point{});
                 ovl_ms = c.timing ? std::chrono::duration<double, std::milli>(t1 - t0).count() : 0.0;
             }
