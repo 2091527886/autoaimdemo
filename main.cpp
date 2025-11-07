@@ -31,7 +31,7 @@ extern std::atomic<bool> g_exit_done;
 #include "HotkeyManager.hpp"
 #include "ScreenCapturer.hpp"
 #include "ObjDet.hpp"
-#include "OvlAsync.hpp"
+#include "Game_overlay.h"
 
 
 // helpers
@@ -95,8 +95,7 @@ public:
         ctr(c.crop_size_px / 2, c.crop_size_px / 2),
         vis(c.enable_visual),
         lat(static_cast<size_t>(std::max(1, c.log_latency_every_n))),
-        fc(c),
-        ovl(c)
+        fc(c)
     {
 
         if (cap.w() < c.crop_size_px || cap.h() < c.crop_size_px) {
@@ -108,19 +107,27 @@ public:
             cv::namedWindow(c.window_title, cv::WINDOW_AUTOSIZE);
         }
         lg::o() << "Detect center " << c.crop_size_px << "x" << c.crop_size_px << lg::endl;
-        // no async ROI/start; capture on main thread
-        /* inference on main thread: no det.start() */
-        
         // init AimAlgo (PropAlgo-based)
         algo.setConfig(c);
-        if (c.ovl) { lg::o() << P_B "Overlay=ON" << lg::endl; ovl.start(); }
-        else { lg::o() << P_B "Overlay=OFF" << lg::endl; }
+        // overlay moved to main thread
+        if (c.ovl) {
+            lg::o() << P_B "Overlay=ON (fps=" << c.ovl_fps
+                    << ", a=" << c.ovl_a << ", rgb=" << c.ovl_r << "," << c.ovl_g << "," << c.ovl_b
+                    << ", th=" << c.ovl_thick << ")" << lg::endl;
+            gover.UseVirtualScreen();
+            gover.SetMaxFPS((unsigned)std::max(1, c.ovl_fps));
+            gover.SetConfig(c);
+            bool ok = gover.Start();
+            lg::ok_or_werr(P_B, "Overlay.Start", ok);
+        } else {
+            lg::o() << P_B "Overlay=OFF" << lg::endl;
+        }
     }
 
     ~Aim() {
         /* inference on main thread: no det.stop() */
         
-        if (c.ovl) ovl.stop();
+        if (c.ovl) gover.Stop();
         if (vis) cv::destroyAllWindows();
     }
 
@@ -156,8 +163,33 @@ public:
             // inference on main thread
             od.detect(img, ds, c, tm);
             det_ms_last = c.timing ? (tm.infer_ms + tm.post_ms) : 0.0;
-            if (c.ovl) ovl.put(ds, crop);
+            // overlay draw on main thread
+            double ovl_ms = 0.0;
+            if (c.ovl) {
+                auto t0 = (c.timing ? std::chrono::high_resolution_clock::now() : std::chrono::high_resolution_clock::time_point{});
+                gover.BeginFrame();
+                for (const auto& d : ds) {
+                    if (c.ovl_only >= 0 && d.class_id != c.ovl_only) continue;
+                    float x = (float)(crop.x + d.box.x);
+                    float y = (float)(crop.y + d.box.y);
+                    float w = (float)d.box.width;
+                    float h = (float)d.box.height;
+                    int cid = d.class_id;
+                    int rr = c.ovl_r, gg = c.ovl_g, bb = c.ovl_b;
+                    if (c.ovl_cls && cid >= 0) {
+                        if (cid < (int)c.ovl_cr.size()) rr = c.ovl_cr[cid];
+                        if (cid < (int)c.ovl_cg.size()) gg = c.ovl_cg[cid];
+                        if (cid < (int)c.ovl_cb.size()) bb = c.ovl_cb[cid];
+                    }
+                    auto col = ARGB((uint8_t)c.ovl_a,(uint8_t)rr,(uint8_t)gg,(uint8_t)bb);
+                    gover.AddRect({x,y,w,h}, col, (float)c.ovl_thick);
+                }
+                gover.EndFrame();
+                auto t1 = (c.timing ? std::chrono::high_resolution_clock::now() : std::chrono::high_resolution_clock::time_point{});
+                ovl_ms = c.timing ? std::chrono::duration<double, std::milli>(t1 - t0).count() : 0.0;
+            }
             fl.det_ms = det_ms_last;
+            fl.ovl_ms = ovl_ms;
 
             
             
@@ -212,7 +244,7 @@ public:
 
             fl.mou_ms = mou_cost_ms;
             fl.ctl_ms = std::max(0.0, ctl_cost_ms - mou_cost_ms); // 去重：控制不含鼠标
-            if (c.timing && c.ovl) { fl.ovl_ms = ovl.take_ms(); }
+            // fl.ovl_ms already measured above
 
             auto loop_end_time = std::chrono::high_resolution_clock::now();
             double proc_ms = std::chrono::duration<double, std::milli>(loop_end_time - loop_start_time).count();
@@ -359,7 +391,7 @@ private:
 
     std::chrono::high_resolution_clock::time_point last_dt_ts = std::chrono::high_resolution_clock::now();
 
-    OvlAsync ovl;
+    Game_overlay gover;
 
 };
 

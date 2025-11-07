@@ -312,8 +312,8 @@ bool Game_overlay::Impl::Start()
     running = true;
     thread = std::thread([this] {
         if (this->running.load()) {
-            // Optional: overlay-specific affinity
-            // affinity handled in OvlAsync/OverlayAnim
+            // Note: overlay-specific affinity removed
+            // affinity handled in main thread (no OvlAsync)
         }
         SetPerMonitorV2DpiAwareness();
         CoInitializeEx(nullptr, COINIT_MULTITHREADED);

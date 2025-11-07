@@ -58,7 +58,6 @@ add_executable(aimassistant
   CaptureDXGI.cpp
   CaptureWGC.cpp
   Game_overlay.cpp
-  OvlAsync.cpp
   AimAlgo.hpp
 )
 

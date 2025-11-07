@@ -39,11 +39,7 @@ public:
     // 帧率
     bool fps_lock = true;                   // 启用帧率锁
     int  fps = 60;                         // 目标 FPS
-    // 亲和/环境
-    bool     enable_affinity = false;      // 启用线程亲和（默认关）
-    // 每模块亲和掩码（0 表示不绑定）
-    uint64_t aff_main = (1ull<<10);      // 主线程 -> CPU#10
-    uint64_t aff_ovl  = (1ull<<15);      // 叠加   -> CPU#15
+    // 调度/环境（简化，无显式亲和设置）
 public:
     // 引擎/路径
     std::string engine_path = "m.engine";
@@ -147,9 +143,6 @@ public:
 
     // 模块线程（按需启用，不使用环境变量；短名、可读）
 
-    bool           mmcss_ovl = false;          // 叠加绘制（默认关）
-    std::wstring   mmcss_ovl_task = L"Playback";
-    AVRT_PRIORITY  mmcss_ovl_prio = AVRT_PRIORITY_NORMAL;
 
     // DXGI
    int dxgi_gpu_prio = 3;                  // -1..7
