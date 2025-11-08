@@ -84,6 +84,10 @@ public:
     int  capture_timing_every_n = 30;
     bool capture_timing_each_frame = false;
     bool capture_timing_on_success = true;
+    
+    // 提交：是否在 Copy 后立即 Flush（DXGI/WGC 共用）
+    bool capture_flush_after_copy = true;
+
     bool perf_report = true;                // TRT-YOLO 报告
     int  perf_report_every_n = 30;
     bool perf_each_frame = false;

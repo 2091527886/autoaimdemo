@@ -77,9 +77,6 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
     for (size_t i = 0; i < kStageN; ++i) {
         HRESULT hr_local = dev->CreateTexture2D(&desc, NULL, &stage[i]);
         if (FAILED(hr_local)) throw std::runtime_error("Failed to create staging texture[" + std::to_string(i) + "]");
-        D3D11_QUERY_DESC qd{}; qd.Query = D3D11_QUERY_EVENT; qd.MiscFlags = 0;
-        hr_local = dev->CreateQuery(&qd, &copyQ[i]);
-        if (FAILED(hr_local)) throw std::runtime_error("Failed to create EVENT query for staging[" + std::to_string(i) + "]");
     }
 
     LOG_IF(cfg.log_init_verbose, lg::o() << P_C "Ready " << (useWgc?"WGC ":"DDA ") << width << "x" << height << ", staging=" << kStageN << lg::endl);
@@ -89,7 +86,6 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
 ScreenCapturer::~ScreenCapturer() {
     for (size_t i = 0; i < kStageN; ++i) {
         SafeRelease(&stage[i]);
-        SafeRelease(&copyQ[i]);
     }
     if (useWgc) {
         rel_wgc();

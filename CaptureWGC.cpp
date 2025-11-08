@@ -71,7 +71,7 @@ bool ScreenCapturer::init_wgc() {
     wgc->pool = winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::Create(
         wgc->wdev,
         winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
-        2, size);
+        1, size);
     wgc->sess = wgc->pool.CreateCaptureSession(wgc->item);
     wgc->sess.IsCursorCaptureEnabled(cfg.cap_cursor);
     wgc->sess.IsBorderRequired(cfg.cap_border);
@@ -120,40 +120,23 @@ bool ScreenCapturer::cap_wgc(cv::Mat& frame, const cv::Rect& crop_region) {
         src.right = crop_region.x + crop_region.width; src.bottom = crop_region.y + crop_region.height;
         src.front = 0; src.back = 1;
 
-        const size_t curr = idx % kStageN;
-        const size_t prev = (idx + kStageN - 1) % kStageN;
-
         auto t_copy_s = do_tim ? clock::now() : clock::time_point{};
-        ctx->CopySubresourceRegion(stage[curr], 0, 0, 0, 0, tex.get(), 0, &src);
+        ctx->CopySubresourceRegion(stage[0], 0, 0, 0, 0, tex.get(), 0, &src);
         auto t_copy_e = do_tim ? clock::now() : t_copy_s;
         if (do_tim) cp = std::chrono::duration<double, std::milli>(t_copy_e - t_copy_s).count();
 
-        ctx->End(copyQ[curr]);
-
-        BOOL copy_done = FALSE;
-        HRESULT qhr = ctx->GetData(copyQ[prev], &copy_done, sizeof(copy_done), 0);
-        if (qhr != S_OK || !copy_done) {
-            ++statCopyPend;
-            aq_sum += aq; cp_sum += cp;
-            idx++;
-            continue;
+        if (cfg.capture_flush_after_copy) {
+            ctx->Flush();
         }
 
-        // Map
+        // Map (blocking)
         D3D11_MAPPED_SUBRESOURCE mr;
         auto t_map_s = do_tim ? clock::now() : clock::time_point{};
-        HRESULT hrm = ctx->Map(stage[prev], 0, D3D11_MAP_READ, D3D11_MAP_FLAG_DO_NOT_WAIT, &mr);
+        HRESULT hrm = ctx->Map(stage[0], 0, D3D11_MAP_READ, 0, &mr);
         auto t_map_e = do_tim ? clock::now() : t_map_s;
         if (do_tim) mp = std::chrono::duration<double, std::milli>(t_map_e - t_map_s).count();
-        if (hrm == DXGI_ERROR_WAS_STILL_DRAWING) {
-            ++statStillDraw;
-            aq_sum += aq; cp_sum += cp; mp_sum += mp;
-            idx++;
-            continue;
-        }
         if (FAILED(hrm)) {
             aq_sum += aq; cp_sum += cp; mp_sum += mp;
-            idx++;
             continue;
         }
 
@@ -166,7 +149,7 @@ bool ScreenCapturer::cap_wgc(cv::Mat& frame, const cv::Rect& crop_region) {
 
         // Unmap
         auto t_unmap_s = do_tim ? clock::now() : clock::time_point{};
-        ctx->Unmap(stage[prev], 0);
+        ctx->Unmap(stage[0], 0);
         auto t_unmap_e = do_tim ? clock::now() : t_unmap_s;
         if (do_tim) up = std::chrono::duration<double, std::milli>(t_unmap_e - t_unmap_s).count();
 
@@ -179,7 +162,6 @@ bool ScreenCapturer::cap_wgc(cv::Mat& frame, const cv::Rect& crop_region) {
         }
         ++statOk;
         dbgTick();
-        idx++;
         return true;
     }
 

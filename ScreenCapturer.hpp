@@ -40,13 +40,12 @@ public:
 private:
     const Config& cfg;
 
-    static constexpr size_t kStageN = 2;
+    static constexpr size_t kStageN = 1;
     std::array<struct ID3D11Texture2D*, kStageN> stage{};
-    std::array<struct ID3D11Query*,     kStageN> copyQ{};
-    size_t idx = 0;
+    // single-buffer: no queries or index rotation
     size_t statSkipDirty = 0;
-    size_t statCopyPend = 0;
-    size_t statStillDraw = 0;
+    size_t statCopyPend = 0;    // kept for reporting compatibility (always 0)
+    size_t statStillDraw = 0;   // kept for reporting compatibility (always 0)
     size_t statOk = 0;
 
     // D3D/DXGI common
