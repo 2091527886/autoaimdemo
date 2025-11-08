@@ -24,22 +24,20 @@ public:
     // 捕获/GPU
     // cap: 0=DXGI DDA, 1=WGC(Windows Graphics Capture)
     int  cap = 0;
-    bool cap_enum = false;      // 枚举打印
+    bool cap_enum = false;      // 枚举打印（调试用，默认关）
     int  cap_gpu = -1;          // 适配器索引
-    std::wstring cap_gpu_name;  // 名称包含匹配（优先）
-    std::wstring cap_gpu_luid;  // 形如 hi:lo
     int  cap_out = 0;           // 输出索引
     bool cap_cursor = false;    // 是否捕获鼠标（WGC）
     bool cap_border = false;    // 是否显示边框（WGC）
     int  cap_retry = 3;         // 捕获失败立即重试次数（0=不重试）
 
     // 可视化
-    const bool enable_visual = true;
-    const std::string window_title = "YOLO Real-time Detection";
+    
+    
 
     // 帧率
-    bool fps_lock = true;                   // 启用帧率锁
-    int  fps = 60;                         // 目标 FPS
+    bool fps_lock = true; // 帧率锁
+    int  fps = 60;      // 目标FPS（更适合高刷显示器）
     // 调度/环境（简化，无显式亲和设置）
 public:
     // 引擎/路径
@@ -47,7 +45,7 @@ public:
     std::string resolve_engine_path() const { return engine_path; }
 
     // 截屏/检测区域
-    const int   crop_size_px   = 640;       // 居中正方形
+    const int   crop_size_px   = 640; // 居中正方形
     const float conf_thresh    = 0.7f;      // 检测阈值
 
     // 操作/热键
@@ -79,7 +77,7 @@ public:
     int  capture_debug_every_n = 30;
     bool log_latency = true;                // 延迟统计
     int  log_latency_every_n = 30;
-    bool latency_on_capture_only = true;
+    bool latency_on_capture_only = true; // 仅采集失败时也计入统计则设为false
     bool capture_timing = true;             // 采集分步计时
     int  capture_timing_every_n = 30;
     bool capture_timing_each_frame = false;
@@ -96,7 +94,6 @@ public:
     bool opt_report = true;
     bool opt_report_capture = true;
     bool opt_report_system = true;
-    bool opt_report_verbose = true;
     int  opt_report_every_n = 30;
 
     // Overlay 绘制
@@ -121,7 +118,7 @@ public:
     bool         ovl_skip_empty = false;       // 无绘制命令时跳过渲染与Present
 
     // Overlay 小窗口
-    bool         ovl_small_window = true;     // 启用小窗口，默认使用裁剪尺寸
+    bool         ovl_small_window = true; // 小窗口（默认使用裁剪尺寸）
     int          ovl_win_x = 0;               // 0 表示默认居中
     int          ovl_win_y = 0;               // 0 表示默认居中
     int          ovl_win_w = crop_size_px;    // 默认用检测裁剪尺寸
@@ -139,7 +136,7 @@ public:
     // 跟踪
     // 线程调度
     // 主线程
-    bool mmcss_main = false;  // 默认关
+    bool mmcss_main = false; // 默认关（当前未使用，仅保留占位）
     std::wstring mmcss_task = L"Capture";
     AVRT_PRIORITY mmcss_prio = AVRT_PRIORITY_HIGH;
     bool enable_thread_mem_prio = false;

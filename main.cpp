@@ -14,7 +14,7 @@
 extern std::atomic<bool> g_exit_req;
 extern std::atomic<bool> g_exit_done;
 
-#include <opencv2/opencv.hpp>
+#include <opencv2/core.hpp>
 #include "Config.hpp"
 #include "Timing.hpp"
 #include "SystemTuner.hpp"
@@ -93,7 +93,6 @@ public:
         hk(c),
         crop((cap.w() - c.crop_size_px) / 2, (cap.h() - c.crop_size_px) / 2, c.crop_size_px, c.crop_size_px),
         ctr(c.crop_size_px / 2, c.crop_size_px / 2),
-        vis(c.enable_visual),
         lat(static_cast<size_t>(std::max(1, c.log_latency_every_n))),
         fc(c)
     {
@@ -103,9 +102,6 @@ public:
         }
         mfac = (c.hfov_deg / static_cast<double>(cap.w()))
             * (c.px_per_360 / 360.0);
-        if (vis) {
-            cv::namedWindow(c.window_title, cv::WINDOW_AUTOSIZE);
-        }
         lg::o() << "Detect center " << c.crop_size_px << "x" << c.crop_size_px << lg::endl;
         // init AimAlgo (PropAlgo-based)
         algo.setConfig(c);
@@ -126,7 +122,6 @@ public:
         /* inference on main thread: no det.stop() */
         
         if (c.ovl) gover.Stop();
-        if (vis) cv::destroyAllWindows();
     }
 
     void loop() {
@@ -160,11 +155,10 @@ public:
 
             // inference on main thread
             od.detect(img, ds, c, tm);
-            det_ms_last = c.timing ? (tm.infer_ms + tm.post_ms) : 0.0;
             // overlay draw on main thread (moved below)
             double ovl_ms = 0.0;
             // [overlay moved below]
-            fl.det_ms = det_ms_last;
+            fl.det_ms = c.timing ? (tm.infer_ms + tm.post_ms) : 0.0;
 
             
             
@@ -256,14 +250,14 @@ public:
                 tm.loop_ms = proc_ms;
             }
             // E2E≈max(loop,cap,det,io)。注意：ctl_ms 不含 mou_ms，避免重复计时
-            if (c.timing) { double loop_e2e = std::max({tm.loop_ms, fl.cap_ms, fl.det_ms, fl.mou_ms, fl.ctl_ms, fl.ovl_ms});
-            fl.loop_ms = loop_e2e;
-            e2e_ms_last = loop_e2e; }
+            if (c.timing) {
+                double loop_e2e = std::max({tm.loop_ms, fl.cap_ms, fl.det_ms, fl.mou_ms, fl.ctl_ms, fl.ovl_ms});
+                fl.loop_ms = loop_e2e;
+            }
 
            // CSV async
             
-            // dt 按需计算（在执行算法前获取），此处仅保留统计输出
-            if (c.timing) stats();
+            // dt 按需计算（在执行算法前获取）
 
             if (c.timing && c.log_latency) {
                 lat.push(fl);
@@ -277,9 +271,6 @@ public:
                             << "drop=" << drop_now
                             << " | ovr=" << fc.ovr << "ms"
                             << lg::endl << lg::df;
-                    // vis cache
-                    dropS = drop_now;
-                    ovrS = fc.ovr;
                     drop_prev = fc.drop;
                 }
             }
@@ -294,74 +285,11 @@ public:
                 tm.trt_gpu_lat.clear();
             }
 
-            if (vis) {
-                draw();
-            }
-            char key = static_cast<char>(cv::waitKey(1));
             if (g_exit_req.load(std::memory_order_relaxed)) { break; }
-            if (key == 27) { // ESC
-                lg::o() << lg::nl << P_I "ESC, exit" << lg::endl;
-                break;
-            }
-            if (key == 'v' || key == 'V') {
-                toggle();
-            }
         }
     }
 
 private:
-    void stats() {
-        const double smoothing_factor = 0.05;
-        if (first) {
-            tTot = tm.loop_ms;
-            first = false;
-        }
-        else {
-            tTot = smoothing_factor * tm.loop_ms + (1.0 - smoothing_factor) * tTot;
-        }
-
-    }
-
-    void draw() {
-        for (const auto& det : ds) {
-            // 显示全部；跟踪"*"；当前目标红框
-            cv::Scalar color = c.is_target(det.class_id) ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0);
-            cv::rectangle(img, det.box, color, 2);
-            std::string label = c.name_or_id(det.class_id) + (c.is_target(det.class_id) ? "*" : "") +
-                                 " " + cv::format("%.2f", det.confidence);
-            cv::putText(img, label, cv::Point(det.box.x, det.box.y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 1);
-        }
-        if (tTot > 0) {
-            // FPS≈E2E
-            double e2e = (e2e_ms_last > 0.0 ? e2e_ms_last : tTot);
-            double smoothed_fps = 1000.0 / e2e;
-            std::ostringstream stats_stream;
-            stats_stream << lg::fx1 << "FPS: " << smoothed_fps << lg::df;
-            cv::putText(img, stats_stream.str(), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 255), 2);
-            // DET/DROP/OVR
-            std::ostringstream line2;
-            line2 << lg::fx1;
-            if (det_ms_last > 0.0) {
-                line2 << "DET: " << (1000.0 / det_ms_last) << " | ";
-            }
-            line2 << "DROP: " << dropS << " | OVR: " << ovrS << "ms" << lg::df;
-            cv::putText(img, line2.str(), cv::Point(10, 60), cv::FONT_HERSHEY_SIMPLEX, 0.9, cv::Scalar(0, 220, 255), 2);
-        }
-        cv::imshow(c.window_title, img);
-    }
-
-    void toggle() {
-        vis = !vis;
-        if (vis) {
-            cv::namedWindow(c.window_title, cv::WINDOW_AUTOSIZE);
-            lg::o() << lg::nl << P_I "Vis ON" << lg::endl;
-        }
-        else {
-            cv::destroyAllWindows();
-            lg::o() << lg::nl << P_I "Vis OFF" << lg::endl;
-        }
-    }
-
     Config c;
     ScreenCapturer cap;
     ObjDet od;
@@ -375,11 +303,6 @@ private:
     cv::Mat img;
     std::vector<Detection> ds;
     Timing tm;
-    bool vis;
-    double det_ms_last = 0.0;
-    double e2e_ms_last = 0.0;
-    double tTot = 0.0;
-    bool first = true;
     // latency agg
     LatAgg lat;
 
@@ -387,8 +310,6 @@ private:
     FpsCtl fc;
     size_t fcnt = 0;      // throttle cnt
     size_t drop_prev = 0; // last drop sum
-    size_t dropS = 0;     // vis cache
-    double ovrS = 0.0;
 
     std::chrono::high_resolution_clock::time_point last_dt_ts = std::chrono::high_resolution_clock::now();
 
