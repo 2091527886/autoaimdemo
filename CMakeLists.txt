@@ -42,10 +42,38 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(OpenCV REQUIRED)
-find_package(TensorRT-YOLO REQUIRED)
+
+# TensorRT-YOLO as submodule build
+# Provide TensorRT install path (Windows example default)
+set(TRT_PATH "C:/cuda/TensorRT-10.9.0.34" CACHE PATH "Path to TensorRT installation (e.g., C:/cuda/TensorRT-10.9.0.34)")
+# Build embedded TensorRT-YOLO library and plugins
+add_subdirectory(${CMAKE_SOURCE_DIR}/TensorRT-YOLO)
+
+# Ensure MSVC compiles trtyolo with UTF-8 and NOMINMAX to avoid header parsing issues
+if(MSVC)
+  if(TARGET trtyolo)
+    target_compile_options(trtyolo PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/utf-8> $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/utf-8>)
+    target_compile_definitions(trtyolo PRIVATE NOMINMAX)
+  endif()
+endif()
 
 if(MSVC)
-  add_compile_options(/W4 /permissive- /utf-8)
+  # Apply MSVC warnings/standards only to C++ sources, avoid leaking raw MSVC flags into NVCC
+  add_compile_options(
+    $<$<COMPILE_LANGUAGE:CXX>:/W4>
+    $<$<COMPILE_LANGUAGE:CXX>:/permissive->
+    $<$<COMPILE_LANGUAGE:CXX>:/utf-8>
+  )
+endif()
+
+# Copy TensorRT runtime DLLs after build (Windows only)
+if(WIN32)
+  set(TRT_BIN_DIR "${TRT_PATH}/lib")
+  set(TRT_DLLS
+    nvinfer_10.dll
+    nvinfer_plugin_10.dll
+    nvonnxparser_10.dll
+  )
 endif()
 
 # 2) 可执行目标
@@ -89,20 +117,35 @@ endif()
 
 target_include_directories(aimassistant PRIVATE
     ${OpenCV_INCLUDE_DIRS}
-    ${TensorRT-YOLO_INCLUDE_DIRS}
+    ${CMAKE_SOURCE_DIR}/TensorRT-YOLO/modules/trtyolo/infer
 )
 
 # 私有链接库
 target_link_libraries(aimassistant PRIVATE
     ${OpenCV_LIBS}
-    ${TensorRT-YOLO_LIBs}
+    trtyolo
 )
 
 
-# 7) 复制根目录下 DLL 至运行目录（确保运行时能找到 InputSimulator DLL）
+# 7) 复制运行所需 DLL 至运行目录
 set(INPUT_SIM_DLL "${CMAKE_SOURCE_DIR}/IbInputSimulator.dll")
 add_custom_command(TARGET aimassistant POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E echo "Post-build: copy IbInputSimulator.dll if present"
   COMMAND ${CMAKE_COMMAND} -E copy_if_different "${INPUT_SIM_DLL}" "$<TARGET_FILE_DIR:aimassistant>"
 )
+
+# Post-build copy TensorRT runtime DLLs
+if(WIN32)
+  foreach(dll ${TRT_DLLS})
+    add_custom_command(TARGET aimassistant POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E echo "Post-build: copy ${dll} if present"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different "${TRT_BIN_DIR}/${dll}" "$<TARGET_FILE_DIR:aimassistant>"
+    )
+  endforeach()
+  # Also copy built trtyolo.dll beside the executable
+  add_custom_command(TARGET aimassistant POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "Post-build: copy trtyolo.dll if present"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:trtyolo>" "$<TARGET_FILE_DIR:aimassistant>"
+  )
+endif()
 
