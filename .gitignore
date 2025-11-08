@@ -65,5 +65,14 @@ coverage/
 *.swp
 *.bak
 
+# Archives
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+
+# Local files
 1.txt
 sunone/
