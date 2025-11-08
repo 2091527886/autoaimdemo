@@ -223,6 +223,9 @@ public:
     bool                        input;   // < 是否为输入张量
     std::unique_ptr<BaseBuffer> buffer;  // < 张量对应的内存
 
+    // 访问器：查询绑定数据类型
+    nvinfer1::DataType dtype() const { return dtype_; }
+
     /**
      * @brief 构造函数，初始化张量信息
      *

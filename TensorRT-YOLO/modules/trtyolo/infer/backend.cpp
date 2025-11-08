@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <cstdint>
 
 #include "backend.hpp"
 
@@ -139,7 +140,9 @@ void TrtBackend::captureCudaGraph() {
     auto calculate_input_size_and_device = [&](int idx, int input_width, int input_height) {
         size_t input_size   = input_height * input_width * max_shape.y;
         void*  input_device = static_cast<uint8_t*>(inputs_buffer_->device()) + idx * input_size;
-        void*  infer_device = static_cast<float*>(tensor_infos.front().buffer->device()) + idx * infer_size_;
+        void*  infer_device = (tensor_infos.front().dtype() == nvinfer1::DataType::kHALF)
+                             ? static_cast<void*>(static_cast<uint16_t*>(tensor_infos.front().buffer->device()) + idx * infer_size_)
+                             : static_cast<void*>(static_cast<float*>(tensor_infos.front().buffer->device()) + idx * infer_size_);
         return std::make_pair(input_device, infer_device);
     };
 
@@ -147,33 +150,62 @@ void TrtBackend::captureCudaGraph() {
     auto warp_affine = [&](bool multi, int input_width, int input_height) {
         if (multi) {
             // Multi-instance WarpAffine
-            cudaMultiLetterbox(
-                inputs_buffer_->device(),
-                input_width,
-                input_height,
-                input_width * max_shape.y,
-                tensor_infos.front().buffer->device(),
-                max_shape.w,
-                max_shape.z,
-                affine_transforms.front(),
-                infer_config.config,
-                max_shape.x,
-                stream);
+            if (tensor_infos.front().dtype() == nvinfer1::DataType::kHALF) {
+                cudaMultiLetterboxHalf(
+                    inputs_buffer_->device(),
+                    input_width,
+                    input_height,
+                    input_width * max_shape.y,
+                    tensor_infos.front().buffer->device(),
+                    max_shape.w,
+                    max_shape.z,
+                    affine_transforms.front(),
+                    infer_config.config,
+                    max_shape.x,
+                    stream);
+            } else {
+                cudaMultiLetterbox(
+                    inputs_buffer_->device(),
+                    input_width,
+                    input_height,
+                    input_width * max_shape.y,
+                    tensor_infos.front().buffer->device(),
+                    max_shape.w,
+                    max_shape.z,
+                    affine_transforms.front(),
+                    infer_config.config,
+                    max_shape.x,
+                    stream);
+            }
         } else {
             // Single-instance WarpAffine
             for (int idx = 0; idx < max_shape.x; ++idx) {
                 auto [input_device, infer_device] = calculate_input_size_and_device(idx, input_width, input_height);
-                cudaLetterbox(
-                    input_device,
-                    input_width,
-                    input_height,
-                    input_width * max_shape.y,
-                    infer_device,
-                    max_shape.w,
-                    max_shape.z,
-                    affine_transforms[idx],
-                    infer_config.config,
-                    stream);
+                if (tensor_infos.front().dtype() == nvinfer1::DataType::kHALF) {
+                    cudaLetterboxHalf(
+                        input_device,
+                        input_width,
+                        input_height,
+                        input_width * max_shape.y,
+                        infer_device,
+                        max_shape.w,
+                        max_shape.z,
+                        affine_transforms[idx],
+                        infer_config.config,
+                        stream);
+                } else {
+                    cudaLetterbox(
+                        input_device,
+                        input_width,
+                        input_height,
+                        input_width * max_shape.y,
+                        infer_device,
+                        max_shape.w,
+                        max_shape.z,
+                        affine_transforms[idx],
+                        infer_config.config,
+                        stream);
+                }
             }
         }
     };
@@ -229,7 +261,9 @@ void TrtBackend::staticInfer(const std::vector<Image>& inputs) {
         if (infer_config.cuda_mem) {
             for (int idx = 0; idx < num; ++idx) {
                 // 计算 infer_device_ptr，避免重复计算
-                auto infer_device_ptr = static_cast<float*>(tensor_infos.front().buffer->device()) + idx * infer_size_;
+                void* infer_device_ptr = (tensor_infos.front().dtype() == nvinfer1::DataType::kHALF)
+                                            ? static_cast<void*>(static_cast<uint16_t*>(tensor_infos.front().buffer->device()) + idx * infer_size_)
+                                            : static_cast<void*>(static_cast<float*>(tensor_infos.front().buffer->device()) + idx * infer_size_);
 
                 void* kernelParams[] = {
                     (void*)&inputs[idx].ptr,
@@ -281,7 +315,9 @@ void TrtBackend::staticInfer(const std::vector<Image>& inputs) {
         for (int idx = 0; idx < num; ++idx) {
             affine_transforms[idx].updateParams(inputs[idx].width, inputs[idx].height, max_shape.w, max_shape.z);
             // 计算 infer_device_ptr，避免重复计算
-            auto infer_device_ptr = static_cast<float*>(tensor_infos.front().buffer->device()) + idx * infer_size_;
+            void* infer_device_ptr = (tensor_infos.front().dtype() == nvinfer1::DataType::kHALF)
+                                        ? static_cast<void*>(static_cast<uint16_t*>(tensor_infos.front().buffer->device()) + idx * infer_size_)
+                                        : static_cast<void*>(static_cast<float*>(tensor_infos.front().buffer->device()) + idx * infer_size_);
 
             void* kernelParams[] = {
                 infer_config.cuda_mem ? (void*)&inputs[idx].ptr : (void*)&input_ptr,
@@ -337,17 +373,31 @@ void TrtBackend::dynamicInfer(const std::vector<Image>& inputs) {
         }
 
         for (int idx = 0; idx < num; ++idx) {
-            cudaLetterbox(
-                infer_config.cuda_mem ? inputs[idx].ptr : static_cast<uint8_t*>(inputs_buffer_->device()) + idx * input_size_,
-                inputs[idx].width,
-                inputs[idx].height,
-                inputs[idx].pitch,
-                static_cast<float*>(tensor_infos.front().buffer->device()) + idx * infer_size_,
-                max_shape.w,
-                max_shape.z,
-                affine_transforms.front(),
-                infer_config.config,
-                stream);
+            if (tensor_infos.front().dtype() == nvinfer1::DataType::kHALF) {
+                cudaLetterboxHalf(
+                    infer_config.cuda_mem ? inputs[idx].ptr : static_cast<uint8_t*>(inputs_buffer_->device()) + idx * input_size_,
+                    inputs[idx].width,
+                    inputs[idx].height,
+                    inputs[idx].pitch,
+                    static_cast<uint16_t*>(tensor_infos.front().buffer->device()) + idx * infer_size_,
+                    max_shape.w,
+                    max_shape.z,
+                    affine_transforms.front(),
+                    infer_config.config,
+                    stream);
+            } else {
+                cudaLetterbox(
+                    infer_config.cuda_mem ? inputs[idx].ptr : static_cast<uint8_t*>(inputs_buffer_->device()) + idx * input_size_,
+                    inputs[idx].width,
+                    inputs[idx].height,
+                    inputs[idx].pitch,
+                    static_cast<float*>(tensor_infos.front().buffer->device()) + idx * infer_size_,
+                    max_shape.w,
+                    max_shape.z,
+                    affine_transforms.front(),
+                    infer_config.config,
+                    stream);
+            }
         }
     } else {
         int              total_size = 0;
@@ -378,33 +428,61 @@ void TrtBackend::dynamicInfer(const std::vector<Image>& inputs) {
             // 在设备内存中进行 WarpAffine 操作
             uint8_t* input_device = static_cast<uint8_t*>(inputs_buffer_->device());
             for (int idx = 0; idx < num; ++idx) {
-                cudaLetterbox(
-                    input_device,
-                    inputs[idx].width,
-                    inputs[idx].height,
-                    inputs[idx].pitch,
-                    static_cast<float*>(tensor_infos.front().buffer->device()) + idx * infer_size_,
-                    max_shape.w,
-                    max_shape.z,
-                    affine_transforms[idx],
-                    infer_config.config,
-                    stream);
+                if (tensor_infos.front().dtype() == nvinfer1::DataType::kHALF) {
+                    cudaLetterboxHalf(
+                        input_device,
+                        inputs[idx].width,
+                        inputs[idx].height,
+                        inputs[idx].pitch,
+                        static_cast<uint16_t*>(tensor_infos.front().buffer->device()) + idx * infer_size_,
+                        max_shape.w,
+                        max_shape.z,
+                        affine_transforms[idx],
+                        infer_config.config,
+                        stream);
+                } else {
+                    cudaLetterbox(
+                        input_device,
+                        inputs[idx].width,
+                        inputs[idx].height,
+                        inputs[idx].pitch,
+                        static_cast<float*>(tensor_infos.front().buffer->device()) + idx * infer_size_,
+                        max_shape.w,
+                        max_shape.z,
+                        affine_transforms[idx],
+                        infer_config.config,
+                        stream);
+                }
                 input_device += input_sizes[idx];
             }
         } else {
             // 直接在设备内存上进行 WarpAffine 操作
             for (int idx = 0; idx < num; ++idx) {
-                cudaLetterbox(
-                    inputs[idx].ptr,
-                    inputs[idx].width,
-                    inputs[idx].height,
-                    inputs[idx].pitch,
-                    static_cast<float*>(tensor_infos.front().buffer->device()) + idx * infer_size_,
-                    max_shape.w,
-                    max_shape.z,
-                    affine_transforms[idx],
-                    infer_config.config,
-                    stream);
+                if (tensor_infos.front().dtype() == nvinfer1::DataType::kHALF) {
+                    cudaLetterboxHalf(
+                        inputs[idx].ptr,
+                        inputs[idx].width,
+                        inputs[idx].height,
+                        inputs[idx].pitch,
+                        static_cast<uint16_t*>(tensor_infos.front().buffer->device()) + idx * infer_size_,
+                        max_shape.w,
+                        max_shape.z,
+                        affine_transforms[idx],
+                        infer_config.config,
+                        stream);
+                } else {
+                    cudaLetterbox(
+                        inputs[idx].ptr,
+                        inputs[idx].width,
+                        inputs[idx].height,
+                        inputs[idx].pitch,
+                        static_cast<float*>(tensor_infos.front().buffer->device()) + idx * infer_size_,
+                        max_shape.w,
+                        max_shape.z,
+                        affine_transforms[idx],
+                        infer_config.config,
+                        stream);
+                }
             }
         }
     }

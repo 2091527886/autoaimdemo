@@ -43,10 +43,21 @@ void cudaLetterbox(const void* src, int src_cols, int src_rows, size_t src_pitch
                    void* dst, int dst_cols, int dst_rows,
                    const LetterboxTransform& params, const ProcessConfig config, cudaStream_t stream);
 
+// Half 精度输出版本（__half）
+void cudaLetterboxHalf(const void* src, int src_cols, int src_rows, size_t src_pitch,
+                       void* dst, int dst_cols, int dst_rows,
+                       const LetterboxTransform& params, const ProcessConfig config, cudaStream_t stream);
+
 // 多图批处理版本，src/dst 是连续内存（与现 backend 使用一致）
 void cudaMultiLetterbox(const void* src, int src_cols, int src_rows, size_t src_pitch,
                         void* dst, int dst_cols, int dst_rows,
                         const LetterboxTransform& params, const ProcessConfig config,
                         int num_images, cudaStream_t stream);
+
+// 多图 Half 精度输出版本
+void cudaMultiLetterboxHalf(const void* src, int src_cols, int src_rows, size_t src_pitch,
+                            void* dst, int dst_cols, int dst_rows,
+                            const LetterboxTransform& params, const ProcessConfig config,
+                            int num_images, cudaStream_t stream);
 
 } // namespace trtyolo

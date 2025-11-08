@@ -44,6 +44,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(OpenCV REQUIRED)
 
 # TensorRT-YOLO as submodule build
+# Force CUDA to target only RTX 3060 (SM 86). We don't care other GPUs.
+set(CMAKE_CUDA_ARCHITECTURES 86)
 # Provide TensorRT install path (Windows example default)
 set(TRT_PATH "C:/cuda/TensorRT-10.9.0.34" CACHE PATH "Path to TensorRT installation (e.g., C:/cuda/TensorRT-10.9.0.34)")
 # Build embedded TensorRT-YOLO library and plugins
