@@ -394,6 +394,7 @@ public:
      * @param swap_rb
      */
     void set_rb();
+    void enableSwapRB();
 
     /**
      * @brief 设置边界值

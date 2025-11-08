@@ -75,6 +75,7 @@ void InferOption::enableCudaMem() { impl_->enableCudaMem(); }
 void InferOption::enableManagedMemory() { impl_->enableManagedMemory(); }
 void InferOption::enablePerformanceReport() { impl_->enablePerformanceReport(); }
 void InferOption::set_rb() { impl_->set_rb(); }
+void InferOption::enableSwapRB() { impl_->set_rb(); }
 void InferOption::setBorderValue(float border_value) { impl_->setBorderValue(border_value); }
 void InferOption::setNormalizeParams(const std::vector<float>& mean, const std::vector<float>& std) { impl_->setNormalizeParams(mean, std); }
 void InferOption::setInputDimensions(int width, int height) { impl_->setInputDimensions(height, width); }

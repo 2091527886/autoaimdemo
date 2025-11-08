@@ -40,10 +40,11 @@ __global__ void gpuLetterboxF32Vec2(const void* src, int src_cols, int src_rows,
 
     const uint8_t* s = static_cast<const uint8_t*>(src);
 
+    float r[2], g[2], b[2];
     #pragma unroll
     for (int k = 0; k < 2; ++k) {
         int x = px + k;
-        if (x >= dst_cols) break;
+        if (x >= dst_cols) { r[k]=g[k]=b[k]=0.f; continue; }
 
         float src_x = (static_cast<float>(x) - static_cast<float>(params.pad_x)) / params.scale;
         float src_y = (static_cast<float>(y) - static_cast<float>(params.pad_y)) / params.scale;
@@ -68,14 +69,21 @@ __global__ void gpuLetterboxF32Vec2(const void* src, int src_cols, int src_rows,
         sum.y = wx0 * wy0 * p00.y + wx1 * wy0 * p10.y + wx0 * wy1 * p01.y + wx1 * wy1 * p11.y;
         sum.z = wx0 * wy0 * p00.z + wx1 * wy0 * p10.z + wx0 * wy1 * p01.z + wx1 * wy1 * p11.z;
 
-        float r = sum.x * config.alpha.x + config.beta.x;
-        float g = sum.y * config.alpha.y + config.beta.y;
-        float b = sum.z * config.alpha.z + config.beta.z;
+        r[k] = sum.x * config.alpha.x + config.beta.x;
+        g[k] = sum.y * config.alpha.y + config.beta.y;
+        b[k] = sum.z * config.alpha.z + config.beta.z;
+    }
 
-        float* out = out_row + k;
-        out[0]           = r;
-        out[plane]       = g;
-        out[plane * 2]   = b;
+    bool full = (px + 1) < dst_cols;
+    if (full) {
+        // vectorized stores for CHW planes
+        reinterpret_cast<float2*>(out_row)[0]             = make_float2(r[0], r[1]);
+        reinterpret_cast<float2*>(out_row + plane)[0]     = make_float2(g[0], g[1]);
+        reinterpret_cast<float2*>(out_row + plane * 2)[0] = make_float2(b[0], b[1]);
+    } else {
+        out_row[0]               = r[0];
+        out_row[plane]           = g[0];
+        out_row[plane*2]         = b[0];
     }
 }
 
