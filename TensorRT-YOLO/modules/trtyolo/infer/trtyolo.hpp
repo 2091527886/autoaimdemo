@@ -393,7 +393,7 @@ public:
      *
      * @param swap_rb
      */
-    void enableSwapRB();
+    void set_rb();
 
     /**
      * @brief 设置边界值

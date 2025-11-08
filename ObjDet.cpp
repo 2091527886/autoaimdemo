@@ -27,8 +27,9 @@ ObjDet::ObjDet(const Config& cfg)
     lg::o() << P_I "Load TRT: " << engine << lg::endl;
 
     trtyolo::InferOption opt;
-    opt.enableSwapRB();
-    opt.setInputDimensions(cfg.crop_size_px, cfg.crop_size_px);
+    opt.set_rb();
+    // Do not set fixed input dimensions to preserve BGRA pitch; use dynamic path
+    // opt.setInputDimensions(cfg.crop_size_px, cfg.crop_size_px);
     if (cfg.perf_report) {
         opt.enablePerformanceReport();
     }

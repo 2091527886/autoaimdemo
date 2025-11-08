@@ -50,7 +50,7 @@ public:
     void        enableManagedMemory() { infer_config.enable_managed_memory = true; }
     void        enablePerformanceReport() { infer_config.enable_performance_report = true; }
     void        setInputDimensions(int width, int height) { infer_config.input_shape = make_int2(height, width); }
-    void        enableSwapRB() { infer_config.config.swap_rb = true; }
+    void        set_rb() { infer_config.config.rb = true; }
     void        setBorderValue(float value) { infer_config.config.border_value = value; }
     void        setNormalizeParams(const std::vector<float>& mean, const std::vector<float>& std) {
         assert(mean.size() == 3 && std.size() == 3 && "ProcessConfig: requires the size of mean and std to be 3.");
@@ -74,7 +74,7 @@ void InferOption::setDeviceId(int id) { impl_->setDeviceId(id); }
 void InferOption::enableCudaMem() { impl_->enableCudaMem(); }
 void InferOption::enableManagedMemory() { impl_->enableManagedMemory(); }
 void InferOption::enablePerformanceReport() { impl_->enablePerformanceReport(); }
-void InferOption::enableSwapRB() { impl_->enableSwapRB(); }
+void InferOption::set_rb() { impl_->set_rb(); }
 void InferOption::setBorderValue(float border_value) { impl_->setBorderValue(border_value); }
 void InferOption::setNormalizeParams(const std::vector<float>& mean, const std::vector<float>& std) { impl_->setNormalizeParams(mean, std); }
 void InferOption::setInputDimensions(int width, int height) { impl_->setInputDimensions(height, width); }

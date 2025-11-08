@@ -85,25 +85,24 @@ __device__ void warp_affine_bilinear(const uint8_t* src, const int src_cols, con
     bool   flag3 = in_bounds(src_x1, src_y1, src_cols, src_rows);
 
     float3  border_value = make_float3(config.border_value, config.border_value, config.border_value);
-    uchar3* input        = (uchar3*)((uint8_t*)src + src_y0 * src_pitch);
-    src_value0           = flag0 ? uchar3_to_float3(input[src_x0]) : border_value;
-    src_value1           = flag1 ? uchar3_to_float3(input[src_x1]) : border_value;
+    // Input is BGRA; convert to RGB on-GPU and ignore alpha
+    uchar4* input4       = (uchar4*)((uint8_t*)src + src_y0 * src_pitch);
+    uchar4 p00           = flag0 ? input4[src_x0] : make_uchar4((uint8_t)config.border_value, (uint8_t)config.border_value, (uint8_t)config.border_value, 255);
+    uchar4 p10           = flag1 ? input4[src_x1] : make_uchar4((uint8_t)config.border_value, (uint8_t)config.border_value, (uint8_t)config.border_value, 255);
+    src_value0           = make_float3(p00.z, p00.y, p00.x);
+    src_value1           = make_float3(p10.z, p10.y, p10.x);
     value0               = wx0 * wy0 * src_value0;
     value1               = wx1 * wy0 * src_value1;
     float3 sum           = value0 + value1;
 
-    input       = (uchar3*)((uint8_t*)src + src_y1 * src_pitch);
-    src_value0  = flag2 ? uchar3_to_float3(input[src_x0]) : border_value;
-    src_value1  = flag3 ? uchar3_to_float3(input[src_x1]) : border_value;
+    input4      = (uchar4*)((uint8_t*)src + src_y1 * src_pitch);
+    uchar4 p01  = flag2 ? input4[src_x0] : make_uchar4((uint8_t)config.border_value, (uint8_t)config.border_value, (uint8_t)config.border_value, 255);
+    uchar4 p11  = flag3 ? input4[src_x1] : make_uchar4((uint8_t)config.border_value, (uint8_t)config.border_value, (uint8_t)config.border_value, 255);
+    src_value0  = make_float3(p01.z, p01.y, p01.x);
+    src_value1  = make_float3(p11.z, p11.y, p11.x);
     value0      = wx0 * wy1 * src_value0;
     value1      = wx1 * wy1 * src_value1;
     sum        += value0 + value1;
-
-    if (config.swap_rb) {
-        float temp = sum.x;
-        sum.x      = sum.z;
-        sum.z      = temp;
-    }
 
     float* output                   = (float*)dst + element_y * dst_cols + element_x;
     output[0]                       = sum.x * config.alpha.x + config.beta.x;

@@ -143,7 +143,7 @@ bool ScreenCapturer::cap_wgc(cv::Mat& frame, const cv::Rect& crop_region) {
         // Convert
         cv::Mat bgra(crop_region.height, crop_region.width, CV_8UC4, mr.pData, mr.RowPitch);
         auto t_cvt_s = do_tim ? clock::now() : clock::time_point{};
-        cv::cvtColor(bgra, frame, cv::COLOR_BGRA2BGR);
+        frame = bgra.clone(); // keep BGRA, avoid CPU-side color conversion
         auto t_cvt_e = do_tim ? clock::now() : t_cvt_s;
         if (do_tim) cvc = std::chrono::duration<double, std::milli>(t_cvt_e - t_cvt_s).count();
 
