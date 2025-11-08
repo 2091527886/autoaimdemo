@@ -113,13 +113,6 @@ void ScreenCapturer::dbgTick() {
     }
 }
 
-bool ScreenCapturer::capture(cv::Mat& frame, const cv::Rect& crop_region) {
-    if (useWgc) {
-        return cap_wgc(frame, crop_region);
-    }
-    return cap_dxgi(frame, crop_region);
-}
-
 bool ScreenCapturer::capture_view(ScreenCapturer::CapturedView& view, const cv::Rect& crop_region) {
     const bool do_tim = cfg.capture_timing && cfg.timing;
     using clock = std::chrono::high_resolution_clock;

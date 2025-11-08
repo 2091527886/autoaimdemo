@@ -2,7 +2,6 @@
 
 #include <vector>
 #include <memory>
-#include <opencv2/core.hpp>
 #include "Detection.hpp"
 #include "Reporting.hpp"
 
@@ -17,11 +16,6 @@ public:
     ObjDet(const ObjDet&) = delete;
     ObjDet& operator=(const ObjDet&) = delete;
     ~ObjDet();
-
-    void detect(const cv::Mat& img,
-                std::vector<Detection>& out,
-                const Config& cfg,
-                Timing& tm);
 
     // Zero-copy detect from BGRA pointer (pitch in bytes)
     void detect_view(unsigned char* data,

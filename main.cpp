@@ -144,17 +144,8 @@ public:
             } else {
                 got = cap.capture_view(view, crop);
             }
-            if (!got) {
-                // fallback to legacy copy path to keep functionality when view unsupported
-                if (c.timing) {
-                    auto tcap0 = std::chrono::high_resolution_clock::now();
-                    got = cap.capture(img, crop);
-                    auto tcap1 = std::chrono::high_resolution_clock::now();
-                    cap_ms = std::chrono::duration<double, std::milli>(tcap1 - tcap0).count();
-                } else {
-                    got = cap.capture(img, crop);
-                }
-            }
+            // no fallback clone path: strictly zero-copy view
+            
             if (!got) {
                 fl.cap_ms = cap_ms;
                 if (c.timing && c.log_latency && !c.latency_on_capture_only) {
@@ -165,12 +156,14 @@ public:
             c.frame_idx++; fl.idx = c.frame_idx;
             fl.cap_ms = cap_ms;
 
-            // inference on main thread
+            // inference on main thread (strict zero-copy)
             if (view.mapped && view.data) {
                 od.detect_view(view.data, view.width, view.height, view.pitch, ds, c, tm);
                 cap.release_view(view);
             } else {
-                od.detect(img, ds, c, tm);
+                // unexpected: no mapped view; skip this frame to keep freshness
+                cap.release_view(view);
+                continue;
             }
             // overlay draw on main thread (moved below)
             double ovl_ms = 0.0;
@@ -317,7 +310,8 @@ private:
     const cv::Rect crop;
     const cv::Point ctr;
     double mfac = 1.0;
-    cv::Mat img;
+    // removed legacy CPU clone buffer
+    // cv::Mat img;
     std::vector<Detection> ds;
     Timing tm;
     // latency agg

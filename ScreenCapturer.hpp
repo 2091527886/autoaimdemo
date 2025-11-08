@@ -1,7 +1,7 @@
 #pragma once
 
 #include <array>
-#include <opencv2/opencv.hpp>
+#include <opencv2/core.hpp>
 #include "Reporting.hpp"
 #include <windows.h>
 #include <atomic>
@@ -34,7 +34,6 @@ public:
     ScreenCapturer(const ScreenCapturer&) = delete;
     ScreenCapturer& operator=(const ScreenCapturer&) = delete;
 
-    bool capture(cv::Mat& frame, const cv::Rect& crop_region);
     // zero-copy view capture (caller must call release_view once done)
     bool capture_view(CapturedView& view, const cv::Rect& crop_region);
     void release_view(CapturedView& view);
@@ -50,8 +49,6 @@ private:
     // backend split (no logic change)
     bool init_dxgi();
     bool init_wgc();
-    bool cap_dxgi(cv::Mat& frame, const cv::Rect& crop_region);
-    bool cap_wgc(cv::Mat& frame, const cv::Rect& crop_region);
     bool cap_wgc_view(CapturedView& view, const cv::Rect& crop_region);
     void rel_wgc();
 

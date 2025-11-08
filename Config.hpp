@@ -84,7 +84,7 @@ public:
     bool capture_timing_on_success = true;
     
     // 提交：是否在 Copy 后立即 Flush（DXGI/WGC 共用）
-    bool capture_flush_after_copy = true;
+    bool capture_flush_after_copy = false;
 
     bool perf_report = true;                // TRT-YOLO 报告
     int  perf_report_every_n = 30;
@@ -115,7 +115,7 @@ public:
     int          ovl_max_latency = 1;         // 最大帧延迟(1..3)，<=0 表示不控制
 
     // Overlay 空闲节流
-    bool         ovl_skip_empty = false;       // 无绘制命令时跳过渲染与Present
+    bool         ovl_skip_empty = true;       // 无绘制命令时跳过渲染与Present
 
     // Overlay 小窗口
     bool         ovl_small_window = true; // 小窗口（默认使用裁剪尺寸）
@@ -144,8 +144,8 @@ public:
 
 
     // DXGI
-   int dxgi_gpu_prio = 3;                  // -1..7
-   int dxgi_max_latency = 2;               // 1..3 推荐
+   int dxgi_gpu_prio = 5;                  // -1..7
+   int dxgi_max_latency = 0;               // 1..3 推荐
 
     // 辅助
     bool is_target(int cid) const {
