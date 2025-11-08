@@ -112,7 +112,6 @@ void ScreenCapturer::dbgTick() {
         lg::o() << P_C "dbg ds=" << statSkipDirty
                 << " ew=" << statCopyPend
                 << " sd=" << statStillDraw
-                << " cr=" << statCacheRe
                 << " ok=" << statOk << lg::endl;
         // 不清零，保持累计视角
     }
@@ -125,23 +124,11 @@ bool ScreenCapturer::capture(cv::Mat& frame, const cv::Rect& crop_region) {
     return cap_dxgi(frame, crop_region);
 }
 
-bool ScreenCapturer::serveCache(cv::Mat& dst) {
-    if (!cache.empty()) {
-        if (cache.rows == dst.rows && cache.cols == dst.cols && cache.type() == dst.type()) {
-            cache.copyTo(dst);
-            return true;
-        } else {
-            dst = cache.clone();
-            return true;
-        }
-    }
-    return false;
-}
 
 void ScreenCapturer::reportTimes(double t_acquire_ms, double t_qi_ms, double t_copy_ms,
                                     double t_map_ms, double t_cvt_ms, double t_unmap_ms, double t_total_ms) {
     reporter.ReportStepTimings(
         t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms,
-        statSkipDirty, statCopyPend, statStillDraw, statCacheRe, statOk
+        statSkipDirty, statCopyPend, statStillDraw, statOk
     );
 }

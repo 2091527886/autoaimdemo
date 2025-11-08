@@ -24,7 +24,6 @@ public:
     int h() const { return height; }
 
 private:
-    bool serveCache(cv::Mat& dst);
     void reportTimes(double t_acquire_ms, double t_qi_ms, double t_copy_ms,
                                     double t_map_ms, double t_cvt_ms, double t_unmap_ms, double t_total_ms);
     void dbgTick();
@@ -45,12 +44,9 @@ private:
     std::array<struct ID3D11Texture2D*, kStageN> stage{};
     std::array<struct ID3D11Query*,     kStageN> copyQ{};
     size_t idx = 0;
-    cv::Mat cache;
-
     size_t statSkipDirty = 0;
     size_t statCopyPend = 0;
     size_t statStillDraw = 0;
-    size_t statCacheRe = 0;
     size_t statOk = 0;
 
     // D3D/DXGI common

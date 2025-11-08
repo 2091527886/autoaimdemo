@@ -31,6 +31,7 @@ public:
     int  cap_out = 0;           // 输出索引
     bool cap_cursor = false;    // 是否捕获鼠标（WGC）
     bool cap_border = false;    // 是否显示边框（WGC）
+    int  cap_retry = 3;         // 捕获失败立即重试次数（0=不重试）
 
     // 可视化
     const bool enable_visual = true;
@@ -173,6 +174,7 @@ private:
     void v_basic() {
         fps = std::max(1, fps);
         capture_timeout_ms_dxgi = std::max(0, capture_timeout_ms_dxgi);
+        cap_retry = std::max(0, cap_retry);
         log_latency_every_n = std::max(1, log_latency_every_n);
         capture_timing_every_n = std::max(1, capture_timing_every_n);
         perf_report_every_n = std::max(1, perf_report_every_n);

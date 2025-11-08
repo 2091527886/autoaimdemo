@@ -7,6 +7,7 @@
 #include <d3d11.h>
 #include <dxgi1_2.h>
 #include <chrono>
+#include <algorithm>
 
 // WinRT (WGC)
 #include <winrt/Windows.Foundation.h>
@@ -43,7 +44,6 @@ struct ScreenCapturer::WgcCtx {
     winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool pool{ nullptr };
     winrt::Windows::Graphics::Capture::GraphicsCaptureSession sess{ nullptr };
 };
-
 
 bool ScreenCapturer::init_wgc() {
     // Initialize WinRT apartment (moved from ctor)
@@ -90,107 +90,102 @@ void ScreenCapturer::rel_wgc() {
 bool ScreenCapturer::cap_wgc(cv::Mat& frame, const cv::Rect& crop_region) {
     const bool do_tim = cfg.capture_timing && cfg.timing;
     using clock = std::chrono::high_resolution_clock;
+
+    // 累计分段计时（多次尝试累加）
+    double aq_sum = 0.0, qi_sum = 0.0, cp_sum = 0.0, mp_sum = 0.0, cv_sum = 0.0, up_sum = 0.0;
     auto t_total_start = do_tim ? clock::now() : clock::time_point{};
-    double t_acquire_ms = 0.0, t_qi_ms = 0.0, t_copy_ms = 0.0, t_map_ms = 0.0, t_cvt_ms = 0.0, t_unmap_ms = 0.0, t_total_ms = 0.0;
 
-    auto t_acq_s = do_tim ? clock::now() : clock::time_point{};
-    auto frm = wgc->pool.TryGetNextFrame(); // timeout controlled via event pacing (1ms)
-    auto t_acq_e = do_tim ? clock::now() : t_acq_s;
-    if (do_tim) t_acquire_ms = std::chrono::duration<double, std::milli>(t_acq_e - t_acq_s).count();
+    const int tries = std::max(1, 1 + cfg.cap_retry);
 
-    if (!frm) {
-        bool served = serveCache(frame);
-        if (!served && do_tim && !cfg.capture_timing_on_success) {
-            t_total_ms = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
-            reportTimes(t_acquire_ms, 0.0, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
+    for (int attempt = 0; attempt < tries; ++attempt) {
+        double aq = 0.0, qi = 0.0, cp = 0.0, mp = 0.0, cvc = 0.0, up = 0.0;
+
+        // Acquire (TryGetNextFrame)
+        auto t_acq_s = do_tim ? clock::now() : clock::time_point{};
+        auto frm = wgc->pool.TryGetNextFrame();
+        auto t_acq_e = do_tim ? clock::now() : t_acq_s;
+        if (do_tim) aq = std::chrono::duration<double, std::milli>(t_acq_e - t_acq_s).count();
+
+        if (!frm) {
+            // 无帧，立即重试
+            aq_sum += aq;
+            continue;
         }
-        return served;
-    }
 
-    auto surf = frm.Surface();
-    auto tex = GetDXGIInterfaceFromObject<ID3D11Texture2D>(surf);
+        auto surf = frm.Surface();
+        auto tex = GetDXGIInterfaceFromObject<ID3D11Texture2D>(surf);
 
-    D3D11_BOX src; src.left = crop_region.x; src.top = crop_region.y;
-    src.right = crop_region.x + crop_region.width; src.bottom = crop_region.y + crop_region.height;
-    src.front = 0; src.back = 1;
+        // Copy
+        D3D11_BOX src{}; src.left = crop_region.x; src.top = crop_region.y;
+        src.right = crop_region.x + crop_region.width; src.bottom = crop_region.y + crop_region.height;
+        src.front = 0; src.back = 1;
 
-    const size_t curr = idx % kStageN;
-    const size_t prev = (idx + kStageN - 1) % kStageN;
+        const size_t curr = idx % kStageN;
+        const size_t prev = (idx + kStageN - 1) % kStageN;
 
-    auto t_copy_s = do_tim ? clock::now() : clock::time_point{};
-    ctx->CopySubresourceRegion(stage[curr], 0, 0, 0, 0, tex.get(), 0, &src);
-    auto t_copy_e = do_tim ? clock::now() : t_copy_s;
-    if (do_tim) t_copy_ms = std::chrono::duration<double, std::milli>(t_copy_e - t_copy_s).count(); // cp
+        auto t_copy_s = do_tim ? clock::now() : clock::time_point{};
+        ctx->CopySubresourceRegion(stage[curr], 0, 0, 0, 0, tex.get(), 0, &src);
+        auto t_copy_e = do_tim ? clock::now() : t_copy_s;
+        if (do_tim) cp = std::chrono::duration<double, std::milli>(t_copy_e - t_copy_s).count();
 
-    ctx->End(copyQ[curr]);
+        ctx->End(copyQ[curr]);
 
-    BOOL copy_done = FALSE;
-    HRESULT qhr = ctx->GetData(copyQ[prev], &copy_done, sizeof(copy_done), 0);
-    if (qhr != S_OK || !copy_done) {
-        ++statCopyPend;
-        bool served = serveCache(frame);
-        if (served) ++statCacheRe;
-        t_total_ms = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
-        if (cfg.capture_timing) {
-            if (served) {
-                if (cfg.capture_timing_on_success) {
-                    reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
-                }
-            } else {
-                if (!cfg.capture_timing_on_success) {
-                    reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
-                }
-            }
+        BOOL copy_done = FALSE;
+        HRESULT qhr = ctx->GetData(copyQ[prev], &copy_done, sizeof(copy_done), 0);
+        if (qhr != S_OK || !copy_done) {
+            ++statCopyPend;
+            aq_sum += aq; cp_sum += cp;
+            idx++;
+            continue;
         }
-        idx++;
-        return served;
-    }
 
-    D3D11_MAPPED_SUBRESOURCE mr;
-    auto t_map_s = do_tim ? clock::now() : clock::time_point{};
-    HRESULT hrm = ctx->Map(stage[prev], 0, D3D11_MAP_READ, D3D11_MAP_FLAG_DO_NOT_WAIT, &mr);
-    auto t_map_e = do_tim ? clock::now() : t_map_s;
-    if (do_tim) t_map_ms = std::chrono::duration<double, std::milli>(t_map_e - t_map_s).count(); // mp
-    if (hrm == DXGI_ERROR_WAS_STILL_DRAWING) {
-        ++statStillDraw;
-        bool served = serveCache(frame);
-        if (served) ++statCacheRe;
-        t_total_ms = std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count();
-        if (cfg.capture_timing) {
-            if (served) {
-                if (cfg.capture_timing_on_success) {
-                    reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
-                }
-            } else {
-                if (!cfg.capture_timing_on_success) {
-                    reportTimes(t_acquire_ms, t_qi_ms, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms);
-                }
-            }
+        // Map
+        D3D11_MAPPED_SUBRESOURCE mr;
+        auto t_map_s = do_tim ? clock::now() : clock::time_point{};
+        HRESULT hrm = ctx->Map(stage[prev], 0, D3D11_MAP_READ, D3D11_MAP_FLAG_DO_NOT_WAIT, &mr);
+        auto t_map_e = do_tim ? clock::now() : t_map_s;
+        if (do_tim) mp = std::chrono::duration<double, std::milli>(t_map_e - t_map_s).count();
+        if (hrm == DXGI_ERROR_WAS_STILL_DRAWING) {
+            ++statStillDraw;
+            aq_sum += aq; cp_sum += cp; mp_sum += mp;
+            idx++;
+            continue;
         }
+        if (FAILED(hrm)) {
+            aq_sum += aq; cp_sum += cp; mp_sum += mp;
+            idx++;
+            continue;
+        }
+
+        // Convert
+        cv::Mat bgra(crop_region.height, crop_region.width, CV_8UC4, mr.pData, mr.RowPitch);
+        auto t_cvt_s = do_tim ? clock::now() : clock::time_point{};
+        cv::cvtColor(bgra, frame, cv::COLOR_BGRA2BGR);
+        auto t_cvt_e = do_tim ? clock::now() : t_cvt_s;
+        if (do_tim) cvc = std::chrono::duration<double, std::milli>(t_cvt_e - t_cvt_s).count();
+
+        // Unmap
+        auto t_unmap_s = do_tim ? clock::now() : clock::time_point{};
+        ctx->Unmap(stage[prev], 0);
+        auto t_unmap_e = do_tim ? clock::now() : t_unmap_s;
+        if (do_tim) up = std::chrono::duration<double, std::milli>(t_unmap_e - t_unmap_s).count();
+
+        aq_sum += aq; qi_sum += qi; cp_sum += cp; mp_sum += mp; cv_sum += cvc; up_sum += up;
+
+        // 成功上报并返回
+        double tt = do_tim ? std::chrono::duration<double, std::milli>(t_unmap_e - t_total_start).count() : 0.0;
+        if (cfg.capture_timing && cfg.capture_timing_on_success) {
+            reportTimes(aq_sum, qi_sum, cp_sum, mp_sum, cv_sum, up_sum, tt);
+        }
+        ++statOk;
+        dbgTick();
         idx++;
-        return served;
-    }
-    if (FAILED(hrm)) {
-        idx++;
-        return false;
+        return true;
     }
 
-    cv::Mat bgra(crop_region.height, crop_region.width, CV_8UC4, mr.pData, mr.RowPitch);
-    auto t_cvt_s = do_tim ? clock::now() : clock::time_point{};
-    cv::cvtColor(bgra, frame, cv::COLOR_BGRA2BGR);
-    frame.copyTo(cache);
-    auto t_cvt_e = do_tim ? clock::now() : t_cvt_s;
-    if (do_tim) t_cvt_ms = std::chrono::duration<double, std::milli>(t_cvt_e - t_cvt_s).count(); // cv
-
-    auto t_unmap_s = do_tim ? clock::now() : clock::time_point{};
-    ctx->Unmap(stage[prev], 0);
-    auto t_unmap_e = do_tim ? clock::now() : t_unmap_s;
-    if (do_tim) t_unmap_ms = std::chrono::duration<double, std::milli>(t_unmap_e - t_unmap_s).count(); // up
-
-    double t_total_ms_loc = do_tim ? std::chrono::duration<double, std::milli>(t_unmap_e - t_total_start).count() : 0.0;
-    idx++;
-    if (do_tim) reportTimes(t_acquire_ms, 0.0, t_copy_ms, t_map_ms, t_cvt_ms, t_unmap_ms, t_total_ms_loc);
-    ++statOk;
-    dbgTick();
-    return true;
+    if (cfg.capture_timing && !cfg.capture_timing_on_success) {
+        double tt = do_tim ? std::chrono::duration<double, std::milli>(clock::now() - t_total_start).count() : 0.0;
+        reportTimes(aq_sum, qi_sum, cp_sum, mp_sum, cv_sum, up_sum, tt);
+    }
+    return false;
 }

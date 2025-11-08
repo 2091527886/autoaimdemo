@@ -28,7 +28,6 @@ public:
                       << " | stg=" << stagingCount
                       << " | evt=OFF"
                       << " | map=DNW"
-                      << " | cr=ON"
                       << lg::endl;
             lg::o() << P_B "Timing: "
                       << "step=" << (cfg_.capture_timing ? "ON" : "OFF")
@@ -44,15 +43,13 @@ public:
                            size_t& stat_dirty_skips_member,
                            size_t& stat_event_not_ready_member,
                            size_t& stat_map_still_drawing_member,
-                           size_t& stat_cache_reused_member,
                            size_t& stat_success_member)
     {
         stat_dirty_skips_       += stat_dirty_skips_member;
         stat_event_not_ready_   += stat_event_not_ready_member;
         stat_map_still_drawing_ += stat_map_still_drawing_member;
-        stat_cache_reused_      += stat_cache_reused_member;
         stat_success_           += stat_success_member;
-        stat_dirty_skips_member = stat_event_not_ready_member = stat_map_still_drawing_member = stat_cache_reused_member = stat_success_member = 0;
+        stat_dirty_skips_member = stat_event_not_ready_member = stat_map_still_drawing_member = stat_success_member = 0;
 
         opt_counter_++;
         counter_++;
@@ -107,11 +104,10 @@ public:
                           << " | ds="  << stat_dirty_skips_       << " (" << pct(stat_dirty_skips_)       << "%)"
                           << " | ev=" << stat_event_not_ready_   << " (" << pct(stat_event_not_ready_)   << "%)"
                           << " | sd="  << stat_map_still_drawing_ << " (" << pct(stat_map_still_drawing_) << "%)"
-                          << " | cr="  << stat_cache_reused_      << " (" << pct(stat_cache_reused_)      << "%)"
                           << " | ok="  << stat_success_           << " (" << pct(stat_success_)           << "%)"
                           << lg::endl << lg::df;
                 opt_counter_ = 0;
-                stat_dirty_skips_ = stat_event_not_ready_ = stat_map_still_drawing_ = stat_cache_reused_ = stat_success_ = 0;
+                stat_dirty_skips_ = stat_event_not_ready_ = stat_map_still_drawing_ = stat_success_ = 0;
             }
         }
 
@@ -123,7 +119,7 @@ public:
 private:
    const Config& cfg_;
    size_t opt_counter_ = 0;
-   size_t stat_dirty_skips_ = 0, stat_event_not_ready_ = 0, stat_map_still_drawing_ = 0, stat_cache_reused_ = 0, stat_success_ = 0;
+   size_t stat_dirty_skips_ = 0, stat_event_not_ready_ = 0, stat_map_still_drawing_ = 0, stat_success_ = 0;
 
    size_t counter_ = 0;
    double acc_acq_ = 0.0, acc_qi_ = 0.0, acc_copy_ = 0.0, acc_map_ = 0.0, acc_cvt_ = 0.0, acc_unmap_ = 0.0, acc_total_ = 0.0;
