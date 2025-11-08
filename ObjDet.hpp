@@ -23,6 +23,15 @@ public:
                 const Config& cfg,
                 Timing& tm);
 
+    // Zero-copy detect from BGRA pointer (pitch in bytes)
+    void detect_view(unsigned char* data,
+                     int width,
+                     int height,
+                     size_t pitch,
+                     std::vector<Detection>& out,
+                     const Config& cfg,
+                     Timing& tm);
+
 private:
     std::unique_ptr<trtyolo::DetectModel> model_;
     metrics::TrtPerfReporting perf_;

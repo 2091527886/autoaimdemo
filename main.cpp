@@ -135,13 +135,25 @@ public:
             // capture on main thread
             double cap_ms = 0.0;
             bool got = false;
+            ScreenCapturer::CapturedView view;
             if (c.timing) {
                 auto tcap0 = std::chrono::high_resolution_clock::now();
-                got = cap.capture(img, crop);
+                got = cap.capture_view(view, crop);
                 auto tcap1 = std::chrono::high_resolution_clock::now();
                 cap_ms = std::chrono::duration<double, std::milli>(tcap1 - tcap0).count();
             } else {
-                got = cap.capture(img, crop);
+                got = cap.capture_view(view, crop);
+            }
+            if (!got) {
+                // fallback to legacy copy path to keep functionality when view unsupported
+                if (c.timing) {
+                    auto tcap0 = std::chrono::high_resolution_clock::now();
+                    got = cap.capture(img, crop);
+                    auto tcap1 = std::chrono::high_resolution_clock::now();
+                    cap_ms = std::chrono::duration<double, std::milli>(tcap1 - tcap0).count();
+                } else {
+                    got = cap.capture(img, crop);
+                }
             }
             if (!got) {
                 fl.cap_ms = cap_ms;
@@ -154,7 +166,12 @@ public:
             fl.cap_ms = cap_ms;
 
             // inference on main thread
-            od.detect(img, ds, c, tm);
+            if (view.mapped && view.data) {
+                od.detect_view(view.data, view.width, view.height, view.pitch, ds, c, tm);
+                cap.release_view(view);
+            } else {
+                od.detect(img, ds, c, tm);
+            }
             // overlay draw on main thread (moved below)
             double ovl_ms = 0.0;
             // [overlay moved below]

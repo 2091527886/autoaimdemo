@@ -5,10 +5,26 @@
 #include "Reporting.hpp"
 #include <windows.h>
 #include <atomic>
+#include <chrono>
 
 class Config;
 
 class ScreenCapturer {
+public:
+    struct CapturedView {
+        // mapped BGRA view into staging texture
+        unsigned char* data = nullptr;
+        int width = 0;
+        int height = 0;
+        size_t pitch = 0;
+        // timing accumulators (reported on release)
+        bool timing_enabled = false;
+        double aq_sum = 0.0, qi_sum = 0.0, cp_sum = 0.0, mp_sum = 0.0, cv_sum = 0.0, up_sum = 0.0;
+        std::chrono::high_resolution_clock::time_point t_total_start{};
+        // ownership
+        bool mapped = false;
+    };
+
 public:
     // Reporting helper
     metrics::CaptureReporting reporter;
@@ -19,6 +35,9 @@ public:
     ScreenCapturer& operator=(const ScreenCapturer&) = delete;
 
     bool capture(cv::Mat& frame, const cv::Rect& crop_region);
+    // zero-copy view capture (caller must call release_view once done)
+    bool capture_view(CapturedView& view, const cv::Rect& crop_region);
+    void release_view(CapturedView& view);
 
     int w() const { return width; }
     int h() const { return height; }
@@ -33,6 +52,7 @@ private:
     bool init_wgc();
     bool cap_dxgi(cv::Mat& frame, const cv::Rect& crop_region);
     bool cap_wgc(cv::Mat& frame, const cv::Rect& crop_region);
+    bool cap_wgc_view(CapturedView& view, const cv::Rect& crop_region);
     void rel_wgc();
 
 public:
