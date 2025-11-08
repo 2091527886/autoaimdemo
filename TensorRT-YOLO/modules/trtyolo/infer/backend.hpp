@@ -20,7 +20,7 @@
 #include "core/core.hpp"
 #include "trtyolo.hpp"
 #include "utils/common.hpp"
-#include "warpaffine.hpp"
+#include "letterbox.hpp"
 
 namespace trtyolo {
 
@@ -64,7 +64,7 @@ public:
     cudaStream_t                 stream;             // < CUDA 流
     InferConfig                  infer_config;       // < 推理选项
     std::vector<TensorInfo>      tensor_infos;       // < 张量信息向量
-    std::vector<AffineTransform> affine_transforms;  // < 仿射变换向量
+    std::vector<LetterboxTransform> affine_transforms;  // < 前处理变换（letterbox）向量
     int4                         min_shape;          // < 最小形状
     int4                         max_shape;          // < 最大形状
     bool                         dynamic;            // < 是否为动态形状

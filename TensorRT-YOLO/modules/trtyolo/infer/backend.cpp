@@ -68,7 +68,7 @@ std::unique_ptr<TrtBackend> TrtBackend::clone() {
 
 TrtBackend::~TrtBackend() {
     std::vector<TensorInfo>().swap(tensor_infos);
-    std::vector<AffineTransform>().swap(affine_transforms);
+    std::vector<LetterboxTransform>().swap(affine_transforms);
     if (!dynamic) cuda_graph_.destroy();
     CHECK(cudaStreamDestroy(stream));
 }
@@ -101,15 +101,15 @@ void TrtBackend::getTensorInfo() {
 
 void TrtBackend::initialize() {
     // 清空并释放affine_transforms和image_buffers_中的资源
-    std::vector<AffineTransform>().swap(affine_transforms);
+    std::vector<LetterboxTransform>().swap(affine_transforms);
     inputs_buffer_ = BufferFactory::createBuffer(buffer_type_);
 
     infer_size_ = max_shape.y * max_shape.w * max_shape.z;
 
     if (infer_config.input_shape.has_value()) {
         input_size_ = max_shape.y * infer_config.input_shape->y * infer_config.input_shape->x;
-        affine_transforms.emplace_back(AffineTransform());
-        affine_transforms.front().updateMatrix(
+        affine_transforms.emplace_back(LetterboxTransform());
+        affine_transforms.front().updateParams(
             infer_config.input_shape->y,
             infer_config.input_shape->x,
             max_shape.w,
@@ -117,7 +117,7 @@ void TrtBackend::initialize() {
         inputs_buffer_->allocate(max_shape.x * input_size_);  // < 按最大情况分配空间
     } else {
         // 输入尺寸不固定时
-        affine_transforms.resize(max_shape.x, AffineTransform());
+        affine_transforms.resize(max_shape.x, LetterboxTransform());
         if (!dynamic) inputs_buffer_->allocate(max_shape.x * infer_size_);
     }
 }
@@ -147,7 +147,7 @@ void TrtBackend::captureCudaGraph() {
     auto warp_affine = [&](bool multi, int input_width, int input_height) {
         if (multi) {
             // Multi-instance WarpAffine
-            cudaMutliWarpAffine(
+            cudaMultiLetterbox(
                 inputs_buffer_->device(),
                 input_width,
                 input_height,
@@ -155,7 +155,7 @@ void TrtBackend::captureCudaGraph() {
                 tensor_infos.front().buffer->device(),
                 max_shape.w,
                 max_shape.z,
-                affine_transforms.front().matrix,
+                affine_transforms.front(),
                 infer_config.config,
                 max_shape.x,
                 stream);
@@ -163,7 +163,7 @@ void TrtBackend::captureCudaGraph() {
             // Single-instance WarpAffine
             for (int idx = 0; idx < max_shape.x; ++idx) {
                 auto [input_device, infer_device] = calculate_input_size_and_device(idx, input_width, input_height);
-                cudaWarpAffine(
+                cudaLetterbox(
                     input_device,
                     input_width,
                     input_height,
@@ -171,7 +171,7 @@ void TrtBackend::captureCudaGraph() {
                     infer_device,
                     max_shape.w,
                     max_shape.z,
-                    affine_transforms[idx].matrix,
+                    affine_transforms[idx],
                     infer_config.config,
                     stream);
             }
@@ -239,8 +239,7 @@ void TrtBackend::staticInfer(const std::vector<Image>& inputs) {
                     (void*)&infer_device_ptr,
                     (void*)&max_shape.w,
                     (void*)&max_shape.z,
-                    (void*)&affine_transforms.front().matrix[0],
-                    (void*)&affine_transforms.front().matrix[1],
+                    (void*)&affine_transforms.front(),
                     (void*)&infer_config.config};
 
                 // 更新 kernel 参数
@@ -280,7 +279,7 @@ void TrtBackend::staticInfer(const std::vector<Image>& inputs) {
         // 更新 kernel 节点
         uint8_t* input_ptr = !infer_config.cuda_mem ? static_cast<uint8_t*>(inputs_buffer_->device()) : nullptr;
         for (int idx = 0; idx < num; ++idx) {
-            affine_transforms[idx].updateMatrix(inputs[idx].width, inputs[idx].height, max_shape.w, max_shape.z);
+            affine_transforms[idx].updateParams(inputs[idx].width, inputs[idx].height, max_shape.w, max_shape.z);
             // 计算 infer_device_ptr，避免重复计算
             auto infer_device_ptr = static_cast<float*>(tensor_infos.front().buffer->device()) + idx * infer_size_;
 
@@ -292,8 +291,7 @@ void TrtBackend::staticInfer(const std::vector<Image>& inputs) {
                 (void*)&infer_device_ptr,
                 (void*)&max_shape.w,
                 (void*)&max_shape.z,
-                (void*)&affine_transforms[idx].matrix[0],
-                (void*)&affine_transforms[idx].matrix[1],
+                (void*)&affine_transforms[idx],
                 (void*)&infer_config.config};
 
             // 判断 idx 更新 kernel 参数
@@ -339,7 +337,7 @@ void TrtBackend::dynamicInfer(const std::vector<Image>& inputs) {
         }
 
         for (int idx = 0; idx < num; ++idx) {
-            cudaWarpAffine(
+            cudaLetterbox(
                 infer_config.cuda_mem ? inputs[idx].ptr : static_cast<uint8_t*>(inputs_buffer_->device()) + idx * input_size_,
                 inputs[idx].width,
                 inputs[idx].height,
@@ -347,7 +345,7 @@ void TrtBackend::dynamicInfer(const std::vector<Image>& inputs) {
                 static_cast<float*>(tensor_infos.front().buffer->device()) + idx * infer_size_,
                 max_shape.w,
                 max_shape.z,
-                affine_transforms.front().matrix,
+                affine_transforms.front(),
                 infer_config.config,
                 stream);
         }
@@ -359,7 +357,7 @@ void TrtBackend::dynamicInfer(const std::vector<Image>& inputs) {
         for (int idx = 0; idx < num; ++idx) {
             input_sizes[idx]  = inputs[idx].height * inputs[idx].pitch;
             total_size       += input_sizes[idx];
-            affine_transforms[idx].updateMatrix(inputs[idx].width, inputs[idx].height, max_shape.w, max_shape.z);
+            affine_transforms[idx].updateParams(inputs[idx].width, inputs[idx].height, max_shape.w, max_shape.z);
         }
 
         // 在主机内存或设备内存中分配空间
@@ -380,7 +378,7 @@ void TrtBackend::dynamicInfer(const std::vector<Image>& inputs) {
             // 在设备内存中进行 WarpAffine 操作
             uint8_t* input_device = static_cast<uint8_t*>(inputs_buffer_->device());
             for (int idx = 0; idx < num; ++idx) {
-                cudaWarpAffine(
+                cudaLetterbox(
                     input_device,
                     inputs[idx].width,
                     inputs[idx].height,
@@ -388,7 +386,7 @@ void TrtBackend::dynamicInfer(const std::vector<Image>& inputs) {
                     static_cast<float*>(tensor_infos.front().buffer->device()) + idx * infer_size_,
                     max_shape.w,
                     max_shape.z,
-                    affine_transforms[idx].matrix,
+                    affine_transforms[idx],
                     infer_config.config,
                     stream);
                 input_device += input_sizes[idx];
@@ -396,7 +394,7 @@ void TrtBackend::dynamicInfer(const std::vector<Image>& inputs) {
         } else {
             // 直接在设备内存上进行 WarpAffine 操作
             for (int idx = 0; idx < num; ++idx) {
-                cudaWarpAffine(
+                cudaLetterbox(
                     inputs[idx].ptr,
                     inputs[idx].width,
                     inputs[idx].height,
@@ -404,7 +402,7 @@ void TrtBackend::dynamicInfer(const std::vector<Image>& inputs) {
                     static_cast<float*>(tensor_infos.front().buffer->device()) + idx * infer_size_,
                     max_shape.w,
                     max_shape.z,
-                    affine_transforms[idx].matrix,
+                    affine_transforms[idx],
                     infer_config.config,
                     stream);
             }
