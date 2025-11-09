@@ -153,7 +153,7 @@ void TrtBackend::captureCudaGraph() {
     };
 
     // Lambda: Perform WarpAffine operation
-    auto warp_affine = [&](bool multi, int input_width, int input_height) {
+    auto run_letterbox = [&](bool multi, int input_width, int input_height) {
         size_t src_pitch = (infer_config.input_shape.has_value() && !infer_config.cuda_mem)
                                ? input_row_bytes_
                                : static_cast<size_t>(input_width) * max_shape.y; // assume tightly packed CHW when not fixed-host path
@@ -199,13 +199,13 @@ void TrtBackend::captureCudaGraph() {
     if (infer_config.cuda_mem) {
         int input_width  = infer_config.input_shape ? infer_config.input_shape->y : max_shape.w;
         int input_height = infer_config.input_shape ? infer_config.input_shape->x : max_shape.z;
-        warp_affine(false, input_width, input_height);
+        run_letterbox(false, input_width, input_height);
     } else {
         inputs_buffer_->hostToDevice(stream);
 
         int input_width  = infer_config.input_shape ? infer_config.input_shape->y : max_shape.w;
         int input_height = infer_config.input_shape ? infer_config.input_shape->x : max_shape.z;
-        warp_affine(infer_config.input_shape.has_value(), input_width, input_height);
+        run_letterbox(infer_config.input_shape.has_value(), input_width, input_height);
     }
 
     // Step 4: Enqueue inference
