@@ -46,8 +46,8 @@ __global__ void gpuLetterboxF16Vec2(const void* src, int src_cols, int src_rows,
         int x = px + k;
         if (x >= dst_cols) { r[k]=g[k]=b[k]=0.f; continue; }
 
-        float src_x = (static_cast<float>(x) - static_cast<float>(params.pad_x)) / params.scale;
-        float src_y = (static_cast<float>(y) - static_cast<float>(params.pad_y)) / params.scale;
+        float src_x = ((static_cast<float>(x) + 0.5f) - static_cast<float>(params.pad_x)) / params.scale - 0.5f;
+        float src_y = ((static_cast<float>(y) + 0.5f) - static_cast<float>(params.pad_y)) / params.scale - 0.5f;
 
         int   x0 = __float2int_rd(src_x);
         int   y0 = __float2int_rd(src_y);
@@ -118,8 +118,8 @@ __global__ void gpuMultiLetterboxHalfVec2(const void* src, int src_cols, int src
         int x = px + k;
         if (x >= dst_cols) { r[k]=g[k]=b[k]=0.f; continue; }
 
-        float src_x = (static_cast<float>(x) - static_cast<float>(params.pad_x)) / params.scale;
-        float src_y = (static_cast<float>(y) - static_cast<float>(params.pad_y)) / params.scale;
+        float src_x = ((static_cast<float>(x) + 0.5f) - static_cast<float>(params.pad_x)) / params.scale - 0.5f;
+        float src_y = ((static_cast<float>(y) + 0.5f) - static_cast<float>(params.pad_y)) / params.scale - 0.5f;
 
         int   x0 = __float2int_rd(src_x);
         int   y0 = __float2int_rd(src_y);
