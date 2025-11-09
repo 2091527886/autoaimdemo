@@ -27,66 +27,6 @@ __device__ inline float3 sample_rgb_bgra(const uint8_t* src, size_t pitch, int x
 }
 }
 
-// F32 vectorized: 2 pixels per thread
-__global__ void gpuLetterboxF32Vec2(const void* src, int src_cols, int src_rows, size_t src_pitch,
-                                    void* dst, int dst_cols, int dst_rows,
-                                    LetterboxTransform params, ProcessConfig config) {
-    int px = (blockDim.x * blockIdx.x + threadIdx.x) * 2; // start x for this thread (2 pixels)
-    int y  = blockDim.y * blockIdx.y + threadIdx.y;
-    if (y >= dst_rows || px >= dst_cols) return;
-
-    float* out_row = static_cast<float*>(dst) + y * dst_cols + px;
-    int plane = dst_cols * dst_rows;
-
-    const uint8_t* s = static_cast<const uint8_t*>(src);
-
-    float r[2], g[2], b[2];
-    #pragma unroll
-    for (int k = 0; k < 2; ++k) {
-        int x = px + k;
-        if (x >= dst_cols) { r[k]=g[k]=b[k]=0.f; continue; }
-
-        float src_x = (static_cast<float>(x) - static_cast<float>(params.pad_x)) / params.scale;
-        float src_y = (static_cast<float>(y) - static_cast<float>(params.pad_y)) / params.scale;
-
-        int   x0 = __float2int_rd(src_x);
-        int   y0 = __float2int_rd(src_y);
-        int   x1 = x0 + 1;
-        int   y1 = y0 + 1;
-
-        float wx1 = src_x - x0;
-        float wy1 = src_y - y0;
-        float wx0 = 1.f - wx1;
-        float wy0 = 1.f - wy1;
-
-        float3 p00 = sample_rgb_bgra(s, src_pitch, x0, y0, src_cols, src_rows, config.border_value);
-        float3 p10 = sample_rgb_bgra(s, src_pitch, x1, y0, src_cols, src_rows, config.border_value);
-        float3 p01 = sample_rgb_bgra(s, src_pitch, x0, y1, src_cols, src_rows, config.border_value);
-        float3 p11 = sample_rgb_bgra(s, src_pitch, x1, y1, src_cols, src_rows, config.border_value);
-
-        float3 sum;
-        sum.x = wx0 * wy0 * p00.x + wx1 * wy0 * p10.x + wx0 * wy1 * p01.x + wx1 * wy1 * p11.x;
-        sum.y = wx0 * wy0 * p00.y + wx1 * wy0 * p10.y + wx0 * wy1 * p01.y + wx1 * wy1 * p11.y;
-        sum.z = wx0 * wy0 * p00.z + wx1 * wy0 * p10.z + wx0 * wy1 * p01.z + wx1 * wy1 * p11.z;
-
-        r[k] = sum.x * config.alpha.x + config.beta.x;
-        g[k] = sum.y * config.alpha.y + config.beta.y;
-        b[k] = sum.z * config.alpha.z + config.beta.z;
-    }
-
-    bool full = (px + 1) < dst_cols;
-    if (full) {
-        // vectorized stores for CHW planes
-        reinterpret_cast<float2*>(out_row)[0]             = make_float2(r[0], r[1]);
-        reinterpret_cast<float2*>(out_row + plane)[0]     = make_float2(g[0], g[1]);
-        reinterpret_cast<float2*>(out_row + plane * 2)[0] = make_float2(b[0], b[1]);
-    } else {
-        out_row[0]               = r[0];
-        out_row[plane]           = g[0];
-        out_row[plane*2]         = b[0];
-    }
-}
-
 // F16 vectorized: 2 pixels per thread using half2 stores
 __global__ void gpuLetterboxF16Vec2(const void* src, int src_cols, int src_rows, size_t src_pitch,
                                     void* dst, int dst_cols, int dst_rows,
@@ -155,62 +95,6 @@ __global__ void gpuLetterboxF16Vec2(const void* src, int src_cols, int src_rows,
 /* } */
 
 // Vectorized multi-image kernels (batch via grid.z)
-__global__ void gpuMultiLetterboxF32Vec2(const void* src, int src_cols, int src_rows, size_t src_pitch,
-                                         void* dst, int dst_cols, int dst_rows,
-                                         LetterboxTransform params, ProcessConfig config,
-                                         int num_images) {
-    int idx = blockIdx.z;
-    if (idx >= num_images) return;
-
-    int px = (blockDim.x * blockIdx.x + threadIdx.x) * 2; // two pixels per thread
-    int y  = blockDim.y * blockIdx.y + threadIdx.y;
-    if (y >= dst_rows || px >= dst_cols) return;
-
-    const uint8_t* src_ptr = static_cast<const uint8_t*>(src) + idx * src_rows * src_pitch;
-    float* dst_ptr = static_cast<float*>(dst) + idx * dst_rows * dst_cols * 3;
-
-    float* out_row = dst_ptr + y * dst_cols + px;
-    int plane = dst_cols * dst_rows;
-
-    #pragma unroll
-    for (int k = 0; k < 2; ++k) {
-        int x = px + k;
-        if (x >= dst_cols) break;
-
-        float src_x = (static_cast<float>(x) - static_cast<float>(params.pad_x)) / params.scale;
-        float src_y = (static_cast<float>(y) - static_cast<float>(params.pad_y)) / params.scale;
-
-        int   x0 = __float2int_rd(src_x);
-        int   y0 = __float2int_rd(src_y);
-        int   x1 = x0 + 1;
-        int   y1 = y0 + 1;
-
-        float wx1 = src_x - x0;
-        float wy1 = src_y - y0;
-        float wx0 = 1.f - wx1;
-        float wy0 = 1.f - wy1;
-
-        float3 p00 = sample_rgb_bgra(src_ptr, src_pitch, x0, y0, src_cols, src_rows, config.border_value);
-        float3 p10 = sample_rgb_bgra(src_ptr, src_pitch, x1, y0, src_cols, src_rows, config.border_value);
-        float3 p01 = sample_rgb_bgra(src_ptr, src_pitch, x0, y1, src_cols, src_rows, config.border_value);
-        float3 p11 = sample_rgb_bgra(src_ptr, src_pitch, x1, y1, src_cols, src_rows, config.border_value);
-
-        float3 sum;
-        sum.x = wx0 * wy0 * p00.x + wx1 * wy0 * p10.x + wx0 * wy1 * p01.x + wx1 * wy1 * p11.x;
-        sum.y = wx0 * wy0 * p00.y + wx1 * wy0 * p10.y + wx0 * wy1 * p01.y + wx1 * wy1 * p11.y;
-        sum.z = wx0 * wy0 * p00.z + wx1 * wy0 * p10.z + wx0 * wy1 * p01.z + wx1 * wy1 * p11.z;
-
-        float r = sum.x * config.alpha.x + config.beta.x;
-        float g = sum.y * config.alpha.y + config.beta.y;
-        float b = sum.z * config.alpha.z + config.beta.z;
-
-        float* out = out_row + k;
-        out[0]           = r;
-        out[plane]       = g;
-        out[plane * 2]   = b;
-    }
-}
-
 __global__ void gpuMultiLetterboxHalfVec2(const void* src, int src_cols, int src_rows, size_t src_pitch,
                                           void* dst, int dst_cols, int dst_rows,
                                           LetterboxTransform params, ProcessConfig config,
@@ -278,25 +162,6 @@ __global__ void gpuMultiLetterboxHalfVec2(const void* src, int src_cols, int src
 }
 
 /* } */
-
-void cudaLetterbox(const void* src, int src_cols, int src_rows, size_t src_pitch,
-                   void* dst, int dst_cols, int dst_rows,
-                   const LetterboxTransform& params, const ProcessConfig config, cudaStream_t stream) {
-    // 强制向量化路径（每线程处理2像素），奇数宽由 kernel 内部尾处理
-    dim3 block(32, 8);
-    dim3 grid(iDivUp((dst_cols + 1) / 2, block.x), iDivUp(dst_rows, block.y));
-    gpuLetterboxF32Vec2<<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
-}
-
-void cudaMultiLetterbox(const void* src, int src_cols, int src_rows, size_t src_pitch,
-                        void* dst, int dst_cols, int dst_rows,
-                        const LetterboxTransform& params, const ProcessConfig config,
-                        int num_images, cudaStream_t stream) {
-    // 强制向量化路径（每线程处理2像素），奇数宽由 kernel 内部尾处理
-    dim3 block(32, 8);
-    dim3 grid(iDivUp((dst_cols + 1) / 2, block.x), iDivUp(dst_rows, block.y), num_images);
-    gpuMultiLetterboxF32Vec2<<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
-}
 
 // Half path
 void cudaLetterboxHalf(const void* src, int src_cols, int src_rows, size_t src_pitch,
