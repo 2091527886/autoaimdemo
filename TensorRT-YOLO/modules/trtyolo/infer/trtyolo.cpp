@@ -52,6 +52,17 @@ public:
     void        setInputDimensions(int width, int height) { infer_config.input_shape = make_int2(height, width); }
     void        set_rb() { infer_config.config.rb = true; }
     void        setBorderValue(float value) { infer_config.config.border_value = value; }
+    void        setLetterboxBlockXY(int bx, int by) {
+        infer_config.config.block_x = bx;
+        infer_config.config.block_y = by;
+    }
+    void        setLetterboxLaunchBounds(bool enable, int min_blocks_per_sm) {
+        infer_config.config.use_launch_bounds = enable;
+        infer_config.config.min_blocks_per_sm = min_blocks_per_sm;
+    }
+    void        enableLetterboxOccupancy(bool enable) {
+        infer_config.config.use_occupancy = enable;
+    }
     void        setNormalizeParams(const std::vector<float>& mean, const std::vector<float>& std) {
         assert(mean.size() == 3 && std.size() == 3 && "ProcessConfig: requires the size of mean and std to be 3.");
 
@@ -77,6 +88,9 @@ void InferOption::enablePerformanceReport() { impl_->enablePerformanceReport(); 
 void InferOption::set_rb() { impl_->set_rb(); }
 void InferOption::enableSwapRB() { impl_->set_rb(); }
 void InferOption::setBorderValue(float border_value) { impl_->setBorderValue(border_value); }
+void InferOption::setLetterboxBlockXY(int bx, int by) { impl_->setLetterboxBlockXY(bx, by); }
+void InferOption::setLetterboxLaunchBounds(bool enable, int min_blocks_per_sm) { impl_->setLetterboxLaunchBounds(enable, min_blocks_per_sm); }
+void InferOption::enableLetterboxOccupancy(bool enable) { impl_->enableLetterboxOccupancy(enable); }
 void InferOption::setNormalizeParams(const std::vector<float>& mean, const std::vector<float>& std) { impl_->setNormalizeParams(mean, std); }
 void InferOption::setInputDimensions(int width, int height) { impl_->setInputDimensions(height, width); }
 

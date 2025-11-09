@@ -11,6 +11,8 @@ __device__ inline bool in_bounds(int x, int y, int cols, int rows) {
     return (x >= 0 && x < cols && y >= 0 && y < rows);
 }
 
+#include <cuda_runtime.h>
+#include <cuda.h>
 #include <cuda_fp16.h>
 
 // Vectorized helpers and kernels added by Rovo Dev
@@ -27,8 +29,8 @@ __device__ inline float3 sample_rgb_bgra(const uint8_t* src, size_t pitch, int x
 }
 }
 
-// F16 vectorized: 2 pixels per thread using half2 stores
-__global__ void gpuLetterboxF16Vec2(const void* src, int src_cols, int src_rows, size_t src_pitch,
+// 核心实现体，供不同 __global__ 内核复用
+__device__ inline void letterboxF16Vec2_body(const void* src, int src_cols, int src_rows, size_t src_pitch,
                                     void* dst, int dst_cols, int dst_rows,
                                     LetterboxTransform params, ProcessConfig config) {
     int px = (blockDim.x * blockIdx.x + threadIdx.x) * 2; // start x for this thread (2 pixels)
@@ -90,12 +92,43 @@ __global__ void gpuLetterboxF16Vec2(const void* src, int src_cols, int src_rows,
     }
 }
 
-/* } */
+// 通用版本（无 launch_bounds），F16 vectorized: 2 pixels/thread
+__global__ void gpuLetterboxF16Vec2_generic(const void* src, int src_cols, int src_rows, size_t src_pitch,
+                                    void* dst, int dst_cols, int dst_rows,
+                                    LetterboxTransform params, ProcessConfig config) {
+    letterboxF16Vec2_body(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+}
 
-/* } */
+// 选择与调优说明（3060/SM86）
+// 预设矩阵（threads/block 与形状）：
+//   256: 32x8, 16x16, 64x4
+//   320: 40x8, 20x16   （已提供模板分派）
+//   384: 48x8, 24x16   （已提供模板分派）
+//   512: 32x16, 64x8, 16x32, 8x64（已支持32x16/64x8模板，另两组少用）
+// 快速选择：先 32x8/MINB=2 → 再 16x16 或 64x4 → 再 32x16/64x8（需实测寄存器/并发）。
+// - 两像素/线程，planar输出，half2存储，BGRA->RGB 手写双线性。
+// - 线程块预设：{32x8, 16x16, 64x4}，可扩展到 {32x16, 64x8}。
+//   * 32x8: 稳定默认，寄存器与占用平衡。
+//   * 16x16: 二维并行更均衡，适合方形/接近方形目标输出。
+//   * 64x4: X向访存合并更好，适合宽图；留意寄存器与指令吞吐。
+// - MINB（min_blocks_per_sm）建议 2；若寄存器压力高，可降为 1；若资源宽裕，可试 3。
+// - use_occupancy=1 时会在候选集中试算 active blocks，便于探索；正式跑请固定块。
+// - 若需继续优化：
+//   * 将BGRA采样做成成对预取（两像素同线，减少边界分支），
+//   * 用常量内存或只读缓存加载alpha/beta，
+//   * 调整寄存器限制（--maxrregcount）与 launch_bounds 协同。
+
+// 启用 launch_bounds 的模板内核
+template<int BX, int BY, int MINB>
+__launch_bounds__(BX*BY, MINB)
+__global__ void gpuLetterboxF16Vec2_lb(const void* src, int src_cols, int src_rows, size_t src_pitch,
+                                    void* dst, int dst_cols, int dst_rows,
+                                    LetterboxTransform params, ProcessConfig config) {
+    letterboxF16Vec2_body(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+}
 
 // Vectorized multi-image kernels (batch via grid.z)
-__global__ void gpuMultiLetterboxHalfVec2(const void* src, int src_cols, int src_rows, size_t src_pitch,
+__device__ inline void multiLetterboxHalfVec2_body(const void* src, int src_cols, int src_rows, size_t src_pitch,
                                           void* dst, int dst_cols, int dst_rows,
                                           LetterboxTransform params, ProcessConfig config,
                                           int num_images) {
@@ -161,26 +194,154 @@ __global__ void gpuMultiLetterboxHalfVec2(const void* src, int src_cols, int src
     }
 }
 
-/* } */
+// Vectorized multi-image kernels (batch via grid.z)
+__global__ void gpuMultiLetterboxHalfVec2_generic(const void* src, int src_cols, int src_rows, size_t src_pitch,
+                                          void* dst, int dst_cols, int dst_rows,
+                                          LetterboxTransform params, ProcessConfig config,
+                                          int num_images) {
+    multiLetterboxHalfVec2_body(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+}
+
+// 启用 launch_bounds 的模板多图内核
+template<int BX, int BY, int MINB>
+__launch_bounds__(BX*BY, MINB)
+__global__ void gpuMultiLetterboxHalfVec2_lb(const void* src, int src_cols, int src_rows, size_t src_pitch,
+                                          void* dst, int dst_cols, int dst_rows,
+                                          LetterboxTransform params, ProcessConfig config,
+                                          int num_images) {
+    multiLetterboxHalfVec2_body(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+}
+
+// 选择块大小（占用率推荐或配置）
+// 选择块大小（占用推荐或配置）；若 use_occupancy=1，将在候选集中估算 active blocks 选择最优
+static inline dim3 pickBlock(const ProcessConfig& cfg, int dst_cols) {
+    int bx = cfg.block_x > 0 ? cfg.block_x : 32;
+    int by = cfg.block_y > 0 ? cfg.block_y : 8;
+    if (cfg.use_occupancy) {
+        // 候选配置集合（针对3060 SM86）
+        const int cand[][2] = {{32,8},{16,16},{64,4},{32,16},{64,8},{48,8},{24,16},{40,8},{20,16}};
+        int best_bx = bx, best_by = by; int best_act = -1;
+        for (auto& c : cand) {
+            int cbx = c[0], cby = c[1];
+            int threads = cbx * cby;
+            int active = 0;
+            cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                &active,
+                (const void*)gpuLetterboxF16Vec2_generic,
+                threads,
+                0);
+            if (active > best_act) { best_act = active; best_bx = cbx; best_by = cby; }
+        }
+        bx = best_bx; by = best_by;
+    }
+    // 对齐到2像素/线程：以像素对为单位
+    return dim3(bx, by, 1);
+}
 
 // Half path
+// 日志建议：可在上层记录最终选择 (block_x,block_y,MINB,use_launch_bounds,use_occupancy) 便于复现与对比。
 void cudaLetterboxHalf(const void* src, int src_cols, int src_rows, size_t src_pitch,
                        void* dst, int dst_cols, int dst_rows,
                        const LetterboxTransform& params, const ProcessConfig config, cudaStream_t stream) {
-    // 强制 half2 向量化路径
-    dim3 block(32, 8);
+    dim3 block = pickBlock(config, dst_cols);
     dim3 grid(iDivUp((dst_cols + 1) / 2, block.x), iDivUp(dst_rows, block.y));
-    gpuLetterboxF16Vec2<<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+    if (config.use_launch_bounds) {
+        // 模板分派（常见配置），否则退回通用
+        int MINB = config.min_blocks_per_sm; MINB = (MINB < 1 ? 1 : (MINB > 3 ? 3 : MINB));
+        if (block.x == 32 && block.y == 8) {
+            if (MINB<=1)      gpuLetterboxF16Vec2_lb<32,8,1><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+            else if (MINB==2) gpuLetterboxF16Vec2_lb<32,8,2><<<grid, block, 0, stream>>> (src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+            else              gpuLetterboxF16Vec2_lb<32,8,3><<<grid, block, 0, stream>>> (src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+        } else if (block.x == 16 && block.y == 16) {
+            if (MINB<=1)      gpuLetterboxF16Vec2_lb<16,16,1><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+            else if (MINB==2) gpuLetterboxF16Vec2_lb<16,16,2><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+            else              gpuLetterboxF16Vec2_lb<16,16,3><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+        } else if (block.x == 64 && block.y == 4) {
+            if (MINB<=1)      gpuLetterboxF16Vec2_lb<64,4,1><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+            else if (MINB==2) gpuLetterboxF16Vec2_lb<64,4,2><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+            else              gpuLetterboxF16Vec2_lb<64,4,3><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+        } else if (block.x == 32 && block.y == 16) {
+            if (MINB<=1)      gpuLetterboxF16Vec2_lb<32,16,1><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+            else if (MINB==2) gpuLetterboxF16Vec2_lb<32,16,2><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+            else              gpuLetterboxF16Vec2_lb<32,16,3><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+        } else if (block.x == 64 && block.y == 8) {
+            if (MINB<=1)      gpuLetterboxF16Vec2_lb<64,8,1><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+            else if (MINB==2) gpuLetterboxF16Vec2_lb<64,8,2><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+            else              gpuLetterboxF16Vec2_lb<64,8,3><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+        } else if (block.x == 48 && block.y == 8) {
+            if (MINB<=1)      gpuLetterboxF16Vec2_lb<48,8,1><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+            else if (MINB==2) gpuLetterboxF16Vec2_lb<48,8,2><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+            else              gpuLetterboxF16Vec2_lb<48,8,3><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+        } else if (block.x == 24 && block.y == 16) {
+            if (MINB<=1)      gpuLetterboxF16Vec2_lb<24,16,1><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+            else if (MINB==2) gpuLetterboxF16Vec2_lb<24,16,2><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+            else              gpuLetterboxF16Vec2_lb<24,16,3><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+        } else if (block.x == 40 && block.y == 8) {
+            if (MINB<=1)      gpuLetterboxF16Vec2_lb<40,8,1><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+            else if (MINB==2) gpuLetterboxF16Vec2_lb<40,8,2><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+            else              gpuLetterboxF16Vec2_lb<40,8,3><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+        } else if (block.x == 20 && block.y == 16) {
+            if (MINB<=1)      gpuLetterboxF16Vec2_lb<20,16,1><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+            else if (MINB==2) gpuLetterboxF16Vec2_lb<20,16,2><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+            else              gpuLetterboxF16Vec2_lb<20,16,3><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+        } else {
+            gpuLetterboxF16Vec2_generic<<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+        }
+    } else {
+        gpuLetterboxF16Vec2_generic<<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config);
+    }
 }
 
 void cudaMultiLetterboxHalf(const void* src, int src_cols, int src_rows, size_t src_pitch,
                             void* dst, int dst_cols, int dst_rows,
                             const LetterboxTransform& params, const ProcessConfig config,
                             int num_images, cudaStream_t stream) {
-    // 强制 half2 向量化路径
-    dim3 block(32, 8);
+    dim3 block = pickBlock(config, dst_cols);
     dim3 grid(iDivUp((dst_cols + 1) / 2, block.x), iDivUp(dst_rows, block.y), num_images);
-    gpuMultiLetterboxHalfVec2<<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+    if (config.use_launch_bounds) {
+        int MINB = config.min_blocks_per_sm; MINB = (MINB < 1 ? 1 : (MINB > 3 ? 3 : MINB));
+        if (block.x == 32 && block.y == 8) {
+            if (MINB<=1)      gpuMultiLetterboxHalfVec2_lb<32,8,1><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+            else if (MINB==2) gpuMultiLetterboxHalfVec2_lb<32,8,2><<<grid, block, 0, stream>>> (src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+            else              gpuMultiLetterboxHalfVec2_lb<32,8,3><<<grid, block, 0, stream>>> (src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+        } else if (block.x == 16 && block.y == 16) {
+            if (MINB<=1)      gpuMultiLetterboxHalfVec2_lb<16,16,1><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+            else if (MINB==2) gpuMultiLetterboxHalfVec2_lb<16,16,2><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+            else              gpuMultiLetterboxHalfVec2_lb<16,16,3><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+        } else if (block.x == 64 && block.y == 4) {
+            if (MINB<=1)      gpuMultiLetterboxHalfVec2_lb<64,4,1><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+            else if (MINB==2) gpuMultiLetterboxHalfVec2_lb<64,4,2><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+            else              gpuMultiLetterboxHalfVec2_lb<64,4,3><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+        } else if (block.x == 32 && block.y == 16) {
+            if (MINB<=1)      gpuMultiLetterboxHalfVec2_lb<32,16,1><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+            else if (MINB==2) gpuMultiLetterboxHalfVec2_lb<32,16,2><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+            else              gpuMultiLetterboxHalfVec2_lb<32,16,3><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+        } else if (block.x == 64 && block.y == 8) {
+            if (MINB<=1)      gpuMultiLetterboxHalfVec2_lb<64,8,1><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+            else if (MINB==2) gpuMultiLetterboxHalfVec2_lb<64,8,2><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+            else              gpuMultiLetterboxHalfVec2_lb<64,8,3><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+        } else if (block.x == 48 && block.y == 8) {
+            if (MINB<=1)      gpuMultiLetterboxHalfVec2_lb<48,8,1><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+            else if (MINB==2) gpuMultiLetterboxHalfVec2_lb<48,8,2><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+            else              gpuMultiLetterboxHalfVec2_lb<48,8,3><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+        } else if (block.x == 24 && block.y == 16) {
+            if (MINB<=1)      gpuMultiLetterboxHalfVec2_lb<24,16,1><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+            else if (MINB==2) gpuMultiLetterboxHalfVec2_lb<24,16,2><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+            else              gpuMultiLetterboxHalfVec2_lb<24,16,3><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+        } else if (block.x == 40 && block.y == 8) {
+            if (MINB<=1)      gpuMultiLetterboxHalfVec2_lb<40,8,1><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+            else if (MINB==2) gpuMultiLetterboxHalfVec2_lb<40,8,2><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+            else              gpuMultiLetterboxHalfVec2_lb<40,8,3><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+        } else if (block.x == 20 && block.y == 16) {
+            if (MINB<=1)      gpuMultiLetterboxHalfVec2_lb<20,16,1><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+            else if (MINB==2) gpuMultiLetterboxHalfVec2_lb<20,16,2><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+            else              gpuMultiLetterboxHalfVec2_lb<20,16,3><<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+        } else {
+            gpuMultiLetterboxHalfVec2_generic<<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+        }
+    } else {
+        gpuMultiLetterboxHalfVec2_generic<<<grid, block, 0, stream>>>(src, src_cols, src_rows, src_pitch, dst, dst_cols, dst_rows, params, config, num_images);
+    }
 }
 
 } // namespace trtyolo

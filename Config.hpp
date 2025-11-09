@@ -44,6 +44,45 @@ public:
     std::string engine_path = "m.engine";
     std::string resolve_engine_path() const { return engine_path; }
 
+    // TRT-YOLO 前处理/内核配置（3060 专项）
+    bool trt_swap_rb = true;                 // GPU侧 BGRA->RGB
+    bool trt_use_normalize = false;          // 是否启用规范化（mean/std）
+    std::vector<float> trt_mean {0.f, 0.f, 0.f};
+    std::vector<float> trt_std  {1.f, 1.f, 1.f};
+    float trt_border_value = 114.f;          // letterbox 边界值
+
+    // 内核块/占用/launch_bounds 配置
+    // 预设（RTX 3060 / SM86 推荐）
+    // - 32x8,  MINB=2: 通用稳定，寄存器压力适中，吞吐与占用平衡（默认）
+    // - 16x16, MINB=2: 更均衡的二维并行分布，对部分输入高宽相近时有更好访存局部性
+    // - 64x4,  MINB=2: 提高X方向访存合并度，适合宽图像；注意寄存器/指令吞吐可能上升
+    // - 32x16/64x8（占用候选）: 在大分辨率且bandwidth占优时可试；当寄存器使用偏高时可能降低SM并发
+    // 使用建议：
+    //   0) 基线：32x8 + MINB=2；
+    //   1) 核偏轻且SM空闲：试 16x16 或 64x4（仍为256线程/块）
+    //   2) 若仍瓶颈：试 32x16 或 64x8（512线程/块），实测寄存器/并发；
+    //   3) 若寄存器压力导致active blocks下降，降低 MINB 或退回 32x8；
+    //   4) use_occupancy=1 仅探索候选，锁定后请固定 block_x/block_y，避免抖动。
+    int  lb_block_x = 32;
+    int  lb_block_y = 8;
+    bool lb_use_launch_bounds = true;
+    int  lb_min_blocks_per_sm = 2;
+    bool lb_use_occupancy = false;           // 运行时基于占用率推荐块大小（探索用，最终建议固定）
+    std::string lb_block_cfg_path = "blocks_default.cfg"; // 外部块配置文件路径（可选），示例键：
+                                             //   block_x, block_y, use_launch_bounds, min_blocks_per_sm, use_occupancy
+                                             // 示例：
+                                             //   block_x=32
+                                             //   block_y=8
+                                             //   use_launch_bounds=1
+                                             //   min_blocks_per_sm=2
+                                             //   use_occupancy=0
+
+    // 内存策略/输入尺寸（可选）
+    bool trt_cuda_mem = false;               // 输入已在 CUDA 显存
+    bool trt_managed_mem = false;            // 统一内存
+    int  trt_input_w = 0;                    // 固定输入宽（0 表示动态）
+    int  trt_input_h = 0;                    // 固定输入高（0 表示动态）
+
     // 截屏/检测区域
     const int   crop_size_px   = 640; // 居中正方形
     const float conf_thresh    = 0.7f;      // 检测阈值
@@ -115,7 +154,7 @@ public:
     int          ovl_max_latency = 1;         // 最大帧延迟(1..3)，<=0 表示不控制
 
     // Overlay 空闲节流
-    bool         ovl_skip_empty = true;       // 无绘制命令时跳过渲染与Present
+    bool         ovl_skip_empty = false;       // 无绘制命令时跳过渲染与Present
 
     // Overlay 小窗口
     bool         ovl_small_window = true; // 小窗口（默认使用裁剪尺寸）
@@ -183,6 +222,12 @@ private:
         // 捕获后端
         cap = (cap==1)?1:0;
         cap_out = std::max(0, cap_out);
+        // 规范化参数
+        if (trt_mean.size()!=3) trt_mean = {0.f,0.f,0.f};
+        if (trt_std.size()!=3)  trt_std  = {1.f,1.f,1.f};
+        lb_block_x = std::max(1, lb_block_x);
+        lb_block_y = std::max(1, lb_block_y);
+        lb_min_blocks_per_sm = std::max(1, lb_min_blocks_per_sm);
     }
     
     // Overlay 相关

@@ -404,6 +404,32 @@ public:
     void setBorderValue(float border_value);
 
     /**
+     * @brief 设置 letterbox 核函数的块大小
+     */
+    // 预设建议（3060/SM86）：
+    //   setLetterboxBlockXY(32,8);    // 默认稳定（256线程）
+    //   setLetterboxBlockXY(16,16);   // 方形更均衡（256线程）
+    //   setLetterboxBlockXY(64,4);    // 宽图更优（256线程）
+    //   setLetterboxBlockXY(32,16);   // 更高并发（512线程，注意寄存器与并发）
+    //   setLetterboxBlockXY(64,8);    // 更高并发（512线程，注意寄存器与并发）
+    void setLetterboxBlockXY(int bx, int by);
+
+    /**
+     * @brief 配置 launch_bounds 与 occupancy
+     */
+    // 启用 __launch_bounds__ 与最小块数设置（建议 min_blocks_per_sm=2）
+    // 可用组合示例：
+    //   (32,8, MINB=2)  稳定默认
+    //   (16,16,MINB=2)  方形更均衡
+    //   (64,4, MINB=2)  宽图合并更好
+    //   (32,16,MINB=2)  512线程，高并发但注意寄存器
+    //   (64,8, MINB=2)  512线程，宽图+高并发
+    void setLetterboxLaunchBounds(bool enable, int min_blocks_per_sm = 2);
+    // 占用探索（仅用于自动挑选候选块）；正式跑请固定 block_x/block_y
+    // 候选集：{32x8,16x16,64x4,32x16,64x8,48x8,24x16,40x8,20x16}（均已提供模板分派）
+    void enableLetterboxOccupancy(bool enable);
+
+    /**
      * @brief 设置归一化参数
      *
      * @param mean

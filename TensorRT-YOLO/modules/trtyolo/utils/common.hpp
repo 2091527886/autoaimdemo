@@ -67,6 +67,13 @@ struct ProcessConfig {
     float  border_value = 114.0f;                                                 // < 边界值，用于填充
     float3 alpha        = make_float3(1.0 / 255.0f, 1.0 / 255.0f, 1.0 / 255.0f);  // < 归一化系数
     float3 beta         = make_float3(0.0f, 0.0f, 0.0f);                          // < 偏移量
+
+    // 内核调优（3060 专项）
+    int    block_x      = 32;                                                     // < 线程块X维（像素对/线程时按2像素）
+    int    block_y      = 8;                                                      // < 线程块Y维
+    int    min_blocks_per_sm = 2;                                                // < __launch_bounds__ 最小块数
+    bool   use_launch_bounds = false;                                            // < 启用 __launch_bounds__ 模式（通过模板实例）
+    bool   use_occupancy     = false;                                            // < 启用occupancy 推荐块大小
 };
 
 /**
