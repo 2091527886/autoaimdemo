@@ -33,17 +33,26 @@ ObjDet::ObjDet(const Config& cfg)
     if (cfg.trt_use_normalize && cfg.trt_mean.size()==3 && cfg.trt_std.size()==3) {
         opt.setNormalizeParams(cfg.trt_mean, cfg.trt_std);
     }
-    // 核函数/占用调优
-    opt.setLetterboxBlockXY(cfg.lb_block_x, cfg.lb_block_y);
-    opt.setLetterboxLaunchBounds(cfg.lb_use_launch_bounds, cfg.lb_min_blocks_per_sm);
-    opt.enableLetterboxOccupancy(cfg.lb_use_occupancy);
+    // 核函数/占用调优（3060 默认稳态：32x8, MINB=2, 关闭 occupancy 探索，可用 cfg 覆盖）
+    int bx = cfg.lb_block_x > 0 ? cfg.lb_block_x : 32;
+    int by = cfg.lb_block_y > 0 ? cfg.lb_block_y : 8;
+    bool use_lb = cfg.lb_use_launch_bounds;
+    int  minb   = (cfg.lb_min_blocks_per_sm>0?cfg.lb_min_blocks_per_sm:2);
+    bool use_occ= cfg.lb_use_occupancy;
+    opt.setLetterboxBlockXY(bx, by);
+    opt.setLetterboxLaunchBounds(true, minb);
+    opt.enableLetterboxOccupancy(false);
 
     // 内存策略
     if (cfg.trt_cuda_mem) opt.enableCudaMem();
     if (cfg.trt_managed_mem) opt.enableManagedMemory();
 
-    // Do not set fixed input dimensions to preserve BGRA pitch; use dynamic path
-    // if (cfg.trt_input_w>0 && cfg.trt_input_h>0) opt.setInputDimensions(cfg.trt_input_w, cfg.trt_input_h);
+    // 固定输入尺寸（使用裁剪窗口）以启用静态图与减少分配
+    if (cfg.trt_input_w>0 && cfg.trt_input_h>0) {
+        opt.setInputDimensions(cfg.trt_input_w, cfg.trt_input_h);
+    } else {
+        opt.setInputDimensions(cfg.crop_size_px, cfg.crop_size_px);
+    }
     if (cfg.perf_report) {
         opt.enablePerformanceReport();
     }

@@ -108,14 +108,20 @@ void TrtBackend::initialize() {
     infer_size_ = max_shape.y * max_shape.w * max_shape.z;
 
     if (infer_config.input_shape.has_value()) {
-        input_size_ = max_shape.y * infer_config.input_shape->y * infer_config.input_shape->x;
+        // 固定输入尺寸：源为 BGRA（4 字节/像素），按行（pitch）拷贝
+        int in_w = infer_config.input_shape->y;
+        int in_h = infer_config.input_shape->x;
+        input_row_bytes_  = static_cast<size_t>(in_w) * 4;           // BGRA
+        input_image_bytes_ = static_cast<size_t>(in_h) * input_row_bytes_;
+        input_size_ = static_cast<int>(input_image_bytes_);          // 兼容旧 int 字段
+
         affine_transforms.emplace_back(LetterboxTransform());
         affine_transforms.front().updateParams(
-            infer_config.input_shape->y,
-            infer_config.input_shape->x,
+            in_w,
+            in_h,
             max_shape.w,
             max_shape.z);
-        inputs_buffer_->allocate(max_shape.x * input_size_);  // < 按最大情况分配空间
+        inputs_buffer_->allocate(max_shape.x * input_image_bytes_);  // < 按最大情况分配空间（逐行拷贝）
     } else {
         // 输入尺寸不固定时
         affine_transforms.resize(max_shape.x, LetterboxTransform());
@@ -138,7 +144,9 @@ void TrtBackend::captureCudaGraph() {
 
     // Lambda: Calculate input size and device pointers
     auto calculate_input_size_and_device = [&](int idx, int input_width, int input_height) {
-        size_t input_size   = input_height * input_width * max_shape.y;
+        size_t input_size = (infer_config.input_shape.has_value() && !infer_config.cuda_mem)
+                                ? input_image_bytes_
+                                : static_cast<size_t>(input_height) * input_width * max_shape.y;
         void*  input_device = static_cast<uint8_t*>(inputs_buffer_->device()) + idx * input_size;
         void*  infer_device = static_cast<void*>(static_cast<uint16_t*>(tensor_infos.front().buffer->device()) + idx * infer_size_);
         return std::make_pair(input_device, infer_device);
@@ -146,13 +154,16 @@ void TrtBackend::captureCudaGraph() {
 
     // Lambda: Perform WarpAffine operation
     auto warp_affine = [&](bool multi, int input_width, int input_height) {
+        size_t src_pitch = (infer_config.input_shape.has_value() && !infer_config.cuda_mem)
+                               ? input_row_bytes_
+                               : static_cast<size_t>(input_width) * max_shape.y; // assume tightly packed CHW when not fixed-host path
         if (multi) {
             // Multi-instance WarpAffine
             cudaMultiLetterboxHalf(
                 inputs_buffer_->device(),
                 input_width,
                 input_height,
-                input_width * max_shape.y,
+                src_pitch,
                 tensor_infos.front().buffer->device(),
                 max_shape.w,
                 max_shape.z,
@@ -169,7 +180,7 @@ void TrtBackend::captureCudaGraph() {
                     input_device,
                     input_width,
                     input_height,
-                    input_width * max_shape.y,
+                    src_pitch,
                     infer_device,
                     max_shape.w,
                     max_shape.z,
@@ -249,8 +260,14 @@ void TrtBackend::staticInfer(const std::vector<Image>& inputs) {
                 cuda_graph_.updateKernelNodeParams(idx, kernelParams);
             }
         } else {
-            for (auto idx = 0; idx < num; ++idx) {
-                std::memcpy(static_cast<uint8_t*>(inputs_buffer_->host()) + idx * input_size_, inputs[idx].ptr, input_size_);
+            // 主机拷贝需按行考虑 pitch
+            for (int idx = 0; idx < num; ++idx) {
+                uint8_t* dst = static_cast<uint8_t*>(inputs_buffer_->host()) + idx * input_image_bytes_;
+                const uint8_t* src = static_cast<const uint8_t*>(inputs[idx].ptr);
+                size_t row_bytes = input_row_bytes_;
+                for (int r = 0; r < infer_config.input_shape->x; ++r) {
+                    std::memcpy(dst + r * row_bytes, src + r * inputs[idx].pitch, row_bytes);
+                }
             }
         }
     } else {
@@ -333,18 +350,24 @@ void TrtBackend::dynamicInfer(const std::vector<Image>& inputs) {
     if (infer_config.input_shape.has_value()) {
         // 2. 处理静态输入形状
         if (!infer_config.cuda_mem) {
+            // 主机拷贝需按行考虑 pitch
             for (int idx = 0; idx < num; ++idx) {
-                std::memcpy(static_cast<uint8_t*>(inputs_buffer_->host()) + idx * input_size_, inputs[idx].ptr, input_size_);
+                uint8_t* dst = static_cast<uint8_t*>(inputs_buffer_->host()) + idx * input_image_bytes_;
+                const uint8_t* src = static_cast<const uint8_t*>(inputs[idx].ptr);
+                size_t row_bytes = input_row_bytes_;
+                for (int r = 0; r < infer_config.input_shape->x; ++r) {
+                    std::memcpy(dst + r * row_bytes, src + r * inputs[idx].pitch, row_bytes);
+                }
             }
             inputs_buffer_->hostToDevice(stream);
         }
 
         for (int idx = 0; idx < num; ++idx) {
             cudaLetterboxHalf(
-                infer_config.cuda_mem ? inputs[idx].ptr : static_cast<uint8_t*>(inputs_buffer_->device()) + idx * input_size_,
+                infer_config.cuda_mem ? inputs[idx].ptr : static_cast<uint8_t*>(inputs_buffer_->device()) + idx * input_image_bytes_,
                 inputs[idx].width,
                 inputs[idx].height,
-                inputs[idx].pitch,
+                infer_config.cuda_mem ? inputs[idx].pitch : input_row_bytes_,
                 static_cast<uint16_t*>(tensor_infos.front().buffer->device()) + idx * infer_size_,
                 max_shape.w,
                 max_shape.z,

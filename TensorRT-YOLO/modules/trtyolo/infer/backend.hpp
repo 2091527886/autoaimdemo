@@ -85,6 +85,10 @@ private:
 
     int input_size_;                             // < 输入大小
     int infer_size_;                             // < 推理大小
+
+    // Input copy sizing when fixed input_shape is set and cuda_mem == false
+    size_t input_row_bytes_ = 0;                 // < 每行源图拷贝字节数（例如 BGRA: width*4）
+    size_t input_image_bytes_ = 0;               // < 单张源图拷贝字节数（height*input_row_bytes_）
 };
 
 }  // namespace trtyolo
