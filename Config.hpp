@@ -139,6 +139,44 @@ public:
     bool   aim_single_use_pred = true;   // 单次点击是否使用预测
     bool   aim_only_with_key = true;     // 仅在按键时启用分段/预测
 
+    // 风鼠标（人类化轨迹）
+    bool   wind_enable = true;           // 总开关（均衡型默认：开启）
+    int    wind_rng_seed = 0;            // 0=随机播种，>0=固定种子
+
+    // 步长与速度
+    // 均衡型默认
+    double wind_step_min_px = 0.6;       // 微步最小像素
+    double wind_step_max_px = 8.0;       // 微步最大像素（上限保护）
+    double wind_speed_curve = 0.6;       // 0..1，越大越早加速后期减速更明显
+    double wind_end_slow_px = 14.0;      // 终端减速触发距离（像素）
+
+    // 风/重力/抖动强度
+    // 均衡型默认
+    double wind_wind_k = 0.35;           // 风力系数：横向扰动
+    double wind_gravity_k = 0.80;        // 重力系数：朝目标的吸引
+    double wind_jitter_std_px = 0.35;    // 高斯抖动标准差
+    double wind_backtrack_k = 0.12;      // 过冲回拉（小反向力）
+    // 分段缩放（与已有距离分段一致，按目标框高度 h）
+    // 均衡型默认
+    double wind_near_scale = 0.9;        // 近距离：更稳更短步
+    double wind_mid_scale  = 1.0;        // 中距离：默认
+    double wind_far_scale  = 1.1;        // 远距离：更快更长步
+
+    // 单帧预算与残差
+    // 均衡型默认
+    int    wind_max_steps_per_frame = 6; // 单帧最多微步次数（硬限制）
+    double wind_time_budget_ms = 1.2;    // 单帧最多用时（软限制，优先于上限）
+    double wind_residual_carry = 1.0;    // 残差占比（1=全额滚入下一帧）
+    // 终端控制与精度
+    // 均衡型默认
+    double wind_dead_px = 0.4;           // 风鼠标内部死区（避免抖动）
+    bool   wind_target_noise_enable = true; // 是否启用终端微抖
+    double wind_target_noise_px = 0.6;   // 终端微抖（更“人类化”）
+
+    // 与现有分段/预测的一致性控制
+    bool   wind_use_seg_scale = true;    // 是否按近/中/远缩放风强度/步长
+    // 兼容/安全
+    double wind_out_limit_px = 450.0;    // 单帧总输出像素上限（保护）
     // 类别/标签
     std::vector<std::string> classes { "enemy","teammate" };
     std::vector<int>         target_ids { 0 };
