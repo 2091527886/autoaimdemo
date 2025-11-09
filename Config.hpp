@@ -101,11 +101,11 @@ public:
 
     // PropAlgo（比例 + 平滑）
     bool   prop = true;                  // 默认启用
-    double prop_k_x = 0.3;
-    double prop_k_y = 0.3;
-    double prop_out_limit = 350.0;       // 每帧像素限幅（Hipfire 预设）
+    double prop_k_x = 0.34;
+    double prop_k_y = 0.34;
+    double prop_out_limit = 360.0;       // 每帧像素限幅（Hipfire 预设）
     double prop_tc_ms = 6.0;             // 一阶低通时间常数（ms）
-    double prop_dead_px = 0.6;           // 误差死区（像素）
+    double prop_dead_px = 0.45;           // 误差死区（像素）
     bool   prop_use_dt = true;           // 使用实测 dt
 
     // 预测
@@ -121,12 +121,12 @@ public:
     bool   curve_interp = false;         // 分段间是否插值（方案A可关闭）
 
     // 分段参数（重配置 AimAlgo）
-    double seg_near_kx   = 0.24, seg_near_ky   = 0.24;
-    double seg_near_tc_ms= 5.0;  double seg_near_lim = 420.0;
-    double seg_mid_kx    = 0.18, seg_mid_ky    = 0.18;
-    double seg_mid_tc_ms = 6.0;  double seg_mid_lim  = 350.0;
-    double seg_far_kx    = 0.12, seg_far_ky    = 0.12;
-    double seg_far_tc_ms = 7.0;  double seg_far_lim  = 280.0;
+    double seg_near_kx   = 0.28, seg_near_ky   = 0.28;
+    double seg_near_tc_ms= 6.0;  double seg_near_lim = 420.0;
+    double seg_mid_kx    = 0.22, seg_mid_ky    = 0.22;
+    double seg_mid_tc_ms = 6.5;  double seg_mid_lim  = 360.0;
+    double seg_far_kx    = 0.16, seg_far_ky    = 0.16;
+    double seg_far_tc_ms = 7.0;  double seg_far_lim  = 300.0;
 
     // 动态锚点（近头远身）
     bool   aim_dyn_anchor = true;
@@ -140,7 +140,7 @@ public:
     bool   aim_only_with_key = true;     // 仅在按键时启用分段/预测
 
     // 风鼠标（人类化轨迹）
-    bool   wind_enable = true;           // 总开关（均衡型默认：开启）
+    bool   wind_enable = false;           // 总开关（均衡型默认：开启）
     int    wind_rng_seed = 0;            // 0=随机播种，>0=固定种子
 
     // 步长与速度
