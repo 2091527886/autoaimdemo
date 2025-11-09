@@ -13,6 +13,7 @@
 
 class Config {
 public:
+public:
     // 计时总开关（关闭则尽量不做统计计时）
     bool timing = true;
 public:
@@ -100,12 +101,43 @@ public:
 
     // PropAlgo（比例 + 平滑）
     bool   prop = true;                  // 默认启用
-    double prop_k_x = 0.18;
-    double prop_k_y = 0.18;
+    double prop_k_x = 0.3;
+    double prop_k_y = 0.3;
     double prop_out_limit = 350.0;       // 每帧像素限幅（Hipfire 预设）
     double prop_tc_ms = 6.0;             // 一阶低通时间常数（ms）
     double prop_dead_px = 0.6;           // 误差死区（像素）
     bool   prop_use_dt = true;           // 使用实测 dt
+
+    // 预测
+    bool   pred_enable = true;           // 启用短期预测
+    double pred_dt_max_ms = 12.0;        // 最大外推时间（ms）
+    double pred_v_tc_ms  = 18.0;         // 速度低通时间常数（ms）
+    double pred_v_lim_px = 320.0;        // 速度幅度限幅（像素/秒）
+
+    // 距离度量与分段
+    double dist_near_h = 220.0;          // 高度>=近
+    double dist_far_h  = 120.0;          // 高度<=远
+    double dist_hys_h  = 20.0;           // 滞回
+    bool   curve_interp = false;         // 分段间是否插值（方案A可关闭）
+
+    // 分段参数（重配置 AimAlgo）
+    double seg_near_kx   = 0.24, seg_near_ky   = 0.24;
+    double seg_near_tc_ms= 5.0;  double seg_near_lim = 420.0;
+    double seg_mid_kx    = 0.18, seg_mid_ky    = 0.18;
+    double seg_mid_tc_ms = 6.0;  double seg_mid_lim  = 350.0;
+    double seg_far_kx    = 0.12, seg_far_ky    = 0.12;
+    double seg_far_tc_ms = 7.0;  double seg_far_lim  = 280.0;
+
+    // 动态锚点（近头远身）
+    bool   aim_dyn_anchor = true;
+    double y_anchor_head  = 0.2;
+    double y_anchor_body  = 0.60;
+    double aim_hys_h      = 20.0;        // 锚点切换滞回
+    bool   aim_lock_on_seg = true;       // 段内保持命中部位
+
+    // 行为开关
+    bool   aim_single_use_pred = true;   // 单次点击是否使用预测
+    bool   aim_only_with_key = true;     // 仅在按键时启用分段/预测
 
     // 类别/标签
     std::vector<std::string> classes { "enemy","teammate" };
@@ -201,6 +233,14 @@ public:
         v_overlay();
         v_dxgi();
         // 合理范围软约束（不改 const 值，仅在此处校验）
+        // 分段/预测校验（仅夹紧与范围提示，不改语义）
+        dist_near_h = std::max(1.0, dist_near_h);
+        dist_far_h  = std::max(1.0, std::min(dist_near_h-1.0, dist_far_h));
+        dist_hys_h  = std::max(0.0, dist_hys_h);
+        aim_hys_h   = std::max(0.0, aim_hys_h);
+        pred_dt_max_ms = std::max(0.0, pred_dt_max_ms);
+        pred_v_tc_ms  = std::max(0.0, pred_v_tc_ms);
+        pred_v_lim_px = std::max(0.0, pred_v_lim_px);
         if (!(conf_thresh >= 0.0f && conf_thresh <= 1.0f)) {
             lg::e() << P_E "conf_thresh out of [0,1]" << lg::endl;
         }

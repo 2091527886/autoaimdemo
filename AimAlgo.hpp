@@ -32,6 +32,13 @@ public:
         return { x_.step(ex, d), y_.step(ey, d) };
     }
 
+public:
+    // 动态设置参数（分段用）
+    void setParams(double kx, double ky, double tc_ms, double out_lim_px) {
+        x_.setK(kx); y_.setK(ky);
+        x_.setTc(tc_ms); y_.setTc(tc_ms);
+        x_.setLim(out_lim_px); y_.setLim(out_lim_px);
+    }
 private:
     PropAlgo x_;
     PropAlgo y_;
