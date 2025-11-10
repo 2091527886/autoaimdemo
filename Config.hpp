@@ -130,8 +130,8 @@ public:
 
     // 动态锚点（近头远身）
     bool   aim_dyn_anchor = true;
-    double y_anchor_head  = 0.2;
-    double y_anchor_body  = 0.60;
+    double y_anchor_head  = 0.6;
+    double y_anchor_body  = 0.80;
     double aim_hys_h      = 28.0;        // 锚点切换滞回
     bool   aim_lock_on_seg = true;       // 段内保持命中部位
 
