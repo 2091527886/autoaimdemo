@@ -110,9 +110,9 @@ public:
 
     // 预测
     bool   pred_enable = true;           // 启用短期预测
-    double pred_dt_max_ms = 10.0;        // 最大外推时间（ms）
-    double pred_v_tc_ms  = 14.0;         // 速度低通时间常数（ms）
-    double pred_v_lim_px = 240.0;        // 速度幅度限幅（像素/秒）
+    double pred_dt_max_ms = 7.0;         // 最大外推时间（ms）
+    double pred_v_tc_ms  = 12.0;         // 速度低通时间常数（ms）
+    double pred_v_lim_px = 220.0;        // 速度幅度限幅（像素/秒）
 
     // 距离度量与分段
     double dist_near_h = 220.0;          // 高度>=近
@@ -121,16 +121,16 @@ public:
     bool   curve_interp = false;         // 分段间是否插值（方案A可关闭）
 
     // 分段参数（重配置 AimAlgo）
-    double seg_near_kx   = 0.30, seg_near_ky   = 0.32;
-    double seg_near_tc_ms= 7.0;  double seg_near_lim = 380.0;
+    double seg_near_kx   = 0.32, seg_near_ky   = 0.34;
+    double seg_near_tc_ms= 7.0;  double seg_near_lim = 360.0;
     double seg_mid_kx    = 0.24, seg_mid_ky    = 0.26;
-    double seg_mid_tc_ms = 6.5;  double seg_mid_lim  = 340.0;
+    double seg_mid_tc_ms = 6.5;  double seg_mid_lim  = 330.0;
     double seg_far_kx    = 0.18, seg_far_ky    = 0.20;
     double seg_far_tc_ms = 6.0;  double seg_far_lim  = 300.0;
 
     // 动态锚点（近头远身）
     bool   aim_dyn_anchor = true;
-    double y_anchor_head  = 0.6;
+    double y_anchor_head  = 0.58;
     double y_anchor_body  = 0.80;
     double aim_hys_h      = 28.0;        // 锚点切换滞回
     bool   aim_lock_on_seg = true;       // 段内保持命中部位
@@ -140,43 +140,43 @@ public:
     bool   aim_only_with_key = true;     // 仅在按键时启用分段/预测
 
     // 风鼠标（人类化轨迹）
-    bool   wind_enable = false;           // 总开关（均衡型默认：开启）
+    bool   wind_enable = true;            // 总开关（均衡型默认：开启）
     int    wind_rng_seed = 0;            // 0=随机播种，>0=固定种子
 
     // 步长与速度
     // 均衡型默认
-    double wind_step_min_px = 0.7;       // 微步最小像素
-    double wind_step_max_px = 9.0;       // 微步最大像素（上限保护）
-    double wind_speed_curve = 0.55;       // 0..1，越大越早加速后期减速更明显
-    double wind_end_slow_px = 12.0;      // 终端减速触发距离（像素）
+    double wind_step_min_px = 0.6;       // 微步最小像素
+    double wind_step_max_px = 7.5;       // 微步最大像素（上限保护）
+    double wind_speed_curve = 0.65;       // 0..1，越大越早加速后期减速更明显
+    double wind_end_slow_px = 10.0;      // 终端减速触发距离（像素）
 
     // 风/重力/抖动强度
     // 均衡型默认
-    double wind_wind_k = 0.28;           // 风力系数：横向扰动
-    double wind_gravity_k = 0.90;        // 重力系数：朝目标的吸引
-    double wind_jitter_std_px = 0.28;    // 高斯抖动标准差
-    double wind_backtrack_k = 0.10;      // 过冲回拉（小反向力）
+    double wind_wind_k = 0.24;           // 风力系数：横向扰动
+    double wind_gravity_k = 0.86;        // 重力系数：朝目标的吸引
+    double wind_jitter_std_px = 0.22;    // 高斯抖动标准差
+    double wind_backtrack_k = 0.12;      // 过冲回拉（小反向力）
     // 分段缩放（与已有距离分段一致，按目标框高度 h）
     // 均衡型默认
-    double wind_near_scale = 0.92;        // 近距离：更稳更短步
+    double wind_near_scale = 0.90;        // 近距离：更稳更短步
     double wind_mid_scale  = 1.0;        // 中距离：默认
-    double wind_far_scale  = 1.12;        // 远距离：更快更长步
+    double wind_far_scale  = 1.15;        // 远距离：更快更长步
 
     // 单帧预算与残差
     // 均衡型默认
-    int    wind_max_steps_per_frame = 5; // 单帧最多微步次数（硬限制）
-    double wind_time_budget_ms = 1.0;    // 单帧最多用时（软限制，优先于上限）
-    double wind_residual_carry = 1.0;    // 残差占比（1=全额滚入下一帧）
+    int    wind_max_steps_per_frame = 4; // 单帧最多微步次数（硬限制）
+    double wind_time_budget_ms = 0.6;    // 单帧最多用时（软限制，优先于上限）
+    double wind_residual_carry = 0.9;    // 残差占比（1=全额滚入下一帧）
     // 终端控制与精度
     // 均衡型默认
-    double wind_dead_px = 0.45;           // 风鼠标内部死区（避免抖动）
-    bool   wind_target_noise_enable = false; // 是否启用终端微抖
-    double wind_target_noise_px = 0.0;   // 终端微抖（更“人类化”）
+    double wind_dead_px = 0.5;            // 风鼠标内部死区（避免抖动）
+    bool   wind_target_noise_enable = true;  // 是否启用终端微抖
+    double wind_target_noise_px = 0.6;   // 终端微抖（更“人类化”）
 
     // 与现有分段/预测的一致性控制
     bool   wind_use_seg_scale = true;    // 是否按近/中/远缩放风强度/步长
     // 兼容/安全
-    double wind_out_limit_px = 450.0;    // 单帧总输出像素上限（保护）
+    double wind_out_limit_px = 340.0;    // 单帧总输出像素上限（保护）
     // 类别/标签
     std::vector<std::string> classes { "enemy","teammate" };
     std::vector<int>         target_ids { 0 };
