@@ -101,8 +101,8 @@ public:
 
     // PropAlgo（比例 + 平滑）
     bool   prop = true;                  // 默认启用
-    double prop_k_x = 0.34;
-    double prop_k_y = 0.34;
+    double prop_k_x = 0.8;
+    double prop_k_y = 0.8;
     double prop_out_limit = 360.0;       // 每帧像素限幅（Hipfire 预设）
     double prop_tc_ms = 6.0;             // 一阶低通时间常数（ms）
     double prop_dead_px = 0.45;           // 误差死区（像素）
