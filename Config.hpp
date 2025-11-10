@@ -105,34 +105,34 @@ public:
     double prop_k_y = 0.8;
     double prop_out_limit = 360.0;       // 每帧像素限幅（Hipfire 预设）
     double prop_tc_ms = 6.0;             // 一阶低通时间常数（ms）
-    double prop_dead_px = 0.45;           // 误差死区（像素）
+    double prop_dead_px = 0.6;           // 误差死区（像素）
     bool   prop_use_dt = true;           // 使用实测 dt
 
     // 预测
     bool   pred_enable = true;           // 启用短期预测
-    double pred_dt_max_ms = 12.0;        // 最大外推时间（ms）
-    double pred_v_tc_ms  = 18.0;         // 速度低通时间常数（ms）
-    double pred_v_lim_px = 320.0;        // 速度幅度限幅（像素/秒）
+    double pred_dt_max_ms = 10.0;        // 最大外推时间（ms）
+    double pred_v_tc_ms  = 14.0;         // 速度低通时间常数（ms）
+    double pred_v_lim_px = 240.0;        // 速度幅度限幅（像素/秒）
 
     // 距离度量与分段
     double dist_near_h = 220.0;          // 高度>=近
     double dist_far_h  = 120.0;          // 高度<=远
-    double dist_hys_h  = 20.0;           // 滞回
+    double dist_hys_h  = 24.0;           // 滞回
     bool   curve_interp = false;         // 分段间是否插值（方案A可关闭）
 
     // 分段参数（重配置 AimAlgo）
-    double seg_near_kx   = 0.28, seg_near_ky   = 0.28;
-    double seg_near_tc_ms= 6.0;  double seg_near_lim = 420.0;
-    double seg_mid_kx    = 0.22, seg_mid_ky    = 0.22;
-    double seg_mid_tc_ms = 6.5;  double seg_mid_lim  = 360.0;
-    double seg_far_kx    = 0.16, seg_far_ky    = 0.16;
-    double seg_far_tc_ms = 7.0;  double seg_far_lim  = 300.0;
+    double seg_near_kx   = 0.30, seg_near_ky   = 0.32;
+    double seg_near_tc_ms= 7.0;  double seg_near_lim = 380.0;
+    double seg_mid_kx    = 0.24, seg_mid_ky    = 0.26;
+    double seg_mid_tc_ms = 6.5;  double seg_mid_lim  = 340.0;
+    double seg_far_kx    = 0.18, seg_far_ky    = 0.20;
+    double seg_far_tc_ms = 6.0;  double seg_far_lim  = 300.0;
 
     // 动态锚点（近头远身）
     bool   aim_dyn_anchor = true;
     double y_anchor_head  = 0.2;
     double y_anchor_body  = 0.60;
-    double aim_hys_h      = 20.0;        // 锚点切换滞回
+    double aim_hys_h      = 28.0;        // 锚点切换滞回
     bool   aim_lock_on_seg = true;       // 段内保持命中部位
 
     // 行为开关
