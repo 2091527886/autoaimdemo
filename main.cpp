@@ -427,6 +427,18 @@ public:
                     }
                     auto col = ARGB((uint8_t)c.ovl_a,(uint8_t)rr,(uint8_t)gg,(uint8_t)bb);
                     gover.AddRect({x,y,w,h}, col, (float)c.ovl_thick);
+                    // label above box to avoid covering
+                    float fsz = (float)std::max(1, c.ovl_font_px);
+                    float ty = std::max(0.0f, y - fsz - 2.0f);
+                    std::string lbl = c.name_or_id(cid);
+                    std::wstring wlbl(lbl.begin(), lbl.end());
+                    if (!wlbl.empty()) {
+                        OverlayColor tcol = ARGB(255, (uint8_t)rr, (uint8_t)gg, (uint8_t)bb);
+                        if (!c.ovl_font_name.empty())
+                            gover.AddText(x, ty, wlbl, fsz, tcol, c.ovl_font_name);
+                        else
+                            gover.AddText(x, ty, wlbl, fsz, tcol);
+                    }
                 }
                 gover.EndFrame();
                 gover.Tick();

@@ -487,12 +487,14 @@ bool Game_overlay::Impl::CreateWindowAndDevices()
     scd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
     scd.AlphaMode = DXGI_ALPHA_MODE_PREMULTIPLIED;
     scd.Scaling = DXGI_SCALING_STRETCH;
-    scd.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+    // Some systems/drivers fail CreateSwapChainForComposition with FRAME_LATENCY_WAITABLE flag; disable for compatibility
+    scd.Flags = 0;
 
-    if (FAILED(factory2->CreateSwapChainForComposition(
-        d3d.Get(), &scd, nullptr, &swapChain)))
+    HRESULT hr_sc = factory2->CreateSwapChainForComposition(
+        d3d.Get(), &scd, nullptr, &swapChain);
+    if (FAILED(hr_sc))
     {
-        lg::werr(P_E, "CreateSwapChainForComposition");
+        lg::hrfail(P_E, "CreateSwapChainForComposition", hr_sc);
         return false;
     }
 
@@ -512,7 +514,8 @@ bool Game_overlay::Impl::CreateWindowAndDevices()
     if (FAILED(d2dCtx->CreateSolidColorBrush(
         D2D1::ColorF(1.f, 1.f, 1.f, 1.f), &brush))) { lg::werr(P_E, "CreateSolidColorBrush"); return false; }
     d2dCtx->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-    d2dCtx->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_CLEARTYPE);
+    // Use GRAYSCALE AA for text over transparent surfaces (ClearType may not render on premultiplied alpha)
+    d2dCtx->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
 
     if (FAILED(DWriteCreateFactory(
         DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
@@ -587,6 +590,10 @@ HRESULT Game_overlay::Impl::CreateTargets()
         if (FAILED(d2dDevice->CreateDeviceContext(
             D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &d2dCtx))) { lg::werr(P_E, "CreateDeviceContext"); return E_FAIL; }
     }
+
+    // Use pixel units and fixed DPI to avoid DPI-scaling distortion
+    d2dCtx->SetUnitMode(D2D1_UNIT_MODE_PIXELS);
+    d2dCtx->SetDpi(96.f, 96.f);
 
     ComPtr<IDXGISurface> surf;
     if (FAILED(bb.As(&surf))) { lg::werr(P_E, "As(IdxgiSurface)"); return E_FAIL; }

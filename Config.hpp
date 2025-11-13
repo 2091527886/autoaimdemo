@@ -239,6 +239,10 @@ public:
     std::vector<int> ovl_cg { 0, 255 };
     std::vector<int> ovl_cb { 0, 0 };
 
+    // Overlay 字体
+    int          ovl_font_px = 40;          // 字号（像素）
+    std::wstring ovl_font_name;             // 字体名（空=默认 Segoe UI）
+
     // 仅显示某一类（-1 显示全部；>=0 仅该 class_id）
     int ovl_only = -1;
 
