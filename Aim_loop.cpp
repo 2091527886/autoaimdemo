@@ -41,21 +41,34 @@ void Aim::loop() {
       if (!target) {
         algo.reset();
         last_tp_valid_ = false;
+        lock_ = false;
+        aim_ok_ = false;
       } else {
         if (!smooth_pressed) {
           algo.reset();
           last_tp_valid_ = false;
         }
 
+        // compute aim point and lock rect for overlay (no side-effect)
+        {
+          cv::Point2f ap = aim_no_pred(*target);
+          aim_pt_.x = ap.x;
+          aim_pt_.y = ap.y;
+          aim_ok_ = true;
+          lock_rect_ = { (float)(crop.x + target->box.x), (float)(crop.y + target->box.y), (float)target->box.width, (float)target->box.height };
+          lock_ = smooth_pressed || single;
+        }
+
+        // compute dt once per frame for control
+        double dt = get_dt();
+
         if (single) {
-          double dt = get_dt();
           bool use_pred = c.aim_single_use_pred;
           auto [dx, dy] = pred_err(*target, dt, use_pred);
           int mx = (int)(dx * mfac);
           int my = (int)(dy * mfac);
           mv(mx, my, mou_cost_ms);
         } else if (smooth_pressed) {
-          double dt = get_dt();
           double h = (double)target->box.height;
           set_seg(h);
           auto [ex, ey] = pred_err(*target, dt, true);

@@ -36,6 +36,7 @@ private:
     // helpers
     double get_dt();
     double anch(double h);
+    double anch_read(double h) const; // read-only anchor, no state write
     void set_seg(double h);
     std::pair<double,double> pred_err(const Detection& d, double dt, bool enable_pred);
     bool capture(FrameLat& fl, ScreenCapturer::CapturedView& view);
@@ -45,6 +46,8 @@ private:
     void draw_ovl(double& ms);
     void log_lat(FrameLat& fl);
     void trt_log();
+    // pure aim point for overlay, no state change
+    cv::Point2f aim_no_pred(const Detection& d) const;
 
     // state
     Config c;
@@ -72,6 +75,12 @@ private:
     cv::Point2d last_tp_ {0.0, 0.0};
     bool last_tp_valid_ = false;
     int  last_seg_ = 1; // 0:far,1:mid,2:near
+
+    // overlay state
+    bool lock_ = false;
+    OverlayRect lock_rect_{0,0,0,0};
+    cv::Point2f aim_pt_{0.f, 0.f};
+    bool aim_ok_ = false;
 
     WindState wind_;
 };

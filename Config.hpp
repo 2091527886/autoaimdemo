@@ -159,6 +159,17 @@ public:
 
     int ovl_only = -1;
 
+    // crosshair and lock style
+    bool  cross_show = true;
+    int   cross_size = 10;      // px, half-length
+    float cross_th   = 2.0f;    // px
+    int   cross_a = 255, cross_r = 255, cross_g = 255, cross_b = 255;
+
+    float lock_th = 2.0f;       // px
+    int   lock_a = 255, lock_r = 255, lock_g = 215, lock_b = 0; // gold
+    bool  lock_show_text = true;
+    std::wstring lock_text = L"locked";
+
     bool mmcss_main = false;
     std::wstring mmcss_task = L"Capture";
     AVRT_PRIORITY mmcss_prio = AVRT_PRIORITY_HIGH;
@@ -201,6 +212,12 @@ private:
     }
     void v_overlay() {
         if (ovl_cls) { size_t n = classes.size(); pad(ovl_cr,n,ovl_r); pad(ovl_cg,n,ovl_g); pad(ovl_cb,n,ovl_b); }
+        cross_size = std::max(1, cross_size);
+        cross_th   = std::max(0.5f, cross_th);
+        lock_th    = std::max(1.0f, lock_th);
+        auto clampc = [](int& v){ v = std::max(0, std::min(255, v)); };
+        clampc(cross_a); clampc(cross_r); clampc(cross_g); clampc(cross_b);
+        clampc(lock_a);  clampc(lock_r);  clampc(lock_g);  clampc(lock_b);
     }
     void v_dxgi() { dxgi_max_latency = std::max(1, dxgi_max_latency); dxgi_gpu_prio = std::min(7, std::max(-1, dxgi_gpu_prio)); }
     static void pad(std::vector<int>& v, size_t n, int d) { if (v.size()<n) v.resize(n,d); for (auto& x : v) x = std::max(0, std::min(255, x)); }

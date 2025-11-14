@@ -41,6 +41,19 @@ double Aim::anch(double h) {
   return (last_seg_ == 2) ? c.y_anchor_head : c.y_anchor_body;
 }
 
+double Aim::anch_read(double h) const {
+  if (!c.aim_dyn_anchor) return c.y_anchor_ratio;
+  double near_h = c.dist_near_h, far_h = c.dist_far_h, hys = c.aim_hys_h;
+  int seg = last_seg_;
+  if (seg == 2) { if (h < near_h - hys) seg = 1; }
+  else if (seg == 0) { if (h > far_h + hys) seg = 1; }
+  else {
+    if (h >= near_h) seg = 2;
+    else if (h <= far_h) seg = 0;
+  }
+  return (seg == 2) ? c.y_anchor_head : c.y_anchor_body;
+}
+
 void Aim::set_seg(double h) {
   double near_h = c.dist_near_h, far_h = c.dist_far_h, hys = c.dist_hys_h;
   int seg = last_seg_;
@@ -107,4 +120,11 @@ std::pair<double, double> Aim::pred_err(const Detection &d, double dt, bool enab
   last_tp_ = tp;
   last_tp_valid_ = true;
   return {tp.x - ctr.x, tp.y - ctr.y};
+}
+
+cv::Point2f Aim::aim_no_pred(const Detection &d) const {
+  double ya = anch_read((double)d.box.height);
+  double cx = crop.x + d.box.x + d.box.width / 2.0;
+  double cy = crop.y + d.box.y + d.box.height * ya;
+  return cv::Point2f((float)cx, (float)cy);
 }
