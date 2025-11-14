@@ -54,13 +54,8 @@ ScreenCapturer::ScreenCapturer(const Config &cfg_ref, int crop_width, int crop_h
   TuneDxgi(dev, cfg.dxgi_gpu_prio, cfg.dxgi_max_latency);
 
   useWgc = (cfg.cap == 1);
-  if (!useWgc) {
-    init_dxgi();
-    reporter.SetBackend(metrics::CaptureReporting::Backend::DXGI);
-  } else {
-    init_wgc();
-    reporter.SetBackend(metrics::CaptureReporting::Backend::WGC);
-  }
+  if (!useWgc) { init_dxgi(); reporter.SetBackend(metrics::CaptureReporting::Backend::DXGI); }
+  else { init_wgc(); reporter.SetBackend(metrics::CaptureReporting::Backend::WGC); }
 
   D3D11_TEXTURE2D_DESC desc;
   ZeroMemory(&desc, sizeof(desc));

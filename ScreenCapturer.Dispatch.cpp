@@ -11,9 +11,5 @@ bool ScreenCapturer::capture_view(ScreenCapturer::CapturedView &view, const cv::
   if (do_tim)
     view.t_total_start = tn();
 
-  if (!useWgc) {
-    return cap_dxgi_view(view, crop_region);
-  } else {
-    return cap_wgc_view(view, crop_region);
-  }
+  return !useWgc ? cap_dxgi_view(view, crop_region) : cap_wgc_view(view, crop_region);
 }

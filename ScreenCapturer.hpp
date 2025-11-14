@@ -4,6 +4,7 @@
 #include <opencv2/core.hpp>
 #include "Reporting.hpp"
 #include <chrono>
+#include "sh.hpp"
 
 class Config;
 
@@ -17,7 +18,7 @@ public:
         size_t pitch = 0;
         // timing accumulators (reported on release)
         double aq_sum = 0.0, qi_sum = 0.0, cp_sum = 0.0, mp_sum = 0.0, cv_sum = 0.0, up_sum = 0.0;
-        std::chrono::high_resolution_clock::time_point t_total_start{};
+        tp t_total_start{};
         // ownership
         bool mapped = false;
     };

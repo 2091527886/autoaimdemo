@@ -33,13 +33,12 @@ void ScreenCapturer::dbgTick(){
 void ScreenCapturer::release_view(ScreenCapturer::CapturedView& view){
   const bool do_tim = cfg.capture_timing && cfg.timing;
   if(!view.mapped) return;
-  auto t_unmap_s = do_tim ? tn() : tp{};
+  TSTART(t_unmap_s, do_tim);
   ctx->Unmap(stage[0], 0);
-  auto t_unmap_e = do_tim ? tn() : t_unmap_s;
-  double up = do_tim ? msd(t_unmap_e - t_unmap_s).count() : 0.0;
+  double up=0.0; TELAPSE(up, do_tim, t_unmap_s);
   view.up_sum += up;
   if(cfg.capture_timing && cfg.capture_timing_on_success){
-    double tt = do_tim ? msd(t_unmap_e - view.t_total_start).count() : 0.0;
+    double tt = do_tim ? msd(tn() - view.t_total_start).count() : 0.0;
     reportTimes(view.aq_sum, view.qi_sum, view.cp_sum, view.mp_sum, view.cv_sum, view.up_sum, tt);
   }
   view.mapped=false; view.data=nullptr;

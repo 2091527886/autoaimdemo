@@ -10,29 +10,32 @@
 #include <winrt/Windows.Graphics.DirectX.Direct3D11.h>
 #include <winrt/Windows.Graphics.DirectX.h>
 #include <winrt/base.h>
+#include "sc_helpers.hpp"
+
+namespace wg = winrt::Windows::Graphics; namespace wgd = wg::DirectX::Direct3D11; namespace wgc = wg::Capture;
+using std::max;
 
 namespace {
 template <typename T>
 winrt::com_ptr<T> GetDXGIInterfaceFromObject(winrt::Windows::Foundation::IInspectable const &object) {
   winrt::com_ptr<::Windows::Graphics::DirectX::Direct3D11::IDirect3DDxgiInterfaceAccess> access = object.as<::Windows::Graphics::DirectX::Direct3D11::IDirect3DDxgiInterfaceAccess>();
-  winrt::com_ptr<T> result;
-  winrt::check_hresult(access->GetInterface(winrt::guid_of<T>(), result.put_void()));
+  winrt::com_ptr<T> result; winrt::check_hresult(access->GetInterface(winrt::guid_of<T>(), result.put_void()));
   return result;
 }
-winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice CreateDirect3DDevice(IDXGIDevice *dxgiDevice) {
-  winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice device{nullptr};
+wgd::IDirect3DDevice CreateDirect3DDevice(IDXGIDevice *dxgiDevice) {
+  wgd::IDirect3DDevice device{nullptr};
   winrt::com_ptr<IInspectable> inspectable;
   winrt::check_hresult(CreateDirect3D11DeviceFromDXGIDevice(dxgiDevice, reinterpret_cast<IInspectable **>(inspectable.put())));
-  device = inspectable.as<winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice>();
+  device = inspectable.as<wgd::IDirect3DDevice>();
   return device;
 }
 } // namespace
 
 struct ScreenCapturer::WgcCtx {
-  winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice wdev{nullptr};
-  winrt::Windows::Graphics::Capture::GraphicsCaptureItem item{nullptr};
-  winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool pool{nullptr};
-  winrt::Windows::Graphics::Capture::GraphicsCaptureSession sess{nullptr};
+  wgd::IDirect3DDevice wdev{nullptr};
+  wgc::GraphicsCaptureItem item{nullptr};
+  wgc::Direct3D11CaptureFramePool pool{nullptr};
+  wgc::GraphicsCaptureSession sess{nullptr};
 };
 
 bool ScreenCapturer::init_wgc() {
@@ -48,15 +51,15 @@ bool ScreenCapturer::init_wgc() {
   wgc->wdev = CreateDirect3DDevice(dxgiDev.get());
 
   winrt::com_ptr<IGraphicsCaptureItemInterop> interop =
-      winrt::get_activation_factory<winrt::Windows::Graphics::Capture::GraphicsCaptureItem, IGraphicsCaptureItemInterop>();
-  winrt::Windows::Graphics::Capture::GraphicsCaptureItem item{nullptr};
-  winrt::check_hresult(interop->CreateForMonitor(od.Monitor, winrt::guid_of<winrt::Windows::Graphics::Capture::GraphicsCaptureItem>(), winrt::put_abi(item)));
+      winrt::get_activation_factory<wgc::GraphicsCaptureItem, IGraphicsCaptureItemInterop>();
+  wgc::GraphicsCaptureItem item{nullptr};
+  winrt::check_hresult(interop->CreateForMonitor(od.Monitor, winrt::guid_of<wgc::GraphicsCaptureItem>(), winrt::put_abi(item)));
   wgc->item = item;
 
   auto size = winrt::Windows::Graphics::SizeInt32{width, height};
-  wgc->pool = winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::Create(
+  wgc->pool = wgc::Direct3D11CaptureFramePool::Create(
       wgc->wdev,
-      winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
+      wg::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
       1, size);
   wgc->sess = wgc->pool.CreateCaptureSession(wgc->item);
   wgc->sess.IsCursorCaptureEnabled(cfg.cap_cursor);
@@ -82,21 +85,13 @@ bool ScreenCapturer::cap_wgc_view(ScreenCapturer::CapturedView &view, const cv::
   if (do_tim)
     view.t_total_start = tn();
 
-  const int tries = std::max(1, 1 + cfg.cap_retry);
+  const int tries = max(1, 1 + cfg.cap_retry);
 
-  auto try_loop = [&](auto &&body) -> bool {
-    for (int attempt = 0; attempt < tries; ++attempt)
-      if (body())
-        return true;
-    return false;
-  };
-  if (try_loop([&]() {
-        double aq = 0.0, cp = 0.0, mp = 0.0;
-        auto t_acq_s = do_tim ? tn() : tp{};
+  if (try_n(tries, [&](){
+        double aq=0.0, cp=0.0, mp=0.0;
+        TSTART(t_acq_s, do_tim);
         auto frm = wgc->pool.TryGetNextFrame();
-        auto t_acq_e = do_tim ? tn() : t_acq_s;
-        if (do_tim)
-          aq = msd(t_acq_e - t_acq_s).count();
+        TELAPSE(aq, do_tim, t_acq_s);
         if (!frm) {
           view.aq_sum += aq;
           return false;
@@ -105,35 +100,15 @@ bool ScreenCapturer::cap_wgc_view(ScreenCapturer::CapturedView &view, const cv::
         auto surf = frm.Surface();
         auto tex = GetDXGIInterfaceFromObject<ID3D11Texture2D>(surf);
 
-        D3D11_BOX src{};
-        src.left = crop_region.x;
-        src.top = crop_region.y;
-        src.right = crop_region.x + crop_region.width;
-        src.bottom = crop_region.y + crop_region.height;
-        src.front = 0;
-        src.back = 1;
+        D3D11_BOX src = box_from_rect(crop_region);
 
-        auto copy_and_map = [&](ID3D11Texture2D *srcTex) -> bool {
-          auto t_copy_s = do_tim ? tn() : tp{};
+        auto copy_and_map = [&](ID3D11Texture2D *srcTex)->bool{
+          TSTART(t_copy_s, do_tim);
           ctx->CopySubresourceRegion(stage[0], 0, 0, 0, 0, srcTex, 0, &src);
-          auto t_copy_e = do_tim ? tn() : t_copy_s;
-          if (do_tim)
-            cp = msd(t_copy_e - t_copy_s).count();
-          if (cfg.capture_flush_after_copy)
-            ctx->Flush();
+          TELAPSE(cp, do_tim, t_copy_s);
+          if (cfg.capture_flush_after_copy) ctx->Flush();
 
-          D3D11_MAPPED_SUBRESOURCE mr;
-          auto t_map_s = do_tim ? tn() : tp{};
-          HRESULT hrm = ctx->Map(stage[0], 0, D3D11_MAP_READ, 0, &mr);
-          auto t_map_e = do_tim ? tn() : t_map_s;
-          if (do_tim)
-            mp = msd(t_map_e - t_map_s).count();
-          if (FAILED(hrm))
-            return false;
-
-          view.data = static_cast<unsigned char *>(mr.pData);
-          view.pitch = mr.RowPitch;
-          view.mapped = true;
+          if(!map_stage(ctx, stage[0], view, do_tim, mp)) return false;
           return true;
         };
 
