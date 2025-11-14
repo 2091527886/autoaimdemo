@@ -81,6 +81,10 @@ endif()
 # 2) 可执行目标
 add_executable(aimassistant
   main.cpp
+  CtrlHandler.cpp
+  Aim.cpp
+  FpsCtl.cpp
+  target_pick.cpp
   Mouse.cpp
   SystemTuner.cpp
   ObjDet.cpp
