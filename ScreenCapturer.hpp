@@ -49,6 +49,7 @@ private:
     bool init_dxgi();
     bool init_wgc();
     bool cap_wgc_view(CapturedView& view, const cv::Rect& crop_region);
+    bool cap_dxgi_view(CapturedView& view, const cv::Rect& crop_region);
     void rel_wgc();
 
 private:

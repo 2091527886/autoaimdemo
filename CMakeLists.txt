@@ -88,7 +88,9 @@ add_executable(aimassistant
   Mouse.cpp
   SystemTuner.cpp
   ObjDet.cpp
-  ScreenCapturer.cpp
+  ScreenCapturer.Core.cpp
+  ScreenCapturer.Dispatch.cpp
+  ScreenCapturer.CaptureDXGI.cpp
   CaptureDXGI.cpp
   CaptureWGC.cpp
   Game_overlay.cpp
