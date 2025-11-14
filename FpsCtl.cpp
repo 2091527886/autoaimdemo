@@ -1,23 +1,29 @@
 #include "FpsCtl.hpp"
 #include <algorithm>
+#include <chrono>
 
-FpsCtl::FpsCtl(const Config& cfg) {
-    tgt_ms = 1000.0 / std::max(1, cfg.fps);
-    per = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-        std::chrono::duration<double, std::milli>(tgt_ms));
-    next_tp = std::chrono::steady_clock::now() + per;
+// shorthands
+using clk = std::chrono::steady_clock;
+using msd = std::chrono::duration<double, std::milli>;
+
+FpsCtl::FpsCtl(const Config &cfg) {
+  tgt_ms = 1000.0 / std::max(1, cfg.fps);
+  per = std::chrono::duration_cast<clk::duration>(msd(tgt_ms));
+  next_tp = clk::now() + per;
 }
 
 double FpsCtl::end() {
-    using clk = std::chrono::steady_clock;
-    auto now = clk::now();
-    if (now < next_tp) {
-        std::this_thread::sleep_until(next_tp);
-        ovr = 0.0;
-        next_tp += per;
-        return tgt_ms;
-    }
-    ovr = std::chrono::duration<double, std::milli>(now - next_tp).count();
-    while (next_tp <= now) { next_tp += per; ++drop; }
+  auto now = clk::now();
+  if (now < next_tp) {
+    std::this_thread::sleep_until(next_tp);
+    ovr = 0.0;
+    next_tp += per;
     return tgt_ms;
+  }
+  ovr = msd(now - next_tp).count();
+  while (next_tp <= now) {
+    next_tp += per;
+    ++drop;
+  }
+  return tgt_ms;
 }
