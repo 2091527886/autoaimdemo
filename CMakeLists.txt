@@ -95,7 +95,9 @@ add_executable(aimassistant
   Mouse.cpp
   HotkeyManager.cpp
   SystemTuner.cpp
-  ObjDet.cpp
+  ObjDet_init.cpp
+  ObjDet_detect.cpp
+  ObjDet_perf.cpp
   ScreenCapturer.Core.cpp
   ScreenCapturer.Dispatch.cpp
   ScreenCapturer.CaptureDXGI.cpp
