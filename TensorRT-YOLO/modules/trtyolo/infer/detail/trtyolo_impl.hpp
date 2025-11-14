@@ -8,7 +8,11 @@
 #include <tuple>
 #include <vector>
 
-#include "infer/trtyolo.hpp"
+#include "infer/api.hpp"
+#include "infer/types.hpp"
+#include "infer/results.hpp"
+#include "infer/infer_option.hpp"
+#include "infer/base_model.hpp"
 #include "infer/backend.hpp"
 #include "utils/common.hpp"
 

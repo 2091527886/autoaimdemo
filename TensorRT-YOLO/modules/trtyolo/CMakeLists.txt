@@ -72,7 +72,18 @@ set(PACKAGE_LIBRARY_DIRS "${CMAKE_INSTALL_LIBDIR}")
 set(PACKAGE_LIBRARIES "trtyolo")
 
 # 安装头文件
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/infer/trtyolo.hpp"
+install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/infer/trtyolo.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/infer/api.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/infer/types.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/infer/results.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/infer/infer_option.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/infer/base_model.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/infer/model_classify.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/infer/model_detect.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/infer/model_obb.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/infer/model_segment.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/infer/model_pose.hpp"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
 
