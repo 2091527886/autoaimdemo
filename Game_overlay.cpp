@@ -64,24 +64,10 @@ static D2D1_COLOR_F ToD2DColor(OverlayColor argb)
     return D2D1::ColorF(r, g, b, a);
 }
 
-static std::wstring wenv(const wchar_t* k)
-{
-    wchar_t buf[512];
-    DWORD n = GetEnvironmentVariableW(k, buf, (DWORD)_countof(buf));
-    if (n == 0 || n >= _countof(buf)) return L"";
-    return std::wstring(buf, buf + n);
-}
-
 static std::wstring wlower(std::wstring s)
 {
     std::transform(s.begin(), s.end(), s.begin(), [](wchar_t c){ return std::towlower(c); });
     return s;
-}
-
-static bool parse_idx(const std::wstring& s, int& out)
-{
-    if (s.empty()) return false;
-    try { out = std::stoi(s); return out >= 0; } catch (...) { return false; }
 }
 
 static bool parse_luid(const std::wstring& s, LUID& out)
@@ -655,28 +641,10 @@ void Game_overlay::Impl::RenderOne()
 {
     if (!d2dCtx || !swapChain) return;
 
-    if (!visible.load())
-    {
-        ShowWindow(hwnd, SW_HIDE);
-        return;
-    }
-    else
-    {
-        ShowWindow(hwnd, SW_SHOWNA);
-    }
-
-    auto dl = std::atomic_load_explicit(&current, std::memory_order_acquire);
-
-    // 空帧跳过：没有绘制命令时不渲染不Present
-    if (skip_empty && (!dl || dl->cmds.empty()))
-    {
-        ShowWindow(hwnd, SW_HIDE);
-        return;
-    }
-    else
-    {
-        ShowWindow(hwnd, SW_SHOWNA);
-    }
+   auto dl = std::atomic_load_explicit(&current, std::memory_order_acquire);
+   bool wantShow = visible.load() && (!skip_empty || (dl && !dl->cmds.empty()));
+   ShowWindow(hwnd, wantShow ? SW_SHOWNA : SW_HIDE);
+   if (!wantShow) return;
 
     d2dCtx->BeginDraw();
 

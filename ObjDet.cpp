@@ -32,15 +32,6 @@ ObjDet::ObjDet(const Config& cfg)
     if (cfg.trt_use_normalize && cfg.trt_mean.size()==3 && cfg.trt_std.size()==3) {
         opt.setNormalizeParams(cfg.trt_mean, cfg.trt_std);
     }
-        int bx = cfg.lb_block_x > 0 ? cfg.lb_block_x : 32;
-    int by = cfg.lb_block_y > 0 ? cfg.lb_block_y : 8;
-    bool use_lb = cfg.lb_use_launch_bounds;
-    int  minb   = (cfg.lb_min_blocks_per_sm>0?cfg.lb_min_blocks_per_sm:2);
-    bool use_occ= cfg.lb_use_occupancy;
-    opt.setLetterboxBlockXY(bx, by);
-    opt.setLetterboxLaunchBounds(true, minb);
-    opt.enableLetterboxOccupancy(false);
-
     // 内存策略
     if (cfg.trt_cuda_mem) opt.enableCudaMem();
     if (cfg.trt_managed_mem) opt.enableManagedMemory();
@@ -135,6 +126,25 @@ void ObjDet::detect_view(unsigned char* data,
 {
     out.clear();
 
+    auto fill = [&](const trtyolo::DetectRes& res){
+        if (res.num > 0 && res.boxes.size() == static_cast<size_t>(res.num)) {
+            for (int i = 0; i < res.num; ++i) {
+                float score = (i < (int)res.scores.size() ? res.scores[i] : 0.0f);
+                if (score < cfg.conf_thresh) continue;
+                int cls = (i < (int)res.classes.size() ? res.classes[i] : -1);
+                const auto& b = res.boxes[i];
+                int x = std::max(0, static_cast<int>(std::floor(b.left)));
+                int y = std::max(0, static_cast<int>(std::floor(b.top)));
+                int w = std::max(0, static_cast<int>(std::round(b.right - b.left)));
+                int h = std::max(0, static_cast<int>(std::round(b.bottom - b.top)));
+                w = std::min(w, width - x);
+                h = std::min(h, height - y);
+                if (w > 0 && h > 0)
+                    out.emplace_back(Detection{ cv::Rect(x, y, w, h), score, cls });
+            }
+        }
+    };
+
     if (cfg.timing) {
         auto t0 = std::chrono::high_resolution_clock::now();
         trtyolo::Image input(data, width, height, pitch);
@@ -143,44 +153,14 @@ void ObjDet::detect_view(unsigned char* data,
         tm.infer_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
         auto t2 = std::chrono::high_resolution_clock::now();
 
-        if (res.num > 0 && res.boxes.size() == static_cast<size_t>(res.num)) {
-            for (int i = 0; i < res.num; ++i) {
-                float score = (i < (int)res.scores.size() ? res.scores[i] : 0.0f);
-                if (score < cfg.conf_thresh) continue;
-                int cls = (i < (int)res.classes.size() ? res.classes[i] : -1);
-                const auto& b = res.boxes[i];
-                int x = std::max(0, static_cast<int>(std::floor(b.left)));
-                int y = std::max(0, static_cast<int>(std::floor(b.top)));
-                int w = std::max(0, static_cast<int>(std::round(b.right - b.left)));
-                int h = std::max(0, static_cast<int>(std::round(b.bottom - b.top)));
-                w = std::min(w, width - x);
-                h = std::min(h, height - y);
-                if (w > 0 && h > 0)
-                    out.emplace_back(Detection{ cv::Rect(x, y, w, h), score, cls });
-            }
-        }
+        fill(res);
 
         auto t3 = std::chrono::high_resolution_clock::now();
         tm.post_ms = std::chrono::duration<double, std::milli>(t3 - t2).count();
     } else {
         trtyolo::Image input(data, width, height, pitch);
         trtyolo::DetectRes res = model_->predict(input);
-        if (res.num > 0 && res.boxes.size() == static_cast<size_t>(res.num)) {
-            for (int i = 0; i < res.num; ++i) {
-                float score = (i < (int)res.scores.size() ? res.scores[i] : 0.0f);
-                if (score < cfg.conf_thresh) continue;
-                int cls = (i < (int)res.classes.size() ? res.classes[i] : -1);
-                const auto& b = res.boxes[i];
-                int x = std::max(0, static_cast<int>(std::floor(b.left)));
-                int y = std::max(0, static_cast<int>(std::floor(b.top)));
-                int w = std::max(0, static_cast<int>(std::round(b.right - b.left)));
-                int h = std::max(0, static_cast<int>(std::round(b.bottom - b.top)));
-                w = std::min(w, width - x);
-                h = std::min(h, height - y);
-                if (w > 0 && h > 0)
-                    out.emplace_back(Detection{ cv::Rect(x, y, w, h), score, cls });
-            }
-        }
+        fill(res);
         tm.infer_ms = 0.0;
         tm.post_ms = 0.0;
     }

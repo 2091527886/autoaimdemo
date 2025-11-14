@@ -182,45 +182,46 @@ public:
                     if (!smooth_pressed) { algo.reset(); last_tp_valid_ = false; }
 
                     int mx = 0, my = 0;
+                    auto upd_seg = [&](int seg, double h, double near_h, double far_h, double hys){
+                        if (seg == 2) { if (h < near_h - hys) seg = 1; }
+                        else if (seg == 0) { if (h > far_h + hys) seg = 1; }
+                        else { if (h >= near_h) seg = 2; else if (h <= far_h) seg = 0; }
+                        return seg;
+                    };
                     auto decide_anchor = [&](double h)->double{
                         if (!c.aim_dyn_anchor) return c.y_anchor_ratio;
-                        // 分段滞回
                         double near_h = c.dist_near_h, far_h = c.dist_far_h, hys = c.aim_hys_h;
-                        int seg = last_seg_;
-                        if (seg == 2) { // NEAR -> 仅当明显变小才降级
-                            if (h < near_h - hys) seg = 1;
-                        } else if (seg == 0) { // FAR -> 仅当明显变大才升级
-                            if (h > far_h + hys) seg = 1;
-                        } else { // MID
-                            if (h >= near_h) seg = 2;
-                            else if (h <= far_h) seg = 0;
-                        }
-                        last_seg_ = seg;
-                        return (seg==2) ? c.y_anchor_head : c.y_anchor_body;
+                        last_seg_ = upd_seg(last_seg_, h, near_h, far_h, hys);
+                        return (last_seg_==2) ? c.y_anchor_head : c.y_anchor_body;
                     };
+
 
                     auto compute_pred_err = [&](const Detection& d, double dt, bool enable_pred){
                         double h = (double)d.box.height;
                         double ya = decide_anchor(h);
                         cv::Point2d tp(d.box.x + d.box.width/2.0,
                                        d.box.y + d.box.height * ya);
-                        if (enable_pred && c.pred_enable && last_tp_valid_) {
+                        auto pred_step = [&](cv::Point2d& v_lp, const cv::Point2d& last_tp, cv::Point2d& tp_io){
                             double tc = std::max(0.0, c.pred_v_tc_ms) / 1000.0;
                             double a = (tc>0.0) ? (dt/(tc+dt)) : 1.0;
                             double inv_dt = 1.0 / std::max(1e-6, dt);
-                            cv::Point2d v_inst{ (tp.x - last_tp_.x) * inv_dt, (tp.y - last_tp_.y) * inv_dt };
-                            v_lp_.x = v_lp_.x + a * (v_inst.x - v_lp_.x);
-                            v_lp_.y = v_lp_.y + a * (v_inst.y - v_lp_.y);
-                        double lim = c.pred_v_lim_px;
-                            v_lp_.x = std::max(-lim, std::min(lim, v_lp_.x));
-                            v_lp_.y = std::max(-lim, std::min(lim, v_lp_.y));
+                            cv::Point2d v_inst{ (tp_io.x - last_tp.x) * inv_dt, (tp_io.y - last_tp.y) * inv_dt };
+                            v_lp.x = v_lp.x + a * (v_inst.x - v_lp.x);
+                            v_lp.y = v_lp.y + a * (v_inst.y - v_lp.y);
+                            double lim = c.pred_v_lim_px;
+                            v_lp.x = std::max(-lim, std::min(lim, v_lp.x));
+                            v_lp.y = std::max(-lim, std::min(lim, v_lp.y));
                             double ext = std::min(dt, std::max(0.0, c.pred_dt_max_ms)/1000.0);
-                            tp.x += v_lp_.x * ext;
-                            tp.y += v_lp_.y * ext;
+                            tp_io.x += v_lp.x * ext;
+                            tp_io.y += v_lp.y * ext;
+                        };
+                        if (enable_pred && c.pred_enable && last_tp_valid_) {
+                            pred_step(v_lp_, last_tp_, tp);
                         }
                         last_tp_ = tp; last_tp_valid_ = true;
                         return std::pair<double,double>(tp.x - ctr.x, tp.y - ctr.y);
                     };
+
 
                     auto apply_seg_params = [&](double h){
                         // 分段/插值参数更新
