@@ -129,9 +129,6 @@ bool ScreenCapturer::cap_wgc_view(ScreenCapturer::CapturedView &view, const cv::
     return true;
   }
 
-  if (cfg.capture_timing && !cfg.capture_timing_on_success) {
-    double tt = do_tim ? msd(tn() - view.t_total_start).count() : 0.0;
-    reportTimes(view.aq_sum, view.qi_sum, view.cp_sum, view.mp_sum, view.cv_sum, view.up_sum, tt);
-  }
+  if (cfg.capture_timing && !cfg.capture_timing_on_success){ double tt = do_tim ? msd(tn() - view.t_total_start).count() : 0.0; rpt(view, tt); }
   return false;
 }

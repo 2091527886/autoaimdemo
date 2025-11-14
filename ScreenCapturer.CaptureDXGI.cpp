@@ -12,7 +12,7 @@ bool ScreenCapturer::cap_dxgi_view(ScreenCapturer::CapturedView &view, const cv:
 
   const int tries = max(1, 1 + cfg.cap_retry);
 
-  auto report_fail = [&](double aq_add){ if (do_tim && !cfg.capture_timing_on_success){ double tt = msd(tn() - view.t_total_start).count(); reportTimes(view.aq_sum + aq_add, view.qi_sum, view.cp_sum, view.mp_sum, view.cv_sum, view.up_sum, tt);} };
+  auto report_fail = [&](double aq_add){ if (do_tim && !cfg.capture_timing_on_success){ double tt = msd(tn() - view.t_total_start).count(); rpt_add(view, tt, aq_add);} };
   bool success=false, fatal=false;
   auto body = [&]() -> bool {
     double aq=0.0, qi=0.0, cp=0.0, mp=0.0; // cv=0
@@ -94,9 +94,6 @@ bool ScreenCapturer::cap_dxgi_view(ScreenCapturer::CapturedView &view, const cv:
   if (try_n(tries, body)) return true;
   if (fatal) return false;
   if (success) return true;
-  if (cfg.capture_timing && !cfg.capture_timing_on_success) {
-    double tt = do_tim ? msd(tn() - view.t_total_start).count() : 0.0;
-    reportTimes(view.aq_sum, view.qi_sum, view.cp_sum, view.mp_sum, view.cv_sum, view.up_sum, tt);
-  }
+  if (cfg.capture_timing && !cfg.capture_timing_on_success){ double tt = do_tim ? msd(tn() - view.t_total_start).count() : 0.0; rpt(view, tt); }
   return false;
 }

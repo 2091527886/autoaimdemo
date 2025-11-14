@@ -43,6 +43,12 @@ private:
     void reportTimes(double t_acquire_ms, double t_qi_ms, double t_copy_ms,
                                     double t_map_ms, double t_cvt_ms, double t_unmap_ms, double t_total_ms);
     void dbgTick();
+    inline void rpt(const CapturedView& v, double tt){
+      reporter.ReportStepTimings(v.aq_sum,v.qi_sum,v.cp_sum,v.mp_sum,v.cv_sum,v.up_sum,tt,statSkipDirty,statCopyPend,statStillDraw,statOk);
+    }
+    inline void rpt_add(const CapturedView& v, double tt, double aq_add){
+      reporter.ReportStepTimings(v.aq_sum+aq_add,v.qi_sum,v.cp_sum,v.mp_sum,v.cv_sum,v.up_sum,tt,statSkipDirty,statCopyPend,statStillDraw,statOk);
+    }
 
     // DXGI/WGC 后端拆分
     bool init_dxgi();
