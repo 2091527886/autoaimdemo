@@ -35,14 +35,14 @@ extern std::atomic<bool> g_exit_done;
 
 
 // helpers
-static Detection* pick_target(const std::vector<Detection>& ds, const Config& c, const cv::Point& ctr) {
-    Detection* target = nullptr;
+static const Detection* pick_target(const std::vector<Detection>& ds, const Config& c, const cv::Point& ctr) {
+    const Detection* target = nullptr;
     double min_dist_to_center = std::numeric_limits<double>::infinity();
     for (const auto& det : ds) {
         if (!c.is_target(det.class_id)) continue;
         cv::Point box_center(det.box.x + det.box.width / 2, det.box.y + det.box.height / 2);
         double dist = std::hypot(box_center.x - ctr.x, box_center.y - ctr.y);
-        if (dist < min_dist_to_center) { min_dist_to_center = dist; target = const_cast<Detection*>(&det); }
+        if (dist < min_dist_to_center) { min_dist_to_center = dist; target = &det; }
     }
     return target;
 }
@@ -112,20 +112,14 @@ public:
         }
         // overlay moved to main thread
         if (c.ovl) {
-            lg::o() << P_B "Overlay=ON (a=" << c.ovl_a << ", rgb=" << c.ovl_r << "," << c.ovl_g << "," << c.ovl_b
-                    << ", th=" << c.ovl_thick << ")" << lg::endl;
             gover.UseVirtualScreen();
             gover.SetConfig(c);
             bool ok = gover.Start();
             lg::ok_or_werr(P_B, "Overlay.Start", ok);
-        } else {
-            lg::o() << P_B "Overlay=OFF" << lg::endl;
         }
     }
 
     ~Aim() {
-        /* inference on main thread: no det.stop() */
-        
         if (c.ovl) gover.Stop();
     }
 
@@ -166,13 +160,12 @@ public:
                 od.detect_view(view.data, view.width, view.height, view.pitch, ds, c, tm);
                 cap.release_view(view);
             } else {
-                // unexpected: no mapped view; skip this frame to keep freshness
+                // unexpected: no mapped view; skip this frame
                 cap.release_view(view);
                 continue;
             }
-            // overlay draw on main thread (moved below)
+            // overlay draw on main thread
             double ovl_ms = 0.0;
-            // [overlay moved below]
             fl.det_ms = c.timing ? (tm.infer_ms + tm.post_ms) : 0.0;
 
             
@@ -188,8 +181,8 @@ public:
                     last_dt_ts = now;
                     return d;
                 } else {
-                    return std::max(0.001, 16.0 / 1000.0);
-                }
+                            return std::max(0.001, 16.0 / 1000.0);
+                        }
             };
 
             // sync control+mouse on main thread
@@ -197,7 +190,7 @@ public:
             double ctl_cost_ms = 0.0;
             double mou_cost_ms = 0.0;
             {
-                Detection* target = pick_target(ds, c, ctr);
+                const Detection* target = pick_target(ds, c, ctr);
                 if (!target) { algo.reset(); last_tp_valid_ = false; }
                 else {
                     if (!smooth_pressed) { algo.reset(); last_tp_valid_ = false; }
@@ -452,9 +445,7 @@ public:
                 fl.loop_ms = loop_e2e;
             }
 
-           // CSV async
             
-            // dt 按需计算（在执行算法前获取）
 
             if (c.timing && c.log_latency) {
                 lat.push(fl);
@@ -578,14 +569,12 @@ int main() {
         assistant.loop();
     }
     catch (const std::exception& e) {
-        // MMCSS disabled; no revert needed
         lg::ml(P_F, std::string("Fatal: ") + e.what(), "Check issues.", "Press Enter to exit.");
         std::cin.get();
         g_exit_done.store(true, std::memory_order_relaxed);
         return -1;
     }
     lg::o() << lg::nl << P_I "Done" << lg::endl;
-    // MMCSS disabled; no revert needed
     g_exit_done.store(true, std::memory_order_relaxed);
     return 0;
 }
