@@ -21,6 +21,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <cstdint>
 
 namespace trtyolo {
 
@@ -483,8 +484,9 @@ public:
      */
     std::tuple<std::string, std::string, std::string> performanceReport();
 
+public:
+    class Impl;                   // 前向声明实现类（为跨TU可见，保持类型公开）
 protected:
-    class Impl;                   // 前向声明实现类
     std::unique_ptr<Impl> impl_;  // 隐藏实现细节;
 };
 
