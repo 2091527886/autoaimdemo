@@ -13,6 +13,7 @@ function(add_target_compile_files target)
         "${CMAKE_CURRENT_SOURCE_DIR}/infer/*.cu"
     )
 
+
     # 将收集到的源文件添加到目标
     target_sources(${target} PRIVATE ${SOURCES})
 endfunction()
