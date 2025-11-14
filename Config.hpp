@@ -13,7 +13,6 @@
 
 class Config {
 public:
-public:
     // 计时总开关（关闭则尽量不做统计计时）
     bool timing = true;
 public:

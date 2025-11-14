@@ -6,7 +6,6 @@
 #include <cmath>
 #include <limits>
 #include <utility>
-#include <sstream>
 #include <thread>
 #include <atomic>
 #include <random>
@@ -46,13 +45,6 @@ static Detection* pick_target(const std::vector<Detection>& ds, const Config& c,
         if (dist < min_dist_to_center) { min_dist_to_center = dist; target = const_cast<Detection*>(&det); }
     }
     return target;
-}
-
-// 计算目标相对中心的误差（像素）。y 使用 y_anchor_ratio。
-static inline std::pair<double,double> calc_err(const Detection& d, const Config& c, const cv::Point& ctr) {
-    cv::Point tp(d.box.x + d.box.width/2,
-                 d.box.y + static_cast<int>(d.box.height * c.y_anchor_ratio));
-    return { double(tp.x - ctr.x), double(tp.y - ctr.y) };
 }
 
 class Aim {
@@ -224,7 +216,7 @@ public:
                             if (h >= near_h) seg = 2;
                             else if (h <= far_h) seg = 0;
                         }
-                        last_seg_ = seg; last_h_ = h;
+                        last_seg_ = seg;
                         // 近头远身，中间取身体
                         return (seg==2) ? c.y_anchor_head : c.y_anchor_body;
                     };
@@ -261,7 +253,7 @@ public:
                         if (seg == 2) { if (h < near_h - hys) seg = 1; }
                         else if (seg == 0) { if (h > far_h + hys) seg = 1; }
                         else { if (h >= near_h) seg = 2; else if (h <= far_h) seg = 0; }
-                        last_seg_ = seg; last_h_ = h;
+                        last_seg_ = seg;
                         auto setp=[&](double kx,double ky,double tc,double lim){ algo.setParams(kx,ky,tc,lim); };
                         if (!c.curve_interp) {
                             if (seg==2) setp(c.seg_near_kx,c.seg_near_ky,c.seg_near_tc_ms,c.seg_near_lim);
@@ -285,7 +277,6 @@ public:
                     if (single) {
                         double dt = calc_dt();
                         bool use_pred = c.aim_single_use_pred;
-                        double h = (double)target->box.height;
                         auto [dx, dy] = compute_pred_err(*target, dt, use_pred);
                         mx = (int)(dx * mfac);
                         my = (int)(dy * mfac);
@@ -506,8 +497,6 @@ private:
     const cv::Rect crop;
     const cv::Point ctr;
     double mfac = 1.0;
-    // removed legacy CPU clone buffer
-    // cv::Mat img;
     std::vector<Detection> ds;
     Timing tm;
     // latency agg
@@ -527,7 +516,7 @@ private:
     cv::Point2d last_tp_ {0.0, 0.0};
     bool last_tp_valid_ = false;
     int  last_seg_ = 1; // 0:far,1:mid,2:near
-    double last_h_ = 0.0;
+    
 
     // 风鼠标状态
     WindState wind_;

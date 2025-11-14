@@ -4,7 +4,6 @@
 #include <opencv2/core.hpp>
 #include "Reporting.hpp"
 #include <windows.h>
-#include <atomic>
 #include <chrono>
 
 class Config;
@@ -51,8 +50,6 @@ private:
     bool init_wgc();
     bool cap_wgc_view(CapturedView& view, const cv::Rect& crop_region);
     void rel_wgc();
-
-public:
 
 private:
     const Config& cfg;
