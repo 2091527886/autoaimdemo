@@ -1,6 +1,5 @@
 #include "FpsCtl.hpp"
-#include <algorithm>
-#include <chrono>
+#include "pch.hpp"
 
 // shorthands
 using clk = std::chrono::steady_clock;

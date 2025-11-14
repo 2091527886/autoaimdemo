@@ -1,7 +1,6 @@
 #include "Mouse.hpp"
 #include "Log.hpp"
 #include "pch.hpp"
-#include <string>
 
 // shorthands
 using E = Send::Error;

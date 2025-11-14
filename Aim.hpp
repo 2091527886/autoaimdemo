@@ -6,8 +6,6 @@
 #include <chrono>
 #include "Config.hpp"
 #include "Timing.hpp"
-#include "SystemTuner.hpp"
-#include "Reporting.hpp"
 #include "Detection.hpp"
 #include "Mouse.hpp"
 #include "AimAlgo.hpp"

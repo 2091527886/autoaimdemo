@@ -1,9 +1,5 @@
 #include "SystemTuner.hpp"
 #include "pch.hpp"
-#include <chrono>
-
-// shorthands
-using msd = std::chrono::duration<double, std::milli>;
 
 void SetProcPrioHigh() {
   BOOL ok = SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);

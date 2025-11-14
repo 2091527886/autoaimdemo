@@ -1,6 +1,6 @@
 #include "target_pick.hpp"
 #include <limits>
-#include <cmath>
+#include "pch.hpp"
 
 const Detection* pick_target(const std::vector<Detection>& ds, const Config& c, const cv::Point& ctr) {
     const Detection* target = nullptr;

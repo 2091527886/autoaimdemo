@@ -1,10 +1,5 @@
 #include "Aim.hpp"
-#include <chrono>
-
-using clk = std::chrono::high_resolution_clock;
-using tp = clk::time_point;
-using msd = std::chrono::duration<double, std::milli>;
-inline tp tn() { return clk::now(); }
+#include "sh.hpp"
 
 bool Aim::capture(FrameLat &fl, ScreenCapturer::CapturedView &view) {
   double cap_ms = 0.0;

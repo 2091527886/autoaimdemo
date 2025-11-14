@@ -2,12 +2,7 @@
 #include "Log.hpp"
 #include "ScreenCapturer.hpp"
 #include "pch.hpp"
-#include <chrono>
-
-using clk = std::chrono::high_resolution_clock;
-using tp = clk::time_point;
-using msd = std::chrono::duration<double, std::milli>;
-inline tp tn() { return clk::now(); }
+#include "sh.hpp"
 
 #include <windows.graphics.capture.interop.h>
 #include <windows.graphics.directx.direct3d11.interop.h>

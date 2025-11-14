@@ -1,6 +1,6 @@
 #include "Aim.hpp"
 #include "Log.hpp"
-#include <algorithm>
+#include "pch.hpp"
 #include <stdexcept>
 
 Aim::Aim()

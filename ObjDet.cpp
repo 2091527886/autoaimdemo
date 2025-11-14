@@ -12,13 +12,8 @@
 #endif
 #include "Config.hpp"
 #include "Timing.hpp"
-#include <chrono>
+#include "sh.hpp"
 
-// shorthands
-using clk = std::chrono::high_resolution_clock;
-using tp = clk::time_point;
-using msd = std::chrono::duration<double, std::milli>;
-inline tp tn() { return clk::now(); }
 using trtyolo::DetectModel;
 using trtyolo::DetectRes;
 using trtyolo::Image;

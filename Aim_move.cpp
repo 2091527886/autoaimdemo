@@ -1,17 +1,12 @@
 #include "Aim.hpp"
-#include <algorithm>
-#include <chrono>
-#include <cmath>
+#include "pch.hpp"
+#include "sh.hpp"
 
 // local shorthands (no logic change)
-using clk = std::chrono::high_resolution_clock;
-using tp = clk::time_point;
-using msd = std::chrono::duration<double, std::milli>;
 using P2 = cv::Point2d;
 using std::clamp;
 using std::max;
 using std::min;
-inline tp tn() { return clk::now(); }
 inline double msf(tp a, tp b) { return msd(a - b).count(); }
 
 void Aim::mv(int mx, int my, double &ms) {

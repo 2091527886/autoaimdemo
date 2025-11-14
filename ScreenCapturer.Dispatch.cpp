@@ -1,12 +1,7 @@
 #include "ScreenCapturer.hpp"
 #include "Config.hpp"
 #include "pch.hpp"
-#include <chrono>
-
-using clk = std::chrono::high_resolution_clock;
-using tp = clk::time_point;
-using msd = std::chrono::duration<double, std::milli>;
-inline tp tn() { return clk::now(); }
+#include "sh.hpp"
 
 bool ScreenCapturer::capture_view(ScreenCapturer::CapturedView &view, const cv::Rect &crop_region) {
   const bool do_tim = cfg.capture_timing && cfg.timing;

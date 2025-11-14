@@ -1,12 +1,8 @@
 #include "Aim.hpp"
-#include <algorithm>
-#include <chrono>
+#include "pch.hpp"
+#include "sh.hpp"
 
 // shorthands
-using clk = std::chrono::high_resolution_clock;
-using tp = clk::time_point;
-using msd = std::chrono::duration<double, std::milli>;
-inline tp tn() { return clk::now(); }
 using P2 = cv::Point2d;
 using std::clamp;
 using std::max;
