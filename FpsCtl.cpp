@@ -1,7 +1,6 @@
 #include "FpsCtl.hpp"
 #include "pch.hpp"
 
-// shorthands
 using clk = std::chrono::steady_clock;
 using msd = std::chrono::duration<double, std::milli>;
 

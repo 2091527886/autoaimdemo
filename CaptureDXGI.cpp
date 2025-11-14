@@ -1,4 +1,3 @@
-#include "Config.hpp"
 #include "Log.hpp"
 #include "ScreenCapturer.hpp"
 #include "pch.hpp"

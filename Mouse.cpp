@@ -2,7 +2,6 @@
 #include "Log.hpp"
 #include "pch.hpp"
 
-// shorthands
 using E = Send::Error;
 using T = Send::SendType;
 using M = Send::MoveMode;

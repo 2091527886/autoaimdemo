@@ -2,7 +2,6 @@
 #include "pch.hpp"
 #include "sh.hpp"
 
-// local shorthands (no logic change)
 using P2 = cv::Point2d;
 using std::clamp;
 using std::max;

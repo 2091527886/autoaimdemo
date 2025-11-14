@@ -1,10 +1,6 @@
 #include "pch.hpp"
 #include <iostream>
 #include "Log.hpp"
-#include <stdexcept>
-#include <thread>
-#include <atomic>
-#include <opencv2/core.hpp>
 #include "Config.hpp"
 #include "Timing.hpp"
 #include "SystemTuner.hpp"

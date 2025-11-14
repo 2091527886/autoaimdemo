@@ -1,8 +1,6 @@
 #include "Aim.hpp"
 #include "Log.hpp"
 #include "pch.hpp"
-#include <stdexcept>
-
 Aim::Aim()
     : c(), cap(c, c.crop_size_px, c.crop_size_px), od(c), hk(c),
       crop((cap.w() - c.crop_size_px) / 2, (cap.h() - c.crop_size_px) / 2, c.crop_size_px, c.crop_size_px),

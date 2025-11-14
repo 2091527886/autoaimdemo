@@ -1,7 +1,5 @@
 #include "Aim.hpp"
 #include "pch.hpp"
-
-// 独立绘制锁定框和文字
 void aim_draw_lock(Aim* self) {
   const auto& c = self->c;
   if (!self->lock_) return;

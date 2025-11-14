@@ -1,7 +1,5 @@
 #include "ovl_gpu.hpp"
 #include "ovl_impl.hpp"
-#include "pch.hpp"
-
 using Microsoft::WRL::ComPtr;
 using std::vector;
 using std::wstring;

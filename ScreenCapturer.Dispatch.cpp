@@ -1,5 +1,4 @@
 #include "ScreenCapturer.hpp"
-#include "Config.hpp"
 #include "pch.hpp"
 #include "sh.hpp"
 

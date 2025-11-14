@@ -1,7 +1,4 @@
 #include "ovl_impl.hpp"
-#include "Log.hpp"
-#include "pch.hpp"
-
 HRESULT Game_overlay::Impl::CreateTargets(){
   ReleaseTargets();
   ComPtr<ID3D11Texture2D> bb; if(FAILED(swapChain->GetBuffer(0, IID_PPV_ARGS(&bb)))){ lg::werr(P_E, "GetBuffer"); return E_FAIL; }

@@ -1,8 +1,5 @@
 #include "ovl_impl.hpp"
 #include "ovl_util.hpp"
-#include "Log.hpp"
-#include "pch.hpp"
-
 void Game_overlay::Impl::RenderOne(){
   if(!d2dCtx || !swapChain) return;
   auto dl = std::atomic_load_explicit(&current, std::memory_order_acquire);

@@ -5,8 +5,6 @@
 #include "Reporting.hpp"
 #include "SystemTuner.hpp"
 #include "pch.hpp"
-#include "sh.hpp"
-
 ScreenCapturer::ScreenCapturer(const Config &cfg_ref, int crop_width, int crop_height)
     : cfg(cfg_ref), reporter(cfg_ref) {
   HRESULT hr;

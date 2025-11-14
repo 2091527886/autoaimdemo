@@ -1,6 +1,5 @@
 #include "ovl_impl.hpp"
 #include "ovl_util.hpp"
-#include "Config.hpp"
 #include "pch.hpp"
 
 bool Game_overlay::Impl::Start() {

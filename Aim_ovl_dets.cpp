@@ -1,9 +1,7 @@
 #include "Aim.hpp"
-#include "Log.hpp"
 #include "sh.hpp"
 #include "ovl_util.hpp"
 
-// 仅绘制检测框与标签
 void Aim::draw_ovl(double &ms) {
   if (!c.ovl) { ms = 0.0; return; }
   auto t0 = (c.timing ? tn() : tp{});

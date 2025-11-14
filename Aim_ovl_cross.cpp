@@ -1,8 +1,5 @@
 #include "Aim.hpp"
 #include "ovl_util.hpp"
-#include "pch.hpp"
-
-// 独立绘制十字准星
 void aim_draw_cross(Aim* self) {
   const auto& c = self->c;
   if (!c.cross_show) return;
