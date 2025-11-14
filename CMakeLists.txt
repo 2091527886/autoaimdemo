@@ -108,8 +108,12 @@ add_executable(aimassistant
   CaptureDXGI.cpp
   CaptureWGC.cpp
   Game_overlay.cpp
-  ovl_window.cpp
-  ovl_render.cpp
+  ovl_window_core.cpp
+  ovl_window_dev.cpp
+  ovl_render_cmd.cpp
+  ovl_render_text.cpp
+  ovl_render_targets.cpp
+  ovl_render_draw.cpp
   ovl_gpu.cpp
   ovl_util.cpp
   AimAlgo.hpp
