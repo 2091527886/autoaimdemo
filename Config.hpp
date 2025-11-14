@@ -170,9 +170,6 @@ public:
     bool  lock_show_text = true;
     std::wstring lock_text = L"locked";
 
-    bool mmcss_main = false;
-    std::wstring mmcss_task = L"Capture";
-    AVRT_PRIORITY mmcss_prio = AVRT_PRIORITY_HIGH;
     bool enable_thread_mem_prio = false;
 
     int dxgi_gpu_prio = 5;

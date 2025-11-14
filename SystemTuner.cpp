@@ -27,32 +27,6 @@ void SetProcPrioBoostDisabled(bool log) {
   SetProcPrioBoost(false, log);
 }
 
-bool setAffinity(uint64_t mask, bool log) {
-  if (!mask)
-    return false;
-  DWORD_PTR pMask = 0, sMask = 0;
-  {
-    BOOL ok = GetProcessAffinityMask(GetCurrentProcess(), &pMask, &sMask);
-    lg::ok_or_werr_if(log, P_A, "GetProcessAffinityMask", ok);
-    if (!ok)
-      return false;
-  }
-  DWORD_PTR fMask = (DWORD_PTR)(mask & (uint64_t)pMask);
-  if (!fMask) {
-    LOG_IF(log, lg::e() << P_A "empty after intersect with process mask" << lg::endl);
-    return false;
-  }
-  {
-    DWORD_PTR prev = SetThreadAffinityMask(GetCurrentThread(), fMask);
-    BOOL ok = prev != 0;
-    lg::ok_or_werr_if(log, P_A, "SetThreadAffinityMask", ok);
-    if (!ok)
-      return false;
-  }
-  LOG_IF(log, lg::o() << P_A "Thread pinned. mask=0x" << lg::hexu << (uint64_t)fMask << lg::deff << lg::endl);
-  return true;
-}
-
 void disablePowerThrottle(bool log) {
   PROCESS_POWER_THROTTLING_STATE pState = {};
   pState.Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION;
@@ -76,32 +50,6 @@ void disablePowerThrottle(bool log) {
     BOOL ok = SetThreadPriorityBoost(GetCurrentThread(), FALSE);
     lg::ok_or_werr_if(log, P_B, "ThreadPriorityBoost(FALSE)", ok);
   }
-}
-
-HANDLE MmcssEnable(bool enable, const wchar_t *task, AVRT_PRIORITY prio, DWORD *outIdx) {
-  if (!enable)
-    return nullptr;
-  if (!task)
-    task = L"Games";
-  DWORD idx = 0;
-  HANDLE h = AvSetMmThreadCharacteristicsW(task, &idx);
-  if (!h) {
-    lg::ok_or_werr(P_MS, "AvSetMmThreadCharacteristicsW", false);
-    return nullptr;
-  }
-  {
-    BOOL ok = AvSetMmThreadPriority(h, prio);
-    lg::ok_or_werr(P_MS, "AvSetMmThreadPriority", ok);
-  }
-  if (outIdx)
-    *outIdx = idx;
-  lg::wo() << WP_MS L"Enabled for thread. Task=" << task << L", priority=" << (int)prio << lg::wendl;
-  return h;
-}
-
-void MmcssDisable(HANDLE h) {
-  if (h)
-    AvRevertMmThreadCharacteristics(h);
 }
 
 void TuneDxgi(ID3D11Device *dev, int gpu_prio, int max_latency) {

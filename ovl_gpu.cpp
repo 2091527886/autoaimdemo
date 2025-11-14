@@ -4,6 +4,13 @@ using Microsoft::WRL::ComPtr;
 using std::vector;
 using std::wstring;
 
+static std::string ws_to_utf8(const std::wstring& ws){
+  if(ws.empty()) return std::string();
+  int len = WideCharToMultiByte(CP_UTF8, 0, ws.c_str(), (int)ws.size(), nullptr, 0, nullptr, nullptr);
+  std::string out; if(len>0){ out.resize(len); WideCharToMultiByte(CP_UTF8, 0, ws.c_str(), (int)ws.size(), out.data(), len, nullptr, nullptr); }
+  return out;
+}
+
 struct GpuInfo {
   ComPtr<IDXGIAdapter1> adp;
   DXGI_ADAPTER_DESC1 desc{};
@@ -67,7 +74,7 @@ static void log_adapters(const vector<GpuInfo> &v) {
     wstring name(g.desc.Description);
     double mb = (double)g.desc.DedicatedVideoMemory / (1024.0 * 1024.0);
     lg::o() << P_I "OVL GPU[" << g.idx << "] "
-            << std::string(name.begin(), name.end())
+            << ws_to_utf8(name)
             << " | ven=0x" << std::hex << std::uppercase << g.desc.VendorId
             << " dev=0x" << g.desc.DeviceId << std::dec << std::nouppercase
             << " | memMB=" << (int)mb

@@ -36,7 +36,7 @@ class CaptureReporting {
 struct SystemBootReporting {
   static void PrintOverlayBanner(const Config& cfg,bool started){ if(!cfg.opt_report||!cfg.opt_report_system) return; if(started){ lg::o()<<P_B "Overlay=ON (a="<<cfg.ovl_a<<", rgb="<<cfg.ovl_r<<","<<cfg.ovl_g<<","<<cfg.ovl_b<<", th="<<cfg.ovl_thick<<")"<<lg::endl; } else { lg::o()<<P_B "Overlay=OFF"<<lg::endl; } }
 #ifdef _WIN32
-  static void PrintSchedulingBanner(const Config& cfg,HANDLE hMmcss){ if(!cfg.opt_report||!cfg.opt_report_system) return; lg::wo()<<WP_B L"Scheduling: MMCSS="<<(hMmcss?L"ON":L"OFF")<<L" (task="<<cfg.mmcss_task<<L", prio="<<(int)cfg.mmcss_prio<<L")"<<lg::wendl; }
+  static void PrintSchedulingBanner(const Config& cfg,HANDLE /*hMmcss*/){ if(!cfg.opt_report||!cfg.opt_report_system) return; lg::wo()<<WP_B L"Scheduling: MMCSS=OFF"<<lg::wendl; }
 #endif
 };
 
