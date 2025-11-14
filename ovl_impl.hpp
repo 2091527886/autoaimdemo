@@ -2,13 +2,6 @@
 #include "Game_overlay.h"
 #include "Log.hpp"
 #include <windows.h>
-#include <dwmapi.h>
-#include <d3d11.h>
-#include <dxgi1_2.h>
-#include <dxgi1_3.h>
-#include <d2d1_1.h>
-#include <dwrite.h>
-#include <dcomp.h>
 #include <wrl/client.h>
 #include <atomic>
 #include <thread>
@@ -20,13 +13,21 @@
 #include <cstdint>
 #include <chrono>
 
-#pragma comment(lib, "dwmapi.lib")
-#pragma comment(lib, "d3d11.lib")
-#pragma comment(lib, "dxgi.lib")
-#pragma comment(lib, "d2d1.lib")
-#pragma comment(lib, "dwrite.lib")
-#pragma comment(lib, "windowscodecs.lib")
-#pragma comment(lib, "dcomp.lib")
+// Forward declarations for COM interfaces to keep header light
+struct ID3D11Device;
+struct ID3D11DeviceContext;
+struct IDXGISwapChain1;
+struct ID3D11RenderTargetView;
+struct ID2D1Factory1;
+struct ID2D1Device;
+struct ID2D1DeviceContext;
+struct ID2D1Bitmap1;
+struct ID2D1SolidColorBrush;
+struct IDWriteFactory;
+struct IDWriteTextFormat;
+struct IDCompositionDevice;
+struct IDCompositionTarget;
+struct IDCompositionVisual;
 
 using Microsoft::WRL::ComPtr;
 

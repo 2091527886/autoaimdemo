@@ -3,7 +3,6 @@
 #include <array>
 #include <opencv2/core.hpp>
 #include "Reporting.hpp"
-#include <windows.h>
 #include <chrono>
 
 class Config;

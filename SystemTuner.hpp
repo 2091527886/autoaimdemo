@@ -3,10 +3,10 @@
 // Unified system scheduling & runtime optimization facade
 #include <windows.h>
 #include <avrt.h>
-#include <d3d11.h>
-#include <dxgi1_2.h>
 #include <cstdint>
 #include "Log.hpp"
+
+struct ID3D11Device;
 
 // Priority
 void SetProcPrioHigh();

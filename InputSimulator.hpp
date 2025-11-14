@@ -1,6 +1,5 @@
 #pragma once // 防止头文件被重复包含
 
-#include <windows.h>
 // 声明我们将要使用的枚举
 // 注意：保持命名空间与枚举不变，避免影响外部调用
 namespace Send {

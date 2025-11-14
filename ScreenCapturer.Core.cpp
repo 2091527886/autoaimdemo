@@ -14,9 +14,6 @@
 #include <d3d11.h>
 #include <dxgi1_2.h>
 
-#pragma comment(lib, "d3d11.lib")
-#pragma comment(lib, "dxgi.lib")
-
 ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_height)
     : cfg(cfg_ref), reporter(cfg_ref) {
     HRESULT hr;

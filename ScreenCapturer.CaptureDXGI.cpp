@@ -10,9 +10,6 @@
 #include <stdexcept>
 #include <algorithm>
 
-#pragma comment(lib, "d3d11.lib")
-#pragma comment(lib, "dxgi.lib")
-
 bool ScreenCapturer::cap_dxgi_view(ScreenCapturer::CapturedView& view, const cv::Rect& crop_region) {
     const bool do_tim = cfg.capture_timing && cfg.timing;
     using clock = std::chrono::high_resolution_clock;

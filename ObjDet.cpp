@@ -1,11 +1,11 @@
 #include "ObjDet.hpp"
 
 #include "Log.hpp"
-#include <sstream>
 #include <stdexcept>
-#include <chrono>
-#include <algorithm>
 #include <fstream>
+#include <algorithm>
+#include <cmath>
+#include <chrono>
 
 #include <windows.h>
 #ifdef _MSC_VER

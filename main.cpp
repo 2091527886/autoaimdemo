@@ -2,13 +2,8 @@
 #include "Log.hpp"
 #include <chrono>
 #include <stdexcept>
-#include <algorithm>
-#include <cmath>
-#include <limits>
-#include <utility>
 #include <thread>
 #include <atomic>
-#include <random>
 #include <windows.h>
 
 #include <opencv2/core.hpp>

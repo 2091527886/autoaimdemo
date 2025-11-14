@@ -3,7 +3,8 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
-#include <d2d1_1.h>
+#include <d2d1.h>
+#include <d2d1helper.h>
 
 void GetVirtualScreen(int& x, int& y, int& w, int& h)
 {

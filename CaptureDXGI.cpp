@@ -6,12 +6,7 @@
 #include <windows.h>
 #include <d3d11.h>
 #include <dxgi1_2.h>
-#include <chrono>
 #include <stdexcept>
-#include <algorithm>
-
-#pragma comment(lib, "d3d11.lib")
-#pragma comment(lib, "dxgi.lib")
 
 bool ScreenCapturer::init_dxgi() {
     if (FAILED(out->QueryInterface(__uuidof(IDXGIOutput1), (void**)&out1))) {

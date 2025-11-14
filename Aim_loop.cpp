@@ -1,10 +1,8 @@
 #include "Aim.hpp"
-#include "Log.hpp"
 #include <algorithm>
+#include "Log.hpp"
 #include <chrono>
 #include <cmath>
-#include <limits>
-#include <utility>
 
 #include "target_pick.hpp"
 #include "CtrlHandler.hpp"

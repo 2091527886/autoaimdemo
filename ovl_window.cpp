@@ -4,8 +4,11 @@
 #include "ovl_gpu.hpp"
 #include <windows.h>
 #include <dwmapi.h>
+#include <d3d11.h>
 #include <dxgi1_2.h>
 #include <dcomp.h>
+#include <d2d1_1.h>
+#include <dwrite.h>
 #include <wrl/client.h>
 
 bool Game_overlay::Impl::Start()

@@ -1,4 +1,5 @@
 #include "FpsCtl.hpp"
+#include <algorithm>
 
 FpsCtl::FpsCtl(const Config& cfg) {
     tgt_ms = 1000.0 / std::max(1, cfg.fps);

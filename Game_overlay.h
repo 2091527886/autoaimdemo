@@ -1,8 +1,6 @@
 #pragma once
 #include <string>
-#include <vector>
 #include <cstdint>
-#include <atomic>
 #include <memory>
 
 struct OverlayRect { float x, y, w, h; };

@@ -92,6 +92,7 @@ add_executable(aimassistant
   FpsCtl.cpp
   target_pick.cpp
   Mouse.cpp
+  HotkeyManager.cpp
   SystemTuner.cpp
   ObjDet.cpp
   ScreenCapturer.Core.cpp

@@ -1,6 +1,7 @@
 #include <string>
 #include "Mouse.hpp"
 #include "Log.hpp"
+#include <windows.h>
 
 Mouse::Mouse() {
     lg::o() << P_M "Init driver" << lg::endl;

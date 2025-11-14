@@ -1,6 +1,5 @@
 #include "Aim.hpp"
 #include <algorithm>
-
 double Aim::get_dt() {
     if (c.prop_use_dt) {
         auto now = std::chrono::high_resolution_clock::now();

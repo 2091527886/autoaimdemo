@@ -51,18 +51,7 @@ public:
     std::vector<float> trt_std  {1.f, 1.f, 1.f};
     float trt_border_value = 114.f;          // letterbox 边界值
 
-    // 内核块/占用/launch_bounds 配置
-    // 预设（RTX 3060 / SM86 推荐）
-    // - 32x8,  MINB=2: 通用稳定，寄存器压力适中，吞吐与占用平衡（默认）
-    // - 16x16, MINB=2: 更均衡的二维并行分布，对部分输入高宽相近时有更好访存局部性
-    // - 64x4,  MINB=2: 提高X方向访存合并度，适合宽图像；注意寄存器/指令吞吐可能上升
-    // - 32x16/64x8（占用候选）: 在大分辨率且bandwidth占优时可试；当寄存器使用偏高时可能降低SM并发
-    // 使用建议：
-    //   0) 基线：32x8 + MINB=2；
-    //   1) 核偏轻且SM空闲：试 16x16 或 64x4（仍为256线程/块）
-    //   2) 若仍瓶颈：试 32x16 或 64x8（512线程/块），实测寄存器/并发；
-    //   3) 若寄存器压力导致active blocks下降，降低 MINB 或退回 32x8；
-    //   4) use_occupancy=1 仅探索候选，锁定后请固定 block_x/block_y，避免抖动。
+    // 内核块/占用/launch_bounds 配置（简）
     int  lb_block_x = 32;
     int  lb_block_y = 8;
     bool lb_use_launch_bounds = true;
