@@ -8,7 +8,6 @@ bool ScreenCapturer::capture_view(ScreenCapturer::CapturedView &view, const cv::
   view = CapturedView{};
   view.width = crop_region.width;
   view.height = crop_region.height;
-  view.timing_enabled = do_tim && cfg.capture_timing_on_success;
   if (do_tim)
     view.t_total_start = tn();
 

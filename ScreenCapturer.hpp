@@ -16,7 +16,6 @@ public:
         int height = 0;
         size_t pitch = 0;
         // timing accumulators (reported on release)
-        bool timing_enabled = false;
         double aq_sum = 0.0, qi_sum = 0.0, cp_sum = 0.0, mp_sum = 0.0, cv_sum = 0.0, up_sum = 0.0;
         std::chrono::high_resolution_clock::time_point t_total_start{};
         // ownership
