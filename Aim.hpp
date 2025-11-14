@@ -35,6 +35,20 @@ public:
     void loop();
 
 private:
+    // helpers
+    double get_dt();
+    double anch(double h);
+    void set_seg(double h);
+    std::pair<double,double> pred_err(const Detection& d, double dt, bool enable_pred);
+    bool capture(FrameLat& fl, ScreenCapturer::CapturedView& view);
+    bool infer_view(ScreenCapturer::CapturedView& view);
+    void mv(int mx, int my, double& ms);
+    void mv_wind(int mx, int my, double& ms);
+    void draw_ovl(double& ms);
+    void log_lat(FrameLat& fl);
+    void trt_log();
+
+    // state
     Config c;
     ScreenCapturer cap;
     ObjDet od;

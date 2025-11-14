@@ -2,6 +2,7 @@
 #include "ovl_util.hpp"
 #include <d2d1_1.h>
 #include <dwrite.h>
+#include <cmath>
 
 void Game_overlay::Impl::BeginFrame()
 {

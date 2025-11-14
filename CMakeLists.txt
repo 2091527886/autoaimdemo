@@ -82,7 +82,13 @@ endif()
 add_executable(aimassistant
   main.cpp
   CtrlHandler.cpp
-  Aim.cpp
+  Aim_init.cpp
+  Aim_loop.cpp
+  Aim_cap.cpp
+  Aim_pred.cpp
+  Aim_move.cpp
+  Aim_ovl.cpp
+  Aim_log.cpp
   FpsCtl.cpp
   target_pick.cpp
   Mouse.cpp
