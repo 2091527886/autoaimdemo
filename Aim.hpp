@@ -83,4 +83,8 @@ private:
     bool aim_ok_ = false;
 
     WindState wind_;
+
+    // grant access to helper free functions defined in separate units
+    friend void aim_draw_cross(Aim* self);
+    friend void aim_draw_lock(Aim* self);
 };

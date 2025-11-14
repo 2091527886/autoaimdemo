@@ -86,9 +86,13 @@ add_executable(aimassistant
   Aim_init.cpp
   Aim_loop.cpp
   Aim_cap.cpp
-  Aim_pred.cpp
+  Aim_time.cpp
+  Aim_anchor.cpp
+  Aim_pred_err.cpp
   Aim_move.cpp
-  Aim_ovl.cpp
+  Aim_ovl_dets.cpp
+  Aim_ovl_cross.cpp
+  Aim_ovl_lock.cpp
   Aim_log.cpp
   FpsCtl.cpp
   target_pick.cpp
