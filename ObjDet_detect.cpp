@@ -4,6 +4,7 @@
 #include "Config.hpp"
 #include "Timing.hpp"
 #include "sh.hpp"
+#include "objdet_helpers.hpp"
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -33,22 +34,15 @@ void ObjDet::detect_view(unsigned char *data,
                          Timing &tm) {
   out.clear();
 
-  auto fill = [&](const trtyolo::DetectRes &res) {
-    if (res.num > 0 && res.boxes.size() == static_cast<size_t>(res.num)) {
-      for (int i = 0; i < res.num; ++i) {
-        float score = (i < (int)res.scores.size() ? res.scores[i] : 0.0f);
-        if (score < cfg.conf_thresh)
-          continue;
-        int cls = (i < (int)res.classes.size() ? res.classes[i] : -1);
+  auto fill = [&](const trtyolo::DetectRes &res){
+    if (res.num > 0 && res.boxes.size() == (size_t)res.num){
+      for (int i=0;i<res.num;++i){
+        float score = (i < (int)res.scores.size()? res.scores[i] : 0.0f);
+        if (score < cfg.conf_thresh) continue;
+        int cls = (i < (int)res.classes.size()? res.classes[i] : -1);
         const auto &b = res.boxes[i];
-        int x = std::max(0, static_cast<int>(std::floor(b.left)));
-        int y = std::max(0, static_cast<int>(std::floor(b.top)));
-        int w = std::max(0, static_cast<int>(std::round(b.right - b.left)));
-        int h = std::max(0, static_cast<int>(std::round(b.bottom - b.top)));
-        w = std::min(w, width - x);
-        h = std::min(h, height - y);
-        if (w > 0 && h > 0)
-          out.emplace_back(Detection{cv::Rect(x, y, w, h), score, cls});
+        cv::Rect r = rect_from_box_clamped(b, width, height);
+        if (r.width>0 && r.height>0) out.emplace_back(Detection{r, score, cls});
       }
     }
   };

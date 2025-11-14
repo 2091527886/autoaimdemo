@@ -11,6 +11,7 @@
 #pragma warning(pop)
 #endif
 #include "Config.hpp"
+#include "objdet_helpers.hpp"
 using trtyolo::DetectModel;
 using trtyolo::InferOption;
 
@@ -60,39 +61,21 @@ ObjDet::ObjDet(const Config &cfg)
   bool final_use_lb = cfg.lb_use_launch_bounds;
   int final_minb = cfg.lb_min_blocks_per_sm;
   bool final_use_occ = cfg.lb_use_occupancy;
-  if (!cfg.lb_block_cfg_path.empty()) {
+  if (!cfg.lb_block_cfg_path.empty()){
     std::ifstream fin(cfg.lb_block_cfg_path);
-    if (fin) {
+    if (fin){
       std::string line;
-      auto trim = [](std::string &s) {
-        size_t a = s.find_first_not_of(" \t\r\n");
-        size_t b = s.find_last_not_of(" \t\r\n");
-        if (a == std::string::npos) {
-          s.clear();
-          return;
-        }
-        s = s.substr(a, b - a + 1);
-      };
-      while (std::getline(fin, line)) {
-        trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == ';')
-          continue;
-        auto pos = line.find('=');
-        if (pos == std::string::npos)
-          continue;
-        std::string k = line.substr(0, pos), v = line.substr(pos + 1);
-        trim(k);
-        trim(v);
-        if (k == "block_x")
-          final_bx = std::stoi(v);
-        else if (k == "block_y")
-          final_by = std::stoi(v);
-        else if (k == "use_launch_bounds")
-          final_use_lb = (std::stoi(v) != 0);
-        else if (k == "min_blocks_per_sm")
-          final_minb = std::stoi(v);
-        else if (k == "use_occupancy")
-          final_use_occ = (std::stoi(v) != 0);
+      while (std::getline(fin, line)){
+        trim_str(line);
+        if (line.empty() || line[0]=='#' || line[0]==';') continue;
+        auto pos = line.find('='); if (pos==std::string::npos) continue;
+        std::string k = line.substr(0,pos), v = line.substr(pos+1);
+        trim_str(k); trim_str(v);
+        if (k=="block_x") final_bx = std::stoi(v);
+        else if (k=="block_y") final_by = std::stoi(v);
+        else if (k=="use_launch_bounds") final_use_lb = (std::stoi(v)!=0);
+        else if (k=="min_blocks_per_sm") final_minb = std::stoi(v);
+        else if (k=="use_occupancy") final_use_occ = (std::stoi(v)!=0);
       }
     }
   }
