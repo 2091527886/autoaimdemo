@@ -1,11 +1,10 @@
+#include "pch.hpp"
 #include <iostream>
 #include "Log.hpp"
 #include <chrono>
 #include <stdexcept>
 #include <thread>
 #include <atomic>
-#include <windows.h>
-
 #include <opencv2/core.hpp>
 #include "Config.hpp"
 #include "Timing.hpp"
@@ -21,21 +20,18 @@ int main() {
 
     Config boot_cfg;
     boot_cfg.validate();
-    // prio/MMCSS/overlay setup
     disablePowerThrottle();
-    
+
     SetProcPrioHigh();
     SetThreadPrioHighest();
 
     HANDLE hMmcss = nullptr; // MMCSS disabled
 
-   // thread mem prio + disable boost
    if (boot_cfg.enable_thread_mem_prio) {
        SetThreadMemPrioNormal();
        SetProcPrioBoostDisabled();
    }
 
-    // overlay (Game overlay) banner based on ovl flag
     metrics::SystemBootReporting::PrintOverlayBanner(boot_cfg, boot_cfg.ovl);
 
     metrics::SystemBootReporting::PrintSchedulingBanner(boot_cfg, hMmcss);

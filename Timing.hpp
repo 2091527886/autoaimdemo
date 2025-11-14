@@ -4,84 +4,41 @@
 #include <vector>
 #include <tuple>
 #include <limits>
-#include "Log.hpp"
 #include <algorithm>
 #include <string>
+#include <cmath>
+#include "Log.hpp"
 
-// Timing details for detection pipeline
-struct Timing {
-    double infer_ms = 0;
-    double post_ms = 0;
-    double loop_ms = 0;
-    // TRT perf strings (filled in det thread, printed in main)
-    std::string trt_throughput;
-    std::string trt_cpu_lat;
-    std::string trt_gpu_lat;
-};
+struct Timing { double infer_ms=0, post_ms=0, loop_ms=0; std::string trt_throughput, trt_cpu_lat, trt_gpu_lat; };
 
-// Per-frame latency breakdown
-struct FrameLat {
-    unsigned long long idx = 0;
-    double cap_ms = 0.0;
-    double det_ms  = 0.0;
-    double mou_ms   = 0.0;
-    double ctl_ms   = 0.0;
-    double ovl_ms   = 0.0;
-    double loop_ms    = 0.0;
-};
+struct FrameLat { unsigned long long idx=0; double cap_ms=0, det_ms=0, mou_ms=0, ctl_ms=0, ovl_ms=0, loop_ms=0; };
 
-// Aggregate and print latency stats over a fixed window
 class LatAgg {
 public:
-    explicit LatAgg(size_t window) : wnd(window ? window : 30) {
-        buf.reserve(wnd);
-    }
-
-    void push(const FrameLat& f) {
-        buf.push_back(f);
-        if (buf.size() >= wnd) {
-            printClear();
-        }
-    }
-
+    explicit LatAgg(size_t window):wnd(window?window:30){ buf.reserve(wnd);} 
+    void push(const FrameLat& f){ buf.push_back(f); if(buf.size()>=wnd) printClear(); }
 private:
-    void printClear() {
-        auto [cap_avg, cap_min, cap_max] = stat([](const FrameLat& f){ return f.cap_ms; });
-        auto [det_avg, det_min, det_max] = stat([](const FrameLat& f){ return f.det_ms;  });
-        auto [mou_avg, mou_min, mou_max] = stat([](const FrameLat& f){ return f.mou_ms;   });
-        auto [ctl_avg, ctl_min, ctl_max] = stat([](const FrameLat& f){ return f.ctl_ms;   });
-        auto [ovl_avg, ovl_min, ovl_max] = stat([](const FrameLat& f){ return f.ovl_ms;   });
-        auto [loo_avg, loo_min, loo_max] = stat([](const FrameLat& f){ return f.loop_ms;    });
-
-        lg::o() << lg::fx2
-                  << lg::ovr(P_L, buf.size())
-                  << " | cap " << cap_avg << "/" << cap_min << "/" << cap_max
-                  << " | det " << det_avg << "/" << det_min << "/" << det_max
-                  << " | mou " << mou_avg << "/" << mou_min << "/" << mou_max
- 
-                  << " | ctl " << ctl_avg << "/" << ctl_min << "/" << ctl_max
-                  << " | ovl " << ovl_avg << "/" << ovl_min << "/" << ovl_max
-                  << " | loop " << loo_avg << "/" << loo_min << "/" << loo_max
-                  << lg::endl << lg::df;
-
-        buf.clear();
-    }
-
+    void printClear(){
+        auto sc=[&](auto g){return stat(g);} ;
+        auto [cap_avg,cap_min,cap_max]=sc([](const FrameLat& f){return f.cap_ms;});
+        auto [det_avg,det_min,det_max]=sc([](const FrameLat& f){return f.det_ms;});
+        auto [mou_avg,mou_min,mou_max]=sc([](const FrameLat& f){return f.mou_ms;});
+        auto [ctl_avg,ctl_min,ctl_max]=sc([](const FrameLat& f){return f.ctl_ms;});
+        auto [ovl_avg,ovl_min,ovl_max]=sc([](const FrameLat& f){return f.ovl_ms;});
+        auto [loo_avg,loo_min,loo_max]=sc([](const FrameLat& f){return f.loop_ms;});
+        lg::o()<<lg::fx2<<lg::ovr(P_L,buf.size())
+            <<" | cap "<<cap_avg<<"/"<<cap_min<<"/"<<cap_max
+            <<" | det "<<det_avg<<"/"<<det_min<<"/"<<det_max
+            <<" | mou "<<mou_avg<<"/"<<mou_min<<"/"<<mou_max
+            <<" | ctl "<<ctl_avg<<"/"<<ctl_min<<"/"<<ctl_max
+            <<" | ovl "<<ovl_avg<<"/"<<ovl_min<<"/"<<ovl_max
+            <<" | loop "<<loo_avg<<"/"<<loo_min<<"/"<<loo_max
+            <<lg::endl<<lg::df; buf.clear(); }
     template<typename Getter>
-    std::tuple<double,double,double> stat(Getter g) const {
-        if (buf.empty()) return {0.0, 0.0, 0.0};
-        double sum = 0.0, mn = std::numeric_limits<double>::infinity(), mx = 0.0;
-        for (const auto& f : buf) {
-            const double v = g(f);
-            sum += v;
-            mn = std::min(mn, v);
-            mx = std::max(mx, v);
-        }
-        return { sum / static_cast<double>(buf.size()), (std::isinf(mn)?0.0:mn), mx };
-    }
+    std::tuple<double,double,double> stat(Getter g) const{
+        if(buf.empty()) return {0,0,0}; double sum=0,mn=std::numeric_limits<double>::infinity(),mx=0; 
+        for(const auto& f:buf){ double v=g(f); sum+=v; mn=std::min(mn,v); mx=std::max(mx,v);} 
+        return { sum/double(buf.size()), (std::isinf(mn)?0.0:mn), mx}; }
+    size_t wnd; std::vector<FrameLat> buf; };
 
-    size_t wnd;
-    std::vector<FrameLat> buf;
-};
-
-#endif // TIMING_HPP
+#endif

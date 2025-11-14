@@ -80,6 +80,7 @@ endif()
 
 # 2) 可执行目标
 add_executable(aimassistant
+  pch.hpp
   main.cpp
   CtrlHandler.cpp
   Aim_init.cpp

@@ -1,8 +1,7 @@
 #pragma once
 
 // Unified system scheduling & runtime optimization facade
-#include <windows.h>
-#include <avrt.h>
+#include "pch.hpp"
 #include <cstdint>
 #include "Log.hpp"
 

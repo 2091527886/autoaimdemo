@@ -1,13 +1,7 @@
+#include "pch.hpp"
 #include "ObjDet.hpp"
 
 #include "Log.hpp"
-#include <stdexcept>
-#include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <chrono>
-
-#include <windows.h>
 #ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:4251)
@@ -27,16 +21,13 @@ ObjDet::ObjDet(const Config& cfg)
 
     trtyolo::InferOption opt;
     if (cfg.trt_swap_rb) opt.set_rb();
-    // 配置预处理参数
     opt.setBorderValue(cfg.trt_border_value);
     if (cfg.trt_use_normalize && cfg.trt_mean.size()==3 && cfg.trt_std.size()==3) {
         opt.setNormalizeParams(cfg.trt_mean, cfg.trt_std);
     }
-    // 内存策略
     if (cfg.trt_cuda_mem) opt.enableCudaMem();
     if (cfg.trt_managed_mem) opt.enableManagedMemory();
 
-    // 固定输入尺寸（使用裁剪窗口）以启用静态图与减少分配
     if (cfg.trt_input_w>0 && cfg.trt_input_h>0) {
         opt.setInputDimensions(cfg.trt_input_w, cfg.trt_input_h);
     } else {
@@ -61,7 +52,6 @@ ObjDet::ObjDet(const Config& cfg)
         }
     }
 
-   // 外部 block 配置覆盖（可选，先解析再一次性应用，避免顺序影响）
    int final_bx = cfg.lb_block_x;
    int final_by = cfg.lb_block_y;
    bool final_use_lb = cfg.lb_use_launch_bounds;
@@ -92,11 +82,9 @@ ObjDet::ObjDet(const Config& cfg)
            }
        }
    }
-   // 应用解析后的最终参数
    opt.setLetterboxBlockXY(final_bx, final_by);
    opt.setLetterboxLaunchBounds(final_use_lb, final_minb);
    opt.enableLetterboxOccupancy(final_use_occ);
-   // 日志打印最终选择，便于核查
    lg::o() << P_I "Letterbox kernel config: block_x=" << final_bx
            << ", block_y=" << final_by
            << ", min_blocks_per_sm=" << final_minb

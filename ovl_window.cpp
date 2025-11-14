@@ -1,15 +1,8 @@
+#include "pch.hpp"
 #include "ovl_impl.hpp"
 #include "ovl_util.hpp"
 #include "Config.hpp"
 #include "ovl_gpu.hpp"
-#include <windows.h>
-#include <dwmapi.h>
-#include <d3d11.h>
-#include <dxgi1_2.h>
-#include <dcomp.h>
-#include <d2d1_1.h>
-#include <dwrite.h>
-#include <wrl/client.h>
 
 bool Game_overlay::Impl::Start()
 {
@@ -121,7 +114,6 @@ bool Game_overlay::Impl::CreateWindowAndDevices()
     D3D_FEATURE_LEVEL flOut{};
     HRESULT hr = E_FAIL;
     {
-        // try config-selected adapter first
         ComPtr<IDXGIAdapter1> pick = pick_adapter_cfg(gpu_name, gpu_luid, gpu_idx, gpu_enum);
         if (pick) {
             hr = D3D11CreateDevice(
@@ -141,7 +133,6 @@ bool Game_overlay::Impl::CreateWindowAndDevices()
             }
         }
         if (FAILED(hr)) {
-            // fallback to default
             hr = D3D11CreateDevice(
                 nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, flags,
                 featureLevels, _countof(featureLevels),
@@ -154,7 +145,6 @@ bool Game_overlay::Impl::CreateWindowAndDevices()
         return false;
     }
 
-    // DXGI factory
     ComPtr<IDXGIDevice> dxgiDev; d3d.As(&dxgiDev);
     ComPtr<IDXGIAdapter> adapter; dxgiDev->GetAdapter(&adapter);
     ComPtr<IDXGIFactory2> factory2;
@@ -185,7 +175,6 @@ bool Game_overlay::Impl::CreateWindowAndDevices()
         return false;
     }
 
-    // set maximum frame latency if configured (>0)
     ComPtr<IDXGIDevice1> dxgiDev1; d3d.As(&dxgiDev1);
     if (dxgiDev1 && max_latency > 0) dxgiDev1->SetMaximumFrameLatency((UINT)std::min(std::max(1, max_latency), 3));
 

@@ -1,5 +1,5 @@
 #pragma once
-#include <windows.h>
+#include "pch.hpp"
 #include <atomic>
 
 extern std::atomic<bool> g_exit_req;

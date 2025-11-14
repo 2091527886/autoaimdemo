@@ -1,7 +1,7 @@
+#include "pch.hpp"
 #include <string>
 #include "Mouse.hpp"
 #include "Log.hpp"
-#include <windows.h>
 
 Mouse::Mouse() {
     lg::o() << P_M "Init driver" << lg::endl;
@@ -19,7 +19,6 @@ Mouse::Mouse() {
         dll_ = nullptr;
         throw std::runtime_error(P_M "Required functions not found in IbInputSimulator.dll");
     }
-    // Logitech SendInput
     Send::Error error = init_(Send::SendType::Logitech, static_cast<Send::InitFlags>(0), nullptr);
     if (error != Send::Error::Success) {
         FreeLibrary(dll_);
@@ -40,7 +39,6 @@ Mouse::~Mouse() {
 void Mouse::Move(int dx, int dy) {
     if (move_) {
         bool ok = move_(dx, dy, Send::MoveMode::Relative);
-        // 仅失败时日志
         if (!ok) {
             lg::ok_or_werr_msg(false, P_M, std::string("mv dx=") + std::to_string(dx) + " dy=" + std::to_string(dy), ok);
         }

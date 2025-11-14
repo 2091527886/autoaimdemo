@@ -1,11 +1,6 @@
+#include "pch.hpp"
 #include "ovl_impl.hpp"
 #include "ovl_util.hpp"
-#include <d3d11.h>
-#include <dxgi.h>
-#include <dxgi1_2.h>
-#include <d2d1_1.h>
-#include <dwrite.h>
-#include <cmath>
 
 void Game_overlay::Impl::BeginFrame()
 {

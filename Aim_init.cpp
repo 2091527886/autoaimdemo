@@ -19,9 +19,7 @@ Aim::Aim()
     mfac = (c.hfov_deg / static_cast<double>(cap.w()))
         * (c.px_per_360 / 360.0);
     lg::o() << "Detect center " << c.crop_size_px << "x" << c.crop_size_px << lg::endl;
-    // init AimAlgo (PropAlgo-based)
     algo.setConfig(c);
-    // seed wind rng if needed
     if (c.wind_rng_seed > 0) {
         wind_.rng.seed(static_cast<uint32_t>(c.wind_rng_seed));
     }

@@ -1,12 +1,8 @@
+#include "pch.hpp"
 #include "ScreenCapturer.hpp"
 #include "Config.hpp"
 #include "Log.hpp"
 #include "ComHelpers.hpp"
-
-#include <windows.h>
-#include <d3d11.h>
-#include <dxgi1_2.h>
-#include <stdexcept>
 
 bool ScreenCapturer::init_dxgi() {
     if (FAILED(out->QueryInterface(__uuidof(IDXGIOutput1), (void**)&out1))) {

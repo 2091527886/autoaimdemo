@@ -1,6 +1,5 @@
+#include "pch.hpp"
 #include "SystemTuner.hpp"
-#include <d3d11.h>
-#include <dxgi1_2.h>
 
 void SetProcPrioHigh() {
     BOOL ok = SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);

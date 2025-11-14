@@ -1,269 +1,177 @@
 #pragma once
-
-#include <windows.h>
-#include <avrt.h>
+#include "pch.hpp"
+#include "Log.hpp"
 #include <vector>
 #include <string>
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
-#include "Log.hpp"
-
-
 
 class Config {
 public:
-    // 计时总开关（关闭则尽量不做统计计时）
     bool timing = true;
 public:
-    // 计时CSV/帧号
     unsigned long long frame_idx = 0;
-    // 基础/日志
-    bool log_init_verbose = true;           // 初始化阶段日志
-    int  capture_timeout_ms_dxgi = 0;       // DXGI固定0以尽可能低延迟
-    // 捕获/GPU
-    // cap: 0=DXGI DDA, 1=WGC(Windows Graphics Capture)
+    bool log_init_verbose = true;
+    int  capture_timeout_ms_dxgi = 0;
     int  cap = 0;
-    bool cap_enum = false;      // 枚举打印（调试用，默认关）
-    int  cap_gpu = -1;          // 适配器索引
-    int  cap_out = 0;           // 输出索引
-    bool cap_cursor = false;    // 是否捕获鼠标（WGC）
-    bool cap_border = false;    // 是否显示边框（WGC）
-    int  cap_retry = 3;         // 捕获失败立即重试次数（0=不重试）
+    bool cap_enum = false;
+    int  cap_gpu = -1;
+    int  cap_out = 0;
+    bool cap_cursor = false;
+    bool cap_border = false;
+    int  cap_retry = 3;
 
-    // 可视化
-    
-    
-
-    // 帧率
-    bool fps_lock = true; // 帧率锁
-    int  fps = 60;      // 目标FPS（更适合高刷显示器）
-    // 调度/环境（简化，无显式亲和设置）
+    bool fps_lock = true;
+    int  fps = 60;
 public:
-    // 引擎/路径
     std::string engine_path = "m.engine";
     std::string resolve_engine_path() const { return engine_path; }
 
-    // TRT-YOLO 前处理/内核配置（3060 专项）
-    bool trt_swap_rb = true;                 // GPU侧 BGRA->RGB
-    bool trt_use_normalize = false;          // 是否启用规范化（mean/std）
-    std::vector<float> trt_mean {0.f, 0.f, 0.f};
-    std::vector<float> trt_std  {1.f, 1.f, 1.f};
-    float trt_border_value = 114.f;          // letterbox 边界值
+    bool trt_swap_rb = true;
+    bool trt_use_normalize = false;
+    std::vector<float> trt_mean {0.f,0.f,0.f};
+    std::vector<float> trt_std  {1.f,1.f,1.f};
+    float trt_border_value = 114.f;
 
-    // 内核块/占用/launch_bounds 配置（简）
     int  lb_block_x = 32;
     int  lb_block_y = 8;
     bool lb_use_launch_bounds = true;
     int  lb_min_blocks_per_sm = 2;
-    bool lb_use_occupancy = false;           // 运行时基于占用率推荐块大小（探索用，最终建议固定）
-    std::string lb_block_cfg_path = "blocks_default.cfg"; // 外部块配置文件路径（可选），示例键：
-                                             //   block_x, block_y, use_launch_bounds, min_blocks_per_sm, use_occupancy
-                                             // 示例：
-                                             //   block_x=32
-                                             //   block_y=8
-                                             //   use_launch_bounds=1
-                                             //   min_blocks_per_sm=2
-                                             //   use_occupancy=0
+    bool lb_use_occupancy = false;
+    std::string lb_block_cfg_path = "blocks_default.cfg";
 
-    // 内存策略/输入尺寸（可选）
-    bool trt_cuda_mem = false;               // 输入已在 CUDA 显存
-    bool trt_managed_mem = false;            // 统一内存
-    int  trt_input_w = 0;                    // 固定输入宽（0 表示动态）
-    int  trt_input_h = 0;                    // 固定输入高（0 表示动态）
+    bool trt_cuda_mem = false;
+    bool trt_managed_mem = false;
+    int  trt_input_w = 0;
+    int  trt_input_h = 0;
 
-    // 截屏/检测区域
-    const int   crop_size_px   = 640; // 居中正方形
-    const float conf_thresh    = 0.7f;      // 检测阈值
+    const int   crop_size_px = 640;
+    const float conf_thresh = 0.7f;
 
-    // 操作/热键
-    const int aim_key       = VK_RBUTTON;   // 按住平滑
-    const int test_move_key = VK_F8;        // 单次移动
+    const int aim_key = VK_RBUTTON;
+    const int test_move_key = VK_F8;
 
-    // 瞄准/视角
-    const double y_anchor_ratio = 0.6;      // 目标Y锚定比例
-    const double px_per_360     = 3600;     // 每360°所需鼠标计数（由脚本计算，CS=1、PF=1、Aim=1，base≈0.1）
-    const double hfov_deg       = 85.461056;     // 水平FOV（垂直60°、1920x1200 -> 水平≈85.461056°）
+    const double y_anchor_ratio = 0.6;
+    const double px_per_360     = 3600;
+    const double hfov_deg       = 85.461056;
 
-    // 移除 PID（完全由 PropAlgo 替代）
-
-    // PropAlgo（比例 + 平滑）
-    bool   prop = true;                  // 默认启用
+    bool   prop = true;
     double prop_k_x = 0.8;
     double prop_k_y = 0.8;
-    double prop_out_limit = 360.0;       // 每帧像素限幅（Hipfire 预设）
-    double prop_tc_ms = 6.0;             // 一阶低通时间常数（ms）
-    double prop_dead_px = 0.6;           // 误差死区（像素）
-    bool   prop_use_dt = true;           // 使用实测 dt
+    double prop_out_limit = 360.0;
+    double prop_tc_ms = 6.0;
+    double prop_dead_px = 0.6;
+    bool   prop_use_dt = true;
 
-    // 预测
-    bool   pred_enable = true;           // 启用短期预测
-    double pred_dt_max_ms = 7.0;         // 最大外推时间（ms）
-    double pred_v_tc_ms  = 12.0;         // 速度低通时间常数（ms）
-    double pred_v_lim_px = 220.0;        // 速度幅度限幅（像素/秒）
+    bool   pred_enable = true;
+    double pred_dt_max_ms = 7.0;
+    double pred_v_tc_ms  = 12.0;
+    double pred_v_lim_px = 220.0;
 
-    // 距离度量与分段
-    double dist_near_h = 220.0;          // 高度>=近
-    double dist_far_h  = 120.0;          // 高度<=远
-    double dist_hys_h  = 24.0;           // 滞回
-    bool   curve_interp = false;         // 分段间是否插值（方案A可关闭）
+    double dist_near_h = 220.0;
+    double dist_far_h  = 120.0;
+    double dist_hys_h  = 24.0;
+    bool   curve_interp = false;
 
-    // 分段参数（重配置 AimAlgo）
-    double seg_near_kx   = 0.32, seg_near_ky   = 0.34;
-    double seg_near_tc_ms= 7.0;  double seg_near_lim = 360.0;
-    double seg_mid_kx    = 0.24, seg_mid_ky    = 0.26;
-    double seg_mid_tc_ms = 6.5;  double seg_mid_lim  = 330.0;
-    double seg_far_kx    = 0.18, seg_far_ky    = 0.20;
-    double seg_far_tc_ms = 6.0;  double seg_far_lim  = 300.0;
+    double seg_near_kx=0.32, seg_near_ky=0.34, seg_near_tc_ms=7.0, seg_near_lim=360.0;
+    double seg_mid_kx =0.24, seg_mid_ky =0.26, seg_mid_tc_ms =6.5, seg_mid_lim =330.0;
+    double seg_far_kx =0.18, seg_far_ky =0.20, seg_far_tc_ms =6.0, seg_far_lim =300.0;
 
-    // 动态锚点（近头远身）
     bool   aim_dyn_anchor = true;
     double y_anchor_head  = 0.58;
     double y_anchor_body  = 0.80;
-    double aim_hys_h      = 28.0;        // 锚点切换滞回
-    bool   aim_lock_on_seg = true;       // 段内保持命中部位
+    double aim_hys_h      = 28.0;
+    bool   aim_lock_on_seg = true;
 
-    // 行为开关
-    bool   aim_single_use_pred = true;   // 单次点击是否使用预测
-    bool   aim_only_with_key = true;     // 仅在按键时启用分段/预测
+    bool   aim_single_use_pred = true;
+    bool   aim_only_with_key = true;
 
-    // 风鼠标（人类化轨迹）
-    bool   wind_enable = true;            // 总开关（均衡型默认：开启）
-    int    wind_rng_seed = 0;            // 0=随机播种，>0=固定种子
+    bool   wind_enable = true;
+    int    wind_rng_seed = 0;
+    double wind_step_min_px = 0.6;
+    double wind_step_max_px = 7.5;
+    double wind_speed_curve = 0.65;
+    double wind_end_slow_px = 10.0;
+    double wind_wind_k = 0.24;
+    double wind_gravity_k = 0.86;
+    double wind_jitter_std_px = 0.22;
+    double wind_backtrack_k = 0.12;
+    double wind_near_scale = 0.90;
+    double wind_mid_scale  = 1.0;
+    double wind_far_scale  = 1.15;
+    int    wind_max_steps_per_frame = 4;
+    double wind_time_budget_ms = 0.6;
+    double wind_residual_carry = 0.9;
+    double wind_dead_px = 0.5;
+    bool   wind_target_noise_enable = true;
+    double wind_target_noise_px = 0.6;
+    bool   wind_use_seg_scale = true;
+    double wind_out_limit_px = 340.0;
 
-    // 步长与速度
-    // 均衡型默认
-    double wind_step_min_px = 0.6;       // 微步最小像素
-    double wind_step_max_px = 7.5;       // 微步最大像素（上限保护）
-    double wind_speed_curve = 0.65;       // 0..1，越大越早加速后期减速更明显
-    double wind_end_slow_px = 10.0;      // 终端减速触发距离（像素）
-
-    // 风/重力/抖动强度
-    // 均衡型默认
-    double wind_wind_k = 0.24;           // 风力系数：横向扰动
-    double wind_gravity_k = 0.86;        // 重力系数：朝目标的吸引
-    double wind_jitter_std_px = 0.22;    // 高斯抖动标准差
-    double wind_backtrack_k = 0.12;      // 过冲回拉（小反向力）
-    // 分段缩放（与已有距离分段一致，按目标框高度 h）
-    // 均衡型默认
-    double wind_near_scale = 0.90;        // 近距离：更稳更短步
-    double wind_mid_scale  = 1.0;        // 中距离：默认
-    double wind_far_scale  = 1.15;        // 远距离：更快更长步
-
-    // 单帧预算与残差
-    // 均衡型默认
-    int    wind_max_steps_per_frame = 4; // 单帧最多微步次数（硬限制）
-    double wind_time_budget_ms = 0.6;    // 单帧最多用时（软限制，优先于上限）
-    double wind_residual_carry = 0.9;    // 残差占比（1=全额滚入下一帧）
-    // 终端控制与精度
-    // 均衡型默认
-    double wind_dead_px = 0.5;            // 风鼠标内部死区（避免抖动）
-    bool   wind_target_noise_enable = true;  // 是否启用终端微抖
-    double wind_target_noise_px = 0.6;   // 终端微抖（更“人类化”）
-
-    // 与现有分段/预测的一致性控制
-    bool   wind_use_seg_scale = true;    // 是否按近/中/远缩放风强度/步长
-    // 兼容/安全
-    double wind_out_limit_px = 340.0;    // 单帧总输出像素上限（保护）
-    // 类别/标签
     std::vector<std::string> classes { "enemy","teammate" };
     std::vector<int>         target_ids { 0 };
 
-    // 运行时日志/统计
-    bool capture_debug = false;             // 捕获链路调试
+    bool capture_debug = false;
     int  capture_debug_every_n = 30;
-    bool log_latency = true;                // 延迟统计
+    bool log_latency = true;
     int  log_latency_every_n = 30;
-    bool latency_on_capture_only = true; // 仅采集失败时也计入统计则设为false
-    bool capture_timing = true;             // 采集分步计时
+    bool latency_on_capture_only = true;
+    bool capture_timing = true;
     int  capture_timing_every_n = 30;
     bool capture_timing_each_frame = false;
     bool capture_timing_on_success = true;
-    
-    // 提交：是否在 Copy 后立即 Flush（DXGI/WGC 共用）
+
     bool capture_flush_after_copy = false;
 
-    bool perf_report = true;                // TRT-YOLO 报告
+    bool perf_report = true;
     int  perf_report_every_n = 30;
     bool perf_each_frame = false;
 
-    // 优化启用报告
     bool opt_report = true;
     bool opt_report_capture = true;
     bool opt_report_system = true;
     int  opt_report_every_n = 30;
 
-    // Overlay 绘制
-    bool      ovl = true;              // 默认启用
-    int       ovl_a = 160;             // 颜色 ARGB
-    int       ovl_r = 0;
-    int       ovl_g = 255;
-    int       ovl_b = 0;
+    bool      ovl = true;
+    int       ovl_a = 160;
+    int       ovl_r = 0, ovl_g = 255, ovl_b = 0;
     float     ovl_thick = 2.0f;
 
-    // Overlay GPU
-    bool         ovl_gpu_enum = false;        // 枚举并日志打印适配器
-    int          ovl_gpu_idx  = 1;           // 0-based；<0 表示未设置
-    std::wstring ovl_gpu_name;                // 名称包含匹配（优先级最高）
-    std::wstring ovl_gpu_luid;                // 形如 hi:lo（十进制或0x..）
+    bool         ovl_gpu_enum = false;
+    int          ovl_gpu_idx  = 1;
+    std::wstring ovl_gpu_name;
+    std::wstring ovl_gpu_luid;
 
-    // Overlay 同步/延迟
-    bool         ovl_vsync = false;           // 默认不使用 VSync（跨适配器降低延迟）
-    int          ovl_max_latency = 1;         // 最大帧延迟(1..3)，<=0 表示不控制
+    bool         ovl_vsync = false;
+    int          ovl_max_latency = 1;
+    bool         ovl_skip_empty = false;
+    bool         ovl_small_window = true;
+    int          ovl_win_x = 0, ovl_win_y = 0, ovl_win_w = crop_size_px, ovl_win_h = crop_size_px;
 
-    // Overlay 空闲节流
-    bool         ovl_skip_empty = false;       // 无绘制命令时跳过渲染与Present
-
-    // Overlay 小窗口
-    bool         ovl_small_window = true; // 小窗口（默认使用裁剪尺寸）
-    int          ovl_win_x = 0;               // 0 表示默认居中
-    int          ovl_win_y = 0;               // 0 表示默认居中
-    int          ovl_win_w = crop_size_px;    // 默认用检测裁剪尺寸
-    int          ovl_win_h = crop_size_px;    // 默认用检测裁剪尺寸
-
-    // Overlay 颜色
     bool ovl_cls = true;
     std::vector<int> ovl_cr { 255, 0 };
     std::vector<int> ovl_cg { 0, 255 };
     std::vector<int> ovl_cb { 0, 0 };
 
-    // Overlay 字体
-    int          ovl_font_px = 40;          // 字号（像素）
-    std::wstring ovl_font_name;             // 字体名（空=默认 Segoe UI）
+    int          ovl_font_px = 40;
+    std::wstring ovl_font_name;
 
-    // 仅显示某一类（-1 显示全部；>=0 仅该 class_id）
     int ovl_only = -1;
 
-    // 跟踪
-    // 线程调度
-    // 主线程
-    bool mmcss_main = false; // 默认关（当前未使用，仅保留占位）
+    bool mmcss_main = false;
     std::wstring mmcss_task = L"Capture";
     AVRT_PRIORITY mmcss_prio = AVRT_PRIORITY_HIGH;
     bool enable_thread_mem_prio = false;
-    // 模块线程（按需启用，不使用环境变量；短名、可读）
 
+    int dxgi_gpu_prio = 5;
+    int dxgi_max_latency = 0;
 
-    // DXGI
-   int dxgi_gpu_prio = 5;                  // -1..7
-   int dxgi_max_latency = 0;               // 1..3 推荐
+    bool is_target(int cid) const { return std::find(target_ids.begin(), target_ids.end(), cid) != target_ids.end(); }
+    std::string name_or_id(int cid) const { if (cid >= 0 && cid < (int)classes.size() && !classes[cid].empty()) return classes[cid]; return std::string("id=") + std::to_string(cid); }
 
-    // 辅助
-    bool is_target(int cid) const {
-        return std::find(target_ids.begin(), target_ids.end(), cid) != target_ids.end();
-    }
-    std::string name_or_id(int cid) const {
-        if (cid >= 0 && cid < (int)classes.size() && !classes[cid].empty()) return classes[cid];
-        return std::string("id=") + std::to_string(cid);
-    }
-
-    // 约束/规范化（最小侵入）
     void validate() {
-        v_basic();
-        v_overlay();
-        v_dxgi();
-        // 合理范围软约束（不改 const 值，仅在此处校验）
-        // 分段/预测校验（仅夹紧与范围提示，不改语义）
+        v_basic(); v_overlay(); v_dxgi();
         dist_near_h = std::max(1.0, dist_near_h);
         dist_far_h  = std::max(1.0, std::min(dist_near_h-1.0, dist_far_h));
         dist_hys_h  = std::max(0.0, dist_hys_h);
@@ -271,16 +179,10 @@ public:
         pred_dt_max_ms = std::max(0.0, pred_dt_max_ms);
         pred_v_tc_ms  = std::max(0.0, pred_v_tc_ms);
         pred_v_lim_px = std::max(0.0, pred_v_lim_px);
-        if (!(conf_thresh >= 0.0f && conf_thresh <= 1.0f)) {
-            lg::e() << P_E "conf_thresh out of [0,1]" << lg::endl;
-        }
-        if (!(y_anchor_ratio >= 0.0 && y_anchor_ratio <= 1.0)) {
-            lg::e() << P_E "y_anchor_ratio out of [0,1]" << lg::endl;
-        }
+        if (!(conf_thresh >= 0.0f && conf_thresh <= 1.0f)) { lg::e()<< P_E "conf_thresh out of [0,1]"<<lg::endl; }
+        if (!(y_anchor_ratio >= 0.0 && y_anchor_ratio <= 1.0)) { lg::e()<< P_E "y_anchor_ratio out of [0,1]"<<lg::endl; }
     }
-
 private:
-    // 基础/计时/通用
     void v_basic() {
         fps = std::max(1, fps);
         capture_timeout_ms_dxgi = std::max(0, capture_timeout_ms_dxgi);
@@ -289,37 +191,17 @@ private:
         capture_timing_every_n = std::max(1, capture_timing_every_n);
         perf_report_every_n = std::max(1, perf_report_every_n);
         opt_report_every_n = std::max(1, opt_report_every_n);
-        // 捕获后端
         cap = (cap==1)?1:0;
         cap_out = std::max(0, cap_out);
-        // 规范化参数
         if (trt_mean.size()!=3) trt_mean = {0.f,0.f,0.f};
         if (trt_std.size()!=3)  trt_std  = {1.f,1.f,1.f};
         lb_block_x = std::max(1, lb_block_x);
         lb_block_y = std::max(1, lb_block_y);
         lb_min_blocks_per_sm = std::max(1, lb_min_blocks_per_sm);
     }
-    
-    // Overlay 相关
     void v_overlay() {
-        if (ovl_cls) {
-            size_t n = classes.size();
-            pad(ovl_cr, n, ovl_r);
-            pad(ovl_cg, n, ovl_g);
-            pad(ovl_cb, n, ovl_b);
-        }
+        if (ovl_cls) { size_t n = classes.size(); pad(ovl_cr,n,ovl_r); pad(ovl_cg,n,ovl_g); pad(ovl_cb,n,ovl_b); }
     }
-
-    // 跟踪参数夹紧
-    // DXGI 范围
-    void v_dxgi() {
-        dxgi_max_latency = std::max(1, dxgi_max_latency);
-        dxgi_gpu_prio = std::min(7, std::max(-1, dxgi_gpu_prio));
-    }
-
-    // 向量尺寸与范围修正（0..255）
-    static void pad(std::vector<int>& v, size_t n, int d) {
-        if (v.size() < n) v.resize(n, d);
-        for (auto& x : v) x = std::max(0, std::min(255, x));
-    }
+    void v_dxgi() { dxgi_max_latency = std::max(1, dxgi_max_latency); dxgi_gpu_prio = std::min(7, std::max(-1, dxgi_gpu_prio)); }
+    static void pad(std::vector<int>& v, size_t n, int d) { if (v.size()<n) v.resize(n,d); for (auto& x : v) x = std::max(0, std::min(255, x)); }
 };

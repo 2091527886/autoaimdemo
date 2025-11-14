@@ -1,3 +1,4 @@
+#include "pch.hpp"
 #include "ScreenCapturer.hpp"
 #include "Config.hpp"
 #include "SystemTuner.hpp"
@@ -5,28 +6,16 @@
 #include "Reporting.hpp"
 #include "Log.hpp"
 
-#include <array>
-#include <chrono>
-#include <stdexcept>
-#include <algorithm>
-
-#include <windows.h>
-#include <d3d11.h>
-#include <dxgi1_2.h>
-
 ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_height)
     : cfg(cfg_ref), reporter(cfg_ref) {
     HRESULT hr;
 
-    // DXGI factory
     hr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&fac);
     if (FAILED(hr)) throw std::runtime_error("Failed to create DXGI Factory.");
 
-    // select by cfg.cap_gpu
     UINT aidx = (cfg.cap_gpu >= 0) ? static_cast<UINT>(cfg.cap_gpu) : 0u;
     if (FAILED(fac->EnumAdapters1(aidx, &adp))) throw std::runtime_error("Failed to enumerate adapters.");
 
-    // Optional enum logging
     if (cfg.cap_enum) {
         lg::o() << P_C "Adapters:" << lg::endl;
         for (UINT i=0;;++i){
@@ -38,19 +27,16 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
             RECT r=od.DesktopCoordinates; lg::o() << P_C "["<<i<<"] " << r.right-r.left << "x" << r.bottom-r.top << lg::endl; o->Release(); }
     }
 
-    // Output selection by cfg.cap_out
     if (FAILED(adp->EnumOutputs(cfg.cap_out, &out))) throw std::runtime_error("Failed to enumerate outputs.");
 
     DXGI_OUTPUT_DESC outputDesc; out->GetDesc(&outputDesc);
     width = outputDesc.DesktopCoordinates.right - outputDesc.DesktopCoordinates.left;
     height = outputDesc.DesktopCoordinates.bottom - outputDesc.DesktopCoordinates.top;
 
-    // D3D11 device
     if (FAILED(D3D11CreateDevice(adp, D3D_DRIVER_TYPE_UNKNOWN, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &dev, nullptr, &ctx)))
         throw std::runtime_error("Failed to create D3D11 device.");
     TuneDxgi(dev, cfg.dxgi_gpu_prio, cfg.dxgi_max_latency);
 
-    // Backend init
     useWgc = (cfg.cap == 1);
     if (!useWgc) {
         init_dxgi();
@@ -60,7 +46,6 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
         reporter.SetBackend(metrics::CaptureReporting::Backend::WGC);
     }
 
-    // staging & queries
     D3D11_TEXTURE2D_DESC desc; ZeroMemory(&desc, sizeof(desc));
     desc.Width = crop_width;
     desc.Height = crop_height;
@@ -105,7 +90,6 @@ void ScreenCapturer::dbgTick() {
                 << " ew=" << statCopyPend
                 << " sd=" << statStillDraw
                 << " ok=" << statOk << lg::endl;
-        // 不清零，保持累计视角
     }
 }
 

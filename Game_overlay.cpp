@@ -1,12 +1,8 @@
+#include "pch.hpp"
 #include "Game_overlay.h"
 #include "Log.hpp"
 #include "Config.hpp"
 #include "ovl_impl.hpp"
-#include <dcomp.h>
-#include <d3d11.h>
-#include <dxgi1_2.h>
-#include <d2d1_1.h>
-#include <dwrite.h>
 Game_overlay::Game_overlay() : impl_(new Impl) {}
 Game_overlay::~Game_overlay() { Stop(); }
 

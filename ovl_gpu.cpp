@@ -1,9 +1,6 @@
+#include "pch.hpp"
 #include "ovl_impl.hpp"
 #include "ovl_gpu.hpp"
-#include <algorithm>
-#include <cwctype>
-#include <string>
-#include <vector>
 
 using Microsoft::WRL::ComPtr;
 

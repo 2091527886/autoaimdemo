@@ -1,14 +1,8 @@
+#include "pch.hpp"
 #include "ScreenCapturer.hpp"
 #include "Config.hpp"
 #include "ComHelpers.hpp"
 #include "Log.hpp"
-
-#include <windows.h>
-#include <d3d11.h>
-#include <dxgi1_2.h>
-#include <chrono>
-#include <stdexcept>
-#include <algorithm>
 
 bool ScreenCapturer::cap_dxgi_view(ScreenCapturer::CapturedView& view, const cv::Rect& crop_region) {
     const bool do_tim = cfg.capture_timing && cfg.timing;
@@ -31,7 +25,7 @@ bool ScreenCapturer::cap_dxgi_view(ScreenCapturer::CapturedView& view, const cv:
     bool success = false, fatal = false;
     auto body = [&]() -> bool {
 
-        double aq = 0.0, qi = 0.0, cp = 0.0, mp = 0.0, up = 0.0; // cv(转换)为0
+        double aq = 0.0, qi = 0.0, cp = 0.0, mp = 0.0; // cv(转换)为0
 
         IDXGIResource* pDesktopResource = nullptr;
         DXGI_OUTDUPL_FRAME_INFO frameInfo{};
@@ -83,7 +77,6 @@ bool ScreenCapturer::cap_dxgi_view(ScreenCapturer::CapturedView& view, const cv:
             if (do_tim) mp = std::chrono::duration<double, std::milli>(t_map_e - t_map_s).count();
             if (FAILED(hrm)) return false;
 
-            // fill view and keep mapped
             view.data = static_cast<unsigned char*>(mr.pData);
             view.pitch = mr.RowPitch;
             view.mapped = true;
@@ -97,7 +90,6 @@ bool ScreenCapturer::cap_dxgi_view(ScreenCapturer::CapturedView& view, const cv:
 
         if (!ok_copy) { view.aq_sum += aq; view.qi_sum += qi; view.cp_sum += cp; view.mp_sum += mp; return false; }
 
-        // accumulate and success (no unmap here)
         view.aq_sum += aq; view.qi_sum += qi; view.cp_sum += cp; view.mp_sum += mp;
         ++statOk; dbgTick();
         success = true;

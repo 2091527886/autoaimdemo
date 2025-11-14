@@ -2,7 +2,7 @@
 
 #include "InputSimulator.hpp"
 
-typedef struct HINSTANCE__* HMODULE; // forward declare to avoid including windows.h in header
+typedef struct HINSTANCE__* HMODULE;
 
 class Mouse {
 public:

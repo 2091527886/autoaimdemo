@@ -1,6 +1,6 @@
 #pragma once
 #include <wrl/client.h>
-#include <dxgi1_2.h>
+#include "pch.hpp"
 #include <string>
 
 Microsoft::WRL::ComPtr<IDXGIAdapter1> pick_adapter_cfg(const std::wstring& name,

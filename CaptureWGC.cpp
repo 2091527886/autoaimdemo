@@ -1,13 +1,8 @@
+#include "pch.hpp"
 #include "ScreenCapturer.hpp"
 #include "Config.hpp"
 #include "ComHelpers.hpp"
 #include "Log.hpp"
-
-#include <windows.h>
-#include <d3d11.h>
-#include <dxgi1_2.h>
-#include <algorithm>
-#include <chrono>
 
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Graphics.Capture.h>

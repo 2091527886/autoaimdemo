@@ -17,7 +17,6 @@ double FpsCtl::end() {
         next_tp += per;
         return tgt_ms;
     }
-    // lagging: compute overshoot and catch up phase without sleeping
     ovr = std::chrono::duration<double, std::milli>(now - next_tp).count();
     while (next_tp <= now) { next_tp += per; ++drop; }
     return tgt_ms;
