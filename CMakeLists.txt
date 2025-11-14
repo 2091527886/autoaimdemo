@@ -102,7 +102,8 @@ add_executable(aimassistant
   ObjDet_init.cpp
   ObjDet_detect.cpp
   ObjDet_perf.cpp
-  ScreenCapturer.Core.cpp
+  ScreenCapturer.Init.cpp
+  ScreenCapturer.Release.cpp
   ScreenCapturer.Dispatch.cpp
   ScreenCapturer.CaptureDXGI.cpp
   CaptureDXGI.cpp
