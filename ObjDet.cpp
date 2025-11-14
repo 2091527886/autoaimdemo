@@ -6,7 +6,6 @@
 #include <chrono>
 #include <algorithm>
 #include <fstream>
-#include <sstream>
 
 #include <windows.h>
 #ifdef _MSC_VER
@@ -33,8 +32,7 @@ ObjDet::ObjDet(const Config& cfg)
     if (cfg.trt_use_normalize && cfg.trt_mean.size()==3 && cfg.trt_std.size()==3) {
         opt.setNormalizeParams(cfg.trt_mean, cfg.trt_std);
     }
-    // 核函数/占用调优（3060 默认稳态：32x8, MINB=2, 关闭 occupancy 探索，可用 cfg 覆盖）
-    int bx = cfg.lb_block_x > 0 ? cfg.lb_block_x : 32;
+        int bx = cfg.lb_block_x > 0 ? cfg.lb_block_x : 32;
     int by = cfg.lb_block_y > 0 ? cfg.lb_block_y : 8;
     bool use_lb = cfg.lb_use_launch_bounds;
     int  minb   = (cfg.lb_min_blocks_per_sm>0?cfg.lb_min_blocks_per_sm:2);
@@ -57,8 +55,7 @@ ObjDet::ObjDet(const Config& cfg)
         opt.enablePerformanceReport();
     }
 
-    // Diagnostics similar to original
-    {
+        {
         char cwd_buffer[MAX_PATH];
         if (GetCurrentDirectoryA(MAX_PATH, cwd_buffer)) {
             lg::o() << P_D "cwd: " << cwd_buffer << lg::endl;

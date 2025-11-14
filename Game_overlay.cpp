@@ -64,7 +64,6 @@ static D2D1_COLOR_F ToD2DColor(OverlayColor argb)
     return D2D1::ColorF(r, g, b, a);
 }
 
-// GPU helpers (overlay-local)
 static std::wstring wenv(const wchar_t* k)
 {
     wchar_t buf[512];
@@ -246,7 +245,6 @@ struct Game_overlay::Impl
     static LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
     bool    CreateWindowAndDevices();
     void    DestroyWindowAndDevices();
-    // RenderLoop removed (single-threaded)
     void    RenderOne();
 
     HRESULT CreateTextFormat(const std::wstring& font, float size, IDWriteTextFormat** out);

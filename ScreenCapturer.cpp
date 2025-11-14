@@ -10,7 +10,6 @@
 #include <stdexcept>
 #include <algorithm>
 
-// Windows & DirectX
 #include <windows.h>
 #include <d3d11.h>
 #include <dxgi1_2.h>
@@ -26,7 +25,7 @@ ScreenCapturer::ScreenCapturer(const Config& cfg_ref, int crop_width, int crop_h
     hr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&fac);
     if (FAILED(hr)) throw std::runtime_error("Failed to create DXGI Factory.");
 
-    // Adapter select by cfg.cap_gpu (>=0)
+    // select by cfg.cap_gpu
     UINT aidx = (cfg.cap_gpu >= 0) ? static_cast<UINT>(cfg.cap_gpu) : 0u;
     if (FAILED(fac->EnumAdapters1(aidx, &adp))) throw std::runtime_error("Failed to enumerate adapters.");
 
@@ -191,7 +190,7 @@ bool ScreenCapturer::capture_view(ScreenCapturer::CapturedView& view, const cv::
             view.mapped = true;
 
             // accumulate and success (no unmap here)
-            view.aq_sum += aq; view.qi_sum += qi; view.cp_sum += cp; view.mp_sum += mp; /*cv_sum+=0*/;
+            view.aq_sum += aq; view.qi_sum += qi; view.cp_sum += cp; view.mp_sum += mp;
             ++statOk; dbgTick();
             return true;
         }

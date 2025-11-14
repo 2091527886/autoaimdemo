@@ -103,7 +103,6 @@ public:
         if (c.wind_rng_seed > 0) {
             wind_.rng.seed(static_cast<uint32_t>(c.wind_rng_seed));
         }
-        // overlay moved to main thread
         if (c.ovl) {
             gover.UseVirtualScreen();
             gover.SetConfig(c);
@@ -527,7 +526,6 @@ int main() {
        SetProcPrioBoostDisabled();
    }
 
-   // thread mem prio + disable boost
     // overlay (Game overlay) banner based on ovl flag
     metrics::SystemBootReporting::PrintOverlayBanner(boot_cfg, boot_cfg.ovl);
 

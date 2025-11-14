@@ -9,7 +9,6 @@
 #include <chrono>
 #include <algorithm>
 
-// WinRT (WGC)
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Graphics.Capture.h>
 #include <winrt/Windows.Graphics.DirectX.h>
@@ -46,27 +45,22 @@ struct ScreenCapturer::WgcCtx {
 };
 
 bool ScreenCapturer::init_wgc() {
-    // Initialize WinRT apartment (moved from ctor)
     winrt::init_apartment(winrt::apartment_type::multi_threaded);
 
-    // HMONITOR from current output
     DXGI_OUTPUT_DESC od; out->GetDesc(&od);
 
     wgc = new WgcCtx();
 
-    // Create WinRT device from DXGI device
     winrt::com_ptr<IDXGIDevice> dxgiDev;
     dev->QueryInterface(__uuidof(IDXGIDevice), dxgiDev.put_void());
     wgc->wdev = CreateDirect3DDevice(dxgiDev.get());
 
-    // Capture item from HMONITOR
     winrt::com_ptr<IGraphicsCaptureItemInterop> interop =
         winrt::get_activation_factory<winrt::Windows::Graphics::Capture::GraphicsCaptureItem, IGraphicsCaptureItemInterop>();
     winrt::Windows::Graphics::Capture::GraphicsCaptureItem item{ nullptr };
     winrt::check_hresult(interop->CreateForMonitor(od.Monitor, winrt::guid_of<winrt::Windows::Graphics::Capture::GraphicsCaptureItem>(), winrt::put_abi(item)));
     wgc->item = item;
 
-    // Frame pool and session
     auto size = winrt::Windows::Graphics::SizeInt32{ width, height };
     wgc->pool = winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::Create(
         wgc->wdev,
@@ -82,7 +76,6 @@ bool ScreenCapturer::init_wgc() {
 
 void ScreenCapturer::rel_wgc() {
     if (wgc) {
-        // session/pool will be released with wgc destruction
         delete wgc; wgc = nullptr;
     }
 }

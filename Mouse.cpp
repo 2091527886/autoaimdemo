@@ -2,7 +2,6 @@
 #include "Mouse.hpp"
 #include "Log.hpp"
 
-// 仅迁移，不改变逻辑/实现细节
 Mouse::Mouse() {
     lg::o() << P_M "Init driver" << lg::endl;
     dll_ = LoadLibrary(L"IbInputSimulator.dll");
@@ -40,7 +39,7 @@ Mouse::~Mouse() {
 void Mouse::Move(int dx, int dy) {
     if (move_) {
         bool ok = move_(dx, dy, Send::MoveMode::Relative);
-        // 仅在失败时日志，避免影响 mou_ms 计时与日志噪声
+        // 仅失败时日志
         if (!ok) {
             lg::ok_or_werr_msg(false, P_M, std::string("mv dx=") + std::to_string(dx) + " dy=" + std::to_string(dy), ok);
         }

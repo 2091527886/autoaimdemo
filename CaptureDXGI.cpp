@@ -14,7 +14,6 @@
 #pragma comment(lib, "dxgi.lib")
 
 bool ScreenCapturer::init_dxgi() {
-    // DDA init (moved from ctor, logic unchanged)
     if (FAILED(out->QueryInterface(__uuidof(IDXGIOutput1), (void**)&out1))) {
         throw std::runtime_error("Failed to query IDXGIOutput1.");
     }
