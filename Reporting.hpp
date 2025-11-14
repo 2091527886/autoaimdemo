@@ -37,8 +37,7 @@ public:
         }
     }
 
-    // detection/capture thread: only accumulate, do not print
-    void ReportStepTimings(double t_acquire_ms, double t_qi_ms, double t_copy_ms,
+        void ReportStepTimings(double t_acquire_ms, double t_qi_ms, double t_copy_ms,
                            double t_map_ms, double t_cvt_ms, double t_unmap_ms, double t_total_ms,
                            size_t& stat_dirty_skips_member,
                            size_t& stat_event_not_ready_member,
@@ -62,7 +61,7 @@ public:
         acc_total_ += t_total_ms;
     }
 
-    // main thread: print and reset when interval reached
+    // 打印并在到达间隔时重置
     void drain() {
         bool should_print = cfg_.capture_timing_each_frame;
         if (!should_print) {
@@ -111,7 +110,7 @@ public:
             }
         }
 
-        // reset perf accumulators
+        // 重置统计
         counter_ = 0;
         acc_acq_ = acc_qi_ = acc_copy_ = acc_map_ = acc_cvt_ = acc_unmap_ = acc_total_ = 0.0;
     }

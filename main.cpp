@@ -21,18 +21,12 @@ extern std::atomic<bool> g_exit_done;
 #include "Reporting.hpp"
 #include "Detection.hpp"
 
-
-
-
-
-
 #include "Mouse.hpp"
 #include "AimAlgo.hpp"
 #include "HotkeyManager.hpp"
 #include "ScreenCapturer.hpp"
 #include "ObjDet.hpp"
 #include "Game_overlay.h"
-
 
 // helpers
 static const Detection* pick_target(const std::vector<Detection>& ds, const Config& c, const cv::Point& ctr) {
@@ -86,7 +80,6 @@ public:
         }
     };
 
-
     Aim()
         : c(),
         cap(c, c.crop_size_px, c.crop_size_px),
@@ -126,7 +119,6 @@ public:
     void loop() {
         while (true) {
             if (g_exit_req.load(std::memory_order_relaxed)) { break; }
-            // no event pacing; capture on main thread
             auto loop_start_time = std::chrono::high_resolution_clock::now();
 
             FrameLat fl;
@@ -143,8 +135,7 @@ public:
             } else {
                 got = cap.capture_view(view, crop);
             }
-            // no fallback clone path: strictly zero-copy view
-            
+                        
             if (!got) {
                 fl.cap_ms = cap_ms;
                 if (c.timing && c.log_latency && !c.latency_on_capture_only) {
@@ -164,16 +155,13 @@ public:
                 cap.release_view(view);
                 continue;
             }
-            // overlay draw on main thread
             double ovl_ms = 0.0;
             fl.det_ms = c.timing ? (tm.infer_ms + tm.post_ms) : 0.0;
 
-            
-            
             bool smooth_pressed = hk.SmoothPressed();
             bool single = hk.SingleShotJustPressed();
 
-            // 延后计算 dt：仅在即将执行算法时按需计算
+            // lazy dt
             auto calc_dt = [&](){
                 if (c.prop_use_dt) {
                     auto now = std::chrono::high_resolution_clock::now();
@@ -185,7 +173,6 @@ public:
                         }
             };
 
-            // sync control+mouse on main thread
             auto tctl0 = (c.timing ? std::chrono::high_resolution_clock::now() : std::chrono::high_resolution_clock::time_point{});
             double ctl_cost_ms = 0.0;
             double mou_cost_ms = 0.0;
@@ -198,7 +185,7 @@ public:
                     int mx = 0, my = 0;
                     auto decide_anchor = [&](double h)->double{
                         if (!c.aim_dyn_anchor) return c.y_anchor_ratio;
-                        // 分段与滞回
+                        // 分段滞回
                         double near_h = c.dist_near_h, far_h = c.dist_far_h, hys = c.aim_hys_h;
                         int seg = last_seg_;
                         if (seg == 2) { // NEAR -> 仅当明显变小才降级
@@ -210,7 +197,6 @@ public:
                             else if (h <= far_h) seg = 0;
                         }
                         last_seg_ = seg;
-                        // 近头远身，中间取身体
                         return (seg==2) ? c.y_anchor_head : c.y_anchor_body;
                     };
 
@@ -219,7 +205,6 @@ public:
                         double ya = decide_anchor(h);
                         cv::Point2d tp(d.box.x + d.box.width/2.0,
                                        d.box.y + d.box.height * ya);
-                        // 预测
                         if (enable_pred && c.pred_enable && last_tp_valid_) {
                             double tc = std::max(0.0, c.pred_v_tc_ms) / 1000.0;
                             double a = (tc>0.0) ? (dt/(tc+dt)) : 1.0;
@@ -227,8 +212,7 @@ public:
                             cv::Point2d v_inst{ (tp.x - last_tp_.x) * inv_dt, (tp.y - last_tp_.y) * inv_dt };
                             v_lp_.x = v_lp_.x + a * (v_inst.x - v_lp_.x);
                             v_lp_.y = v_lp_.y + a * (v_inst.y - v_lp_.y);
-                            // 限幅
-                            double lim = c.pred_v_lim_px;
+                        double lim = c.pred_v_lim_px;
                             v_lp_.x = std::max(-lim, std::min(lim, v_lp_.x));
                             v_lp_.y = std::max(-lim, std::min(lim, v_lp_.y));
                             double ext = std::min(dt, std::max(0.0, c.pred_dt_max_ms)/1000.0);
@@ -240,7 +224,7 @@ public:
                     };
 
                     auto apply_seg_params = [&](double h){
-                        // 选择段 + 可选插值
+                        // 分段/插值参数更新
                         double near_h = c.dist_near_h, far_h = c.dist_far_h, hys = c.dist_hys_h;
                         int seg = last_seg_;
                         if (seg == 2) { if (h < near_h - hys) seg = 1; }
@@ -290,10 +274,9 @@ public:
                             mouse.Move(mx, my);
                         } else {
                             cv::Point2d want{ (double)mx, (double)my };
-                            // 残差滚入
-                            want.x += wind_.residual.x; want.y += wind_.residual.y;
+            want.x += wind_.residual.x; want.y += wind_.residual.y;
 
-                            // 分段缩放
+                            // 分段缩放参数
                             double seg_scale = 1.0;
                             if (c.wind_use_seg_scale) {
                                 if (last_seg_ == 2) seg_scale = c.wind_near_scale;
@@ -322,32 +305,28 @@ public:
                                 double dist = std::hypot(want.x, want.y);
                                 if (dist <= dead_px) break;
 
-                                // 指向目标的单位向量
-                                double ux = (dist > 1e-6) ? (want.x / dist) : 0.0;
+                    double ux = (dist > 1e-6) ? (want.x / dist) : 0.0;
                                 double uy = (dist > 1e-6) ? (want.y / dist) : 0.0;
-                                // 切向风：与目标方向垂直
-                                double tx = -uy, ty = ux;
+                    double tx = -uy, ty = ux;
 
-                                // 速度曲线：加速-减速钟形
+                                // 速度曲线
                                 double t = std::clamp(1.0 - dist / std::max(1.0, end_slow * 4.0), 0.0, 1.0);
                                 double curve = std::clamp(c.wind_speed_curve, 0.0, 1.0);
                                 double bell = (1.0 - curve) * t + curve * (1.0 - std::abs(2.0 * t - 1.0));
                                 bell = std::clamp(bell, 0.1, 1.0);
                                 double step_len = std::clamp(dist * 0.25 * bell, step_min, step_max);
 
-                                // 噪声
-                                double jx = wind_.n01(wind_.rng) * jitter_s;
+                    double jx = wind_.n01(wind_.rng) * jitter_s;
                                 double jy = wind_.n01(wind_.rng) * jitter_s;
 
-                                // 合成方向
-                                double sx = grav_k * ux + wind_k * tx + jx;
+                    double sx = grav_k * ux + wind_k * tx + jx;
                                 double sy = grav_k * uy + wind_k * ty + jy;
                                 double s_norm = std::hypot(sx, sy);
                                 if (s_norm < 1e-6) { sx = ux; sy = uy; s_norm = 1.0; }
                                 sx = sx / s_norm * step_len;
                                 sy = sy / s_norm * step_len;
 
-                                // 终端微回拉，避免过冲
+                                // 终端微回拉
                                 if (dist < end_slow) {
                                     sx -= c.wind_backtrack_k * (want.x - sx);
                                     sy -= c.wind_backtrack_k * (want.y - sy);
@@ -368,7 +347,7 @@ public:
                                 if (sent >= out_lim) break;
                             }
 
-                            // 终端微抖（可选）
+                            // 终端微抖
                             if (c.wind_target_noise_enable) {
                                 if (std::hypot(want.x, want.y) <= dead_px && c.wind_target_noise_px > 0.0) {
                                     int ndx = (int)std::lround(wind_.n01(wind_.rng) * c.wind_target_noise_px * 0.5);
@@ -390,9 +369,8 @@ public:
             ctl_cost_ms = c.timing ? std::chrono::duration<double, std::milli>(tctl1 - tctl0).count() : 0.0;
 
             fl.mou_ms = mou_cost_ms;
-            fl.ctl_ms = std::max(0.0, ctl_cost_ms - mou_cost_ms); // 去重：控制不含鼠标
+            fl.ctl_ms = std::max(0.0, ctl_cost_ms - mou_cost_ms); // ctl不含mou
 
-            // overlay draw on main thread (now after mouse movement)
             if (c.ovl) {
                 auto t0 = (c.timing ? std::chrono::high_resolution_clock::now() : std::chrono::high_resolution_clock::time_point{});
                 gover.BeginFrame();
@@ -434,22 +412,18 @@ public:
             auto loop_end_time = std::chrono::high_resolution_clock::now();
             double proc_ms = std::chrono::duration<double, std::milli>(loop_end_time - loop_start_time).count();
             if (c.fps_lock) {
-                // FPS 锁基于主循环真实耗时，避免被其他线程阶段统计值放大而误限速
                 tm.loop_ms = fc.end();
             } else {
                 tm.loop_ms = proc_ms;
             }
-            // E2E≈max(loop,cap,det,io)。注意：ctl_ms 不含 mou_ms，避免重复计时
+            // E2E=max(loop,cap,det,mou,ctl,ovl)
             if (c.timing) {
                 double loop_e2e = std::max({tm.loop_ms, fl.cap_ms, fl.det_ms, fl.mou_ms, fl.ctl_ms, fl.ovl_ms});
                 fl.loop_ms = loop_e2e;
             }
 
-            
-
             if (c.timing && c.log_latency) {
                 lat.push(fl);
-                // drop/ovr 节流
                 ++fcnt;
                 int n = std::max(1, c.log_latency_every_n);
                 if (fcnt % (size_t)n == 0) {
@@ -465,7 +439,6 @@ public:
             // 主线程输出采集统计
             if (c.timing) cap.reporter.drain();
 
-            
             if (c.timing && !tm.trt_throughput.empty()) {
                 lg::ml(P_T, tm.trt_throughput, tm.trt_cpu_lat, tm.trt_gpu_lat);
                 tm.trt_throughput.clear();
@@ -508,11 +481,9 @@ private:
     bool last_tp_valid_ = false;
     int  last_seg_ = 1; // 0:far,1:mid,2:near
     
-
     // 风鼠标状态
     WindState wind_;
 };
-
 
 std::atomic<bool> g_exit_req{false};
 std::atomic<bool> g_exit_done{false};
@@ -548,8 +519,6 @@ int main() {
     SetProcPrioHigh();
     SetThreadPrioHighest();
 
-    
-   
     HANDLE hMmcss = nullptr; // MMCSS disabled
 
    // thread mem prio + disable boost

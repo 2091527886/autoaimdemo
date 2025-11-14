@@ -33,7 +33,7 @@ public:
     ScreenCapturer(const ScreenCapturer&) = delete;
     ScreenCapturer& operator=(const ScreenCapturer&) = delete;
 
-    // zero-copy view capture (caller must call release_view once done)
+    // 零拷贝视图捕获（需调用 release_view 归还）
     bool capture_view(CapturedView& view, const cv::Rect& crop_region);
     void release_view(CapturedView& view);
 
@@ -45,7 +45,7 @@ private:
                                     double t_map_ms, double t_cvt_ms, double t_unmap_ms, double t_total_ms);
     void dbgTick();
 
-    // backend split (no logic change)
+    // DXGI/WGC 后端拆分
     bool init_dxgi();
     bool init_wgc();
     bool cap_wgc_view(CapturedView& view, const cv::Rect& crop_region);
@@ -56,8 +56,7 @@ private:
 
     static constexpr size_t kStageN = 1;
     std::array<struct ID3D11Texture2D*, kStageN> stage{};
-    // single-buffer: no queries or index rotation
-    size_t statSkipDirty = 0;
+        size_t statSkipDirty = 0;
     size_t statCopyPend = 0;    // kept for reporting compatibility (always 0)
     size_t statStillDraw = 0;   // kept for reporting compatibility (always 0)
     size_t statOk = 0;

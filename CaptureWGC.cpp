@@ -87,7 +87,6 @@ void ScreenCapturer::rel_wgc() {
     }
 }
 
-
 bool ScreenCapturer::cap_wgc_view(ScreenCapturer::CapturedView& view, const cv::Rect& crop_region) {
     const bool do_tim = cfg.capture_timing && cfg.timing;
     using clock = std::chrono::high_resolution_clock;

@@ -226,7 +226,6 @@ void ScreenCapturer::release_view(ScreenCapturer::CapturedView& view) {
     view.data = nullptr;
 }
 
-
 void ScreenCapturer::reportTimes(double t_acquire_ms, double t_qi_ms, double t_copy_ms,
                                     double t_map_ms, double t_cvt_ms, double t_unmap_ms, double t_total_ms) {
     reporter.ReportStepTimings(

@@ -4,7 +4,7 @@
 #include "Config.hpp"
 #include <utility>
 
-// 简洁鼠标移动算法封装：使用 PropAlgo 双轴，集中配置与接口
+// 鼠标移动算法封装（双轴 PropAlgo）
 class AimAlgo {
 public:
     AimAlgo() = default;
@@ -12,8 +12,7 @@ public:
     explicit AimAlgo(const Config& c) { setConfig(c); }
 
     void setConfig(const Config& c) {
-        // 仅使用 prop_* 配置
-        x_.setK(c.prop_k_x);
+                x_.setK(c.prop_k_x);
         x_.setLim(c.prop_out_limit);
         x_.setTc(c.prop_tc_ms);
         x_.setDz(c.prop_dead_px);
