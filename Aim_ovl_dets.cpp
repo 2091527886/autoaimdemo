@@ -1,6 +1,7 @@
 #include "Aim.hpp"
 #include "sh.hpp"
 #include "ovl_util.hpp"
+#include "aim_ovl.hpp"
 
 void Aim::draw_ovl(double &ms) {
   if (!c.ovl) { ms = 0.0; return; }
@@ -32,8 +33,6 @@ void Aim::draw_ovl(double &ms) {
       else gover.AddText(x, ty, wlbl, fsz, tcol);
     }
   }
-  extern void aim_draw_cross(Aim* self);
-  extern void aim_draw_lock(Aim* self);
   aim_draw_cross(this);
   aim_draw_lock(this);
   gover.EndFrame();

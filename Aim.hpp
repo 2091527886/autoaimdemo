@@ -87,4 +87,14 @@ private:
     // grant access to helper free functions defined in separate units
     friend void aim_draw_cross(Aim* self);
     friend void aim_draw_lock(Aim* self);
+
+    // small control helpers to shrink .cpp
+    void on_no_target();
+    void on_single(const Detection& target, double dt, double& mou_ms);
+    void on_smooth(const Detection& target, double dt, double& mou_ms);
 };
+
+// inline impls (keep tiny to reduce .cpp size; no logic change)
+inline void Aim::on_no_target(){ algo.reset(); last_tp_valid_ = false; lock_ = false; aim_ok_ = false; }
+inline void Aim::on_single(const Detection& target, double dt, double& mou_ms){ bool use_pred = c.aim_single_use_pred; auto [dx, dy] = pred_err(target, dt, use_pred); int mx = (int)(dx * mfac), my = (int)(dy * mfac); mv(mx, my, mou_ms); }
+inline void Aim::on_smooth(const Detection& target, double dt, double& mou_ms){ double h = (double)target.box.height; set_seg(h); auto [ex, ey] = pred_err(target, dt, true); auto pr = algo.step(ex, ey, dt); int mx = (int)(pr.first * mfac), my = (int)(pr.second * mfac); if (!c.wind_enable) mv(mx, my, mou_ms); else mv_wind(mx, my, mou_ms); }

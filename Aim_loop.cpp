@@ -33,32 +33,13 @@ void Aim::loop() {
     {
       const Detection *target = pick_target(ds, c, ctr);
       if (!target) {
-        algo.reset();
-        last_tp_valid_ = false;
-        lock_ = false;
-        aim_ok_ = false;
+        on_no_target();
       } else {
-        if (!smooth_pressed) {
-          algo.reset();
-          last_tp_valid_ = false;
-        }
-
+        if (!smooth_pressed) { algo.reset(); last_tp_valid_ = false; }
         { auto ap = aim_no_pred(*target); aim_pt_.x = ap.x; aim_pt_.y = ap.y; aim_ok_ = true; lock_rect_ = {(float)(crop.x + target->box.x), (float)(crop.y + target->box.y), (float)target->box.width, (float)target->box.height}; lock_ = smooth_pressed || single; }
-
         double dt = get_dt();
-
-        if (single) {
-          bool use_pred = c.aim_single_use_pred;
-          auto [dx, dy] = pred_err(*target, dt, use_pred);
-          int mx = (int)(dx * mfac), my = (int)(dy * mfac); mv(mx, my, mou_cost_ms);
-        } else if (smooth_pressed) {
-          double h = (double)target->box.height;
-          set_seg(h);
-          auto [ex, ey] = pred_err(*target, dt, true);
-          auto pr = algo.step(ex, ey, dt);
-          int mx = (int)(pr.first * mfac), my = (int)(pr.second * mfac);
-          if (!c.wind_enable) mv(mx, my, mou_cost_ms); else mv_wind(mx, my, mou_cost_ms);
-        }
+        if (single) { on_single(*target, dt, mou_cost_ms); }
+        else if (smooth_pressed) { on_smooth(*target, dt, mou_cost_ms); }
       }
     }
     auto tctl1 = (c.timing ? tn() : tctl0);

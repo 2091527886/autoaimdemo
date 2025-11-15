@@ -1,5 +1,6 @@
 #include "ovl_impl.hpp"
 #include "ovl_util.hpp"
+#include "pch.hpp"
 void Game_overlay::Impl::RenderOne(){
   if(!d2dCtx || !swapChain) return;
   auto dl = std::atomic_load_explicit(&current, std::memory_order_acquire);
@@ -12,11 +13,7 @@ void Game_overlay::Impl::RenderOne(){
   if(dl){ for(const auto& c : dl->cmds){ switch(c.type){
     case DrawCmd::Rect: brush->SetColor(C(c.color)); d2dCtx->DrawRectangle(RF(c.rect.x, c.rect.y, c.rect.w, c.rect.h), brush.Get(), c.thickness); break;
     case DrawCmd::RectFilled: brush->SetColor(C(c.color)); d2dCtx->FillRectangle(RF(c.rect.x, c.rect.y, c.rect.w, c.rect.h), brush.Get()); break;
-    case DrawCmd::Text: {
-      brush->SetColor(C(c.color)); ComPtr<IDWriteTextFormat> fmt; if(SUCCEEDED(CreateTextFormat(c.fontName.empty()?L"Segoe UI":c.fontName, c.textPos.size, &fmt))){
-        D2D1_RECT_F layout=RF(c.textPos.x,c.textPos.y,4000.f,1200.f);
-        d2dCtx->DrawTextW(c.text.c_str(), (UINT32)c.text.size(), fmt.Get(), layout, brush.Get());
-      } } break; }
+    case DrawCmd::Text: { brush->SetColor(C(c.color)); OVL_DRAW_TEXT(d2dCtx, c.text, c.textPos.x, c.textPos.y, c.textPos.size, c.color, c.fontName); } break; }
     }
   }
   if(small_window){ d2dCtx->SetTransform(__oldM); }

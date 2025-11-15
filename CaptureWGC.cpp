@@ -92,10 +92,7 @@ bool ScreenCapturer::cap_wgc_view(ScreenCapturer::CapturedView &view, const cv::
         TSTART(t_acq_s, do_tim);
         auto frm = wgc->pool.TryGetNextFrame();
         TELAPSE(aq, do_tim, t_acq_s);
-        if (!frm) {
-          view.aq_sum += aq;
-          return false;
-        }
+        if (!frm) { view.aq_sum += aq; return false; }
 
         auto surf = frm.Surface();
         auto tex = GetDXGIInterfaceFromObject<ID3D11Texture2D>(surf);
@@ -103,18 +100,10 @@ bool ScreenCapturer::cap_wgc_view(ScreenCapturer::CapturedView &view, const cv::
         D3D11_BOX src = box_from_rect(crop_region);
 
         if (!cpmp(ctx, stage[0], tex.get(), &src, view, do_tim, cp, mp, cfg.capture_flush_after_copy)) {
-          view.aq_sum += aq;
-          view.cp_sum += cp;
-          view.mp_sum += mp;
-          return false;
+          view.aq_sum += aq; view.cp_sum += cp; view.mp_sum += mp; return false;
         }
 
-        view.aq_sum += aq;
-        view.cp_sum += cp;
-        view.mp_sum += mp;
-        ++statOk;
-        dbgTick();
-        return true;
+        view.aq_sum += aq; view.cp_sum += cp; view.mp_sum += mp; ++statOk; dbgTick(); return true;
       })) {
     return true;
   }

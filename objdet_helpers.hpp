@@ -4,6 +4,7 @@
 #include <cmath>
 #include <opencv2/core.hpp>
 #include "sh.hpp"
+#include "Detection.hpp"
 
 inline void trim_str(std::string& s){
   size_t a = s.find_first_not_of(" \t\r\n");
@@ -23,3 +24,8 @@ inline cv::Rect rect_from_box_clamped(const BoxT& b, int width, int height){
   h = MN(h, height - y);
   return (w>0 && h>0) ? cv::Rect(x,y,w,h) : cv::Rect();
 }
+
+inline bool accept_det(float score, float conf_thresh){ return score >= conf_thresh; }
+
+template<typename BoxT>
+inline Detection make_det(const BoxT& b, int w, int h, float score, int cls){ return Detection{rect_from_box_clamped(b,w,h), score, cls}; }

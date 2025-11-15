@@ -37,22 +37,14 @@ void Aim::mv_wind(int mx, int my, double &ms) {
   const int steps_cap = std::max(1, c.wind_max_steps_per_frame);
 
   while (steps < steps_cap) {
-    auto now = tn();
-    if (now >= budget_end)
-      break;
-    double dist = hypot(want.x, want.y);
-    if (dist <= dead_px)
-      break;
+    auto now = tn(); if (now >= budget_end) break;
+    double dist = HYP(want.x, want.y); if (dist <= dead_px) break;
 
-    double ux = (dist > 1e-6) ? (want.x / dist) : 0.0;
-    double uy = (dist > 1e-6) ? (want.y / dist) : 0.0;
-    double tx = -uy, ty = ux;
+    double ux, uy; unit(want.x, want.y, ux, uy); double tx = -uy, ty = ux;
 
     double t = CLP(1.0 - dist / MX(1.0, end_slow * 4.0), 0.0, 1.0);
-    double curve = CLP(c.wind_speed_curve, 0.0, 1.0);
-    double bell = (1.0 - curve) * t + curve * (1.0 - fabs(2.0 * t - 1.0));
-    bell = CLP(bell, 0.1, 1.0);
-    double step_len = CLP(dist * 0.25 * bell, step_min, step_max);
+    double bell = bell_curve(t, c.wind_speed_curve);
+    double step_len = step_len_px(dist, bell, step_min, step_max);
 
     double jx = wind_.n01(wind_.rng) * jitter_s;
     double jy = wind_.n01(wind_.rng) * jitter_s;
@@ -60,35 +52,18 @@ void Aim::mv_wind(int mx, int my, double &ms) {
     double sx = grav_k * ux + wind_k * tx + jx;
     double sy = grav_k * uy + wind_k * ty + jy;
     double s_norm = HYP(sx, sy);
-    if (s_norm < 1e-6) {
-      sx = ux;
-      sy = uy;
-      s_norm = 1.0;
-    }
-    sx = sx / s_norm * step_len;
-    sy = sy / s_norm * step_len;
+    if (s_norm < 1e-6) { sx = ux; sy = uy; s_norm = 1.0; }
+    sx = sx / s_norm * step_len; sy = sy / s_norm * step_len;
 
-    if (dist < end_slow) {
-      sx -= c.wind_backtrack_k * (want.x - sx);
-      sy -= c.wind_backtrack_k * (want.y - sy);
-    }
+    if (dist < end_slow) { backtrack(sx, sy, want.x, want.y, c.wind_backtrack_k); }
 
-    int dx = (int)LR(sx);
-    int dy = (int)LR(sy);
-    if (dx == 0 && dy == 0) {
-      dx = (want.x > 0) ? 1 : ((want.x < 0) ? -1 : 0);
-      dy = (want.y > 0) ? 1 : ((want.y < 0) ? -1 : 0);
-      if (dx == 0 && dy == 0)
-        break;
-    }
+    int dx = (int)LR(sx), dy = (int)LR(sy);
+    minstep(dx, dy, want.x, want.y); if (dx == 0 && dy == 0) break;
 
     mouse.Move(dx, dy);
-    want.x -= dx;
-    want.y -= dy;
+    want.x -= dx; want.y -= dy;
     sent += HYP((double)dx, (double)dy);
-    ++steps;
-    if (sent >= out_lim)
-      break;
+    ++steps; if (sent >= out_lim) break;
   }
 
   if (c.wind_target_noise_enable) {

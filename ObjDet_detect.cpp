@@ -29,11 +29,11 @@ void ObjDet::detect_view(unsigned char *data,
     if (res.num > 0 && res.boxes.size() == (size_t)res.num){
       for (int i=0;i<res.num;++i){
         float score = (i < (int)res.scores.size()? res.scores[i] : 0.0f);
-        if (score < cfg.conf_thresh) continue;
+        if (!accept_det(score, cfg.conf_thresh)) continue;
         int cls = (i < (int)res.classes.size()? res.classes[i] : -1);
         const auto &b = res.boxes[i];
-        R r = rect_from_box_clamped(b, width, height);
-        if (r.width>0 && r.height>0) out.emplace_back(Detection{r, score, cls});
+        auto det = make_det(b, width, height, score, cls);
+        if (det.box.width>0 && det.box.height>0) out.emplace_back(det);
       }
     }
   };

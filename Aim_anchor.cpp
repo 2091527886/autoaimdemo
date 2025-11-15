@@ -6,53 +6,20 @@ double Aim::anch(double h) {
   if (!c.aim_dyn_anchor)
     return c.y_anchor_ratio;
   double near_h = c.dist_near_h, far_h = c.dist_far_h, hys = c.aim_hys_h;
-  auto upd_seg = [&](int seg, double hh) {
-    if (seg == 2) {
-      if (hh < near_h - hys)
-        seg = 1;
-    } else if (seg == 0) {
-      if (hh > far_h + hys)
-        seg = 1;
-    } else {
-      if (hh >= near_h)
-        seg = 2;
-      else if (hh <= far_h)
-        seg = 0;
-    }
-    return seg;
-  };
-  last_seg_ = upd_seg(last_seg_, h);
+  last_seg_ = upd_seg(last_seg_, h, near_h, far_h, hys);
   return (last_seg_ == 2) ? c.y_anchor_head : c.y_anchor_body;
 }
 
 double Aim::anch_read(double h) const {
   if (!c.aim_dyn_anchor) return c.y_anchor_ratio;
   double near_h = c.dist_near_h, far_h = c.dist_far_h, hys = c.aim_hys_h;
-  int seg = last_seg_;
-  if (seg == 2) { if (h < near_h - hys) seg = 1; }
-  else if (seg == 0) { if (h > far_h + hys) seg = 1; }
-  else {
-    if (h >= near_h) seg = 2;
-    else if (h <= far_h) seg = 0;
-  }
+  int seg = upd_seg(last_seg_, h, near_h, far_h, hys);
   return (seg == 2) ? c.y_anchor_head : c.y_anchor_body;
 }
 
 void Aim::set_seg(double h) {
   double near_h = c.dist_near_h, far_h = c.dist_far_h, hys = c.dist_hys_h;
-  int seg = last_seg_;
-  if (seg == 2) {
-    if (h < near_h - hys)
-      seg = 1;
-  } else if (seg == 0) {
-    if (h > far_h + hys)
-      seg = 1;
-  } else {
-    if (h >= near_h)
-      seg = 2;
-    else if (h <= far_h)
-      seg = 0;
-  }
+  int seg = upd_seg(last_seg_, h, near_h, far_h, hys);
   last_seg_ = seg;
   auto setp = [&](double kx, double ky, double tc, double lim) { algo.setParams(kx, ky, tc, lim); };
   if (!c.curve_interp) {
@@ -64,7 +31,6 @@ void Aim::set_seg(double h) {
       setp(c.seg_far_kx, c.seg_far_ky, c.seg_far_tc_ms, c.seg_far_lim);
   } else {
     double m = (far_h + near_h) * 0.5;
-    auto lerp = [&](double a, double b, double t) { return a + (b - a) * t; };
     if (h <= m) {
       double t = (h - far_h) / MX(1e-6, (m - far_h));
       t = CLP(t, 0.0, 1.0);
