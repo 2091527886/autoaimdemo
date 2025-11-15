@@ -12,16 +12,8 @@ FpsCtl::FpsCtl(const Config &cfg) {
 
 double FpsCtl::end() {
   auto now = clk::now();
-  if (now < next_tp) {
-    std::this_thread::sleep_until(next_tp);
-    ovr = 0.0;
-    next_tp += per;
-    return tgt_ms;
-  }
+  if (now < next_tp){ std::this_thread::sleep_until(next_tp); ovr=0.0; next_tp+=per; return tgt_ms; }
   ovr = msd(now - next_tp).count();
-  while (next_tp <= now) {
-    next_tp += per;
-    ++drop;
-  }
+  while (next_tp <= now){ next_tp += per; ++drop; }
   return tgt_ms;
 }

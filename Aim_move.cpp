@@ -6,6 +6,8 @@ using P2 = cv::Point2d;
 using std::clamp;
 using std::max;
 using std::min;
+using std::hypot;
+using std::lround;
 inline double msf(tp a, tp b) { return msd(a - b).count(); }
 
 void Aim::mv(int mx, int my, double &ms) {
@@ -24,22 +26,15 @@ void Aim::mv_wind(int mx, int my, double &ms) {
   want.y += wind_.residual.y;
 
   double seg_scale = 1.0;
-  if (c.wind_use_seg_scale) {
-    if (last_seg_ == 2)
-      seg_scale = c.wind_near_scale;
-    else if (last_seg_ == 1)
-      seg_scale = c.wind_mid_scale;
-    else
-      seg_scale = c.wind_far_scale;
-  }
-  double step_min = std::max(0.0, c.wind_step_min_px * seg_scale);
-  double step_max = std::max(step_min, c.wind_step_max_px * seg_scale);
+  if (c.wind_use_seg_scale){ seg_scale = (last_seg_==2? c.wind_near_scale : (last_seg_==1? c.wind_mid_scale : c.wind_far_scale)); }
+  double step_min = max(0.0, c.wind_step_min_px * seg_scale);
+  double step_max = max(step_min, c.wind_step_max_px * seg_scale);
   double wind_k = c.wind_wind_k * seg_scale;
   double grav_k = c.wind_gravity_k * seg_scale;
   double jitter_s = c.wind_jitter_std_px * seg_scale;
-  double end_slow = std::max(0.0, c.wind_end_slow_px * seg_scale);
-  double out_lim = std::max(0.0, c.wind_out_limit_px);
-  double dead_px = std::max(0.0, c.wind_dead_px * seg_scale);
+  double end_slow = max(0.0, c.wind_end_slow_px * seg_scale);
+  double out_lim = max(0.0, c.wind_out_limit_px);
+  double dead_px = max(0.0, c.wind_dead_px * seg_scale);
 
   auto budget_end = tn() + std::chrono::duration_cast<clk::duration>(msd(max(0.0, c.wind_time_budget_ms)));
   int steps = 0;
@@ -50,7 +45,7 @@ void Aim::mv_wind(int mx, int my, double &ms) {
     auto now = tn();
     if (now >= budget_end)
       break;
-    double dist = std::hypot(want.x, want.y);
+    double dist = hypot(want.x, want.y);
     if (dist <= dead_px)
       break;
 
@@ -58,18 +53,18 @@ void Aim::mv_wind(int mx, int my, double &ms) {
     double uy = (dist > 1e-6) ? (want.y / dist) : 0.0;
     double tx = -uy, ty = ux;
 
-    double t = std::clamp(1.0 - dist / std::max(1.0, end_slow * 4.0), 0.0, 1.0);
-    double curve = std::clamp(c.wind_speed_curve, 0.0, 1.0);
-    double bell = (1.0 - curve) * t + curve * (1.0 - std::abs(2.0 * t - 1.0));
-    bell = std::clamp(bell, 0.1, 1.0);
-    double step_len = std::clamp(dist * 0.25 * bell, step_min, step_max);
+    double t = clamp(1.0 - dist / max(1.0, end_slow * 4.0), 0.0, 1.0);
+    double curve = clamp(c.wind_speed_curve, 0.0, 1.0);
+    double bell = (1.0 - curve) * t + curve * (1.0 - fabs(2.0 * t - 1.0));
+    bell = clamp(bell, 0.1, 1.0);
+    double step_len = clamp(dist * 0.25 * bell, step_min, step_max);
 
     double jx = wind_.n01(wind_.rng) * jitter_s;
     double jy = wind_.n01(wind_.rng) * jitter_s;
 
     double sx = grav_k * ux + wind_k * tx + jx;
     double sy = grav_k * uy + wind_k * ty + jy;
-    double s_norm = std::hypot(sx, sy);
+    double s_norm = hypot(sx, sy);
     if (s_norm < 1e-6) {
       sx = ux;
       sy = uy;
@@ -83,8 +78,8 @@ void Aim::mv_wind(int mx, int my, double &ms) {
       sy -= c.wind_backtrack_k * (want.y - sy);
     }
 
-    int dx = (int)std::lround(sx);
-    int dy = (int)std::lround(sy);
+    int dx = (int)lround(sx);
+    int dy = (int)lround(sy);
     if (dx == 0 && dy == 0) {
       dx = (want.x > 0) ? 1 : ((want.x < 0) ? -1 : 0);
       dy = (want.y > 0) ? 1 : ((want.y < 0) ? -1 : 0);
@@ -95,16 +90,16 @@ void Aim::mv_wind(int mx, int my, double &ms) {
     mouse.Move(dx, dy);
     want.x -= dx;
     want.y -= dy;
-    sent += std::hypot((double)dx, (double)dy);
+    sent += hypot((double)dx, (double)dy);
     ++steps;
     if (sent >= out_lim)
       break;
   }
 
   if (c.wind_target_noise_enable) {
-    if (std::hypot(want.x, want.y) <= dead_px && c.wind_target_noise_px > 0.0) {
-      int ndx = (int)std::lround(wind_.n01(wind_.rng) * c.wind_target_noise_px * 0.5);
-      int ndy = (int)std::lround(wind_.n01(wind_.rng) * c.wind_target_noise_px * 0.5);
+    if (hypot(want.x, want.y) <= dead_px && c.wind_target_noise_px > 0.0) {
+      int ndx = (int)lround(wind_.n01(wind_.rng) * c.wind_target_noise_px * 0.5);
+      int ndy = (int)lround(wind_.n01(wind_.rng) * c.wind_target_noise_px * 0.5);
       if (ndx || ndy)
         mouse.Move(ndx, ndy);
     }

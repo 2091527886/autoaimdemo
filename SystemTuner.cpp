@@ -7,8 +7,7 @@ void SetProcPrioHigh() {
 }
 
 void SetThreadPrioHighest() {
-  BOOL ok = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
-  lg::ok_or_werr(P_B, "ThreadPrio(HIGHEST)", ok);
+  BOOL ok = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST); lg::ok_or_werr(P_B, "ThreadPrio(HIGHEST)", ok);
 }
 
 void SetThreadMemPrioNormal(bool log) {
@@ -33,8 +32,7 @@ void disablePowerThrottle(bool log) {
   pState.ControlMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
   pState.StateMask = 0;
   {
-    BOOL ok = SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling, &pState, sizeof(pState));
-    lg::ok_or_werr_if(log, P_B, "ProcPowerThrottling=OFF", ok);
+    BOOL ok = SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling, &pState, sizeof(pState)); lg::ok_or_werr_if(log, P_B, "ProcPowerThrottling=OFF", ok);
   }
 
   THREAD_POWER_THROTTLING_STATE tState = {};
@@ -42,13 +40,11 @@ void disablePowerThrottle(bool log) {
   tState.ControlMask = THREAD_POWER_THROTTLING_EXECUTION_SPEED;
   tState.StateMask = 0;
   {
-    BOOL ok = SetThreadInformation(GetCurrentThread(), ThreadPowerThrottling, &tState, sizeof(tState));
-    lg::ok_or_werr_if(log, P_B, "ThreadPowerThrottling=OFF", ok);
+    BOOL ok = SetThreadInformation(GetCurrentThread(), ThreadPowerThrottling, &tState, sizeof(tState)); lg::ok_or_werr_if(log, P_B, "ThreadPowerThrottling=OFF", ok);
   }
 
   {
-    BOOL ok = SetThreadPriorityBoost(GetCurrentThread(), FALSE);
-    lg::ok_or_werr_if(log, P_B, "ThreadPriorityBoost(FALSE)", ok);
+    BOOL ok = SetThreadPriorityBoost(GetCurrentThread(), FALSE); lg::ok_or_werr_if(log, P_B, "ThreadPriorityBoost(FALSE)", ok);
   }
 }
 

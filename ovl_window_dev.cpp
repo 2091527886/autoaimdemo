@@ -65,10 +65,10 @@ bool Game_overlay::Impl::CreateWindowAndDevices() {
   ComPtr<IDXGIDevice1> dxgiDev1; d3d.As(&dxgiDev1); if (dxgiDev1 && max_latency>0) dxgiDev1->SetMaximumFrameLatency((UINT)std::min(std::max(1, max_latency), 3));
 
   if (FAILED(DCompositionCreateDevice(dxgiDev.Get(), IID_PPV_ARGS(&dcompDevice)))) { lg::werr(P_E, "DCompositionCreateDevice"); return false; }
-  if (FAILED(dcompDevice->CreateTargetForHwnd(hwnd, TRUE, &dcompTarget))) { lg::werr(P_E, "CreateTargetForHwnd"); return false; }
-  if (FAILED(dcompDevice->CreateVisual(&dcompRoot))) { lg::werr(P_E, "CreateVisual"); return false; }
-  if (FAILED(dcompRoot->SetContent(swapChain.Get()))) { lg::werr(P_E, "SetContent"); return false; }
-  if (FAILED(dcompTarget->SetRoot(dcompRoot.Get()))) { lg::werr(P_E, "SetRoot"); return false; }
+  if (FAILED(dcompDevice->CreateTargetForHwnd(hwnd, TRUE, &dcompTarget))){ lg::werr(P_E, "CreateTargetForHwnd"); return false; }
+  if (FAILED(dcompDevice->CreateVisual(&dcompRoot))){ lg::werr(P_E, "CreateVisual"); return false; }
+  if (FAILED(dcompRoot->SetContent(swapChain.Get()))){ lg::werr(P_E, "SetContent"); return false; }
+  if (FAILED(dcompTarget->SetRoot(dcompRoot.Get()))){ lg::werr(P_E, "SetRoot"); return false; }
   dcompDevice->Commit();
 
   if (FAILED(CreateTargets())) { lg::werr(P_E, "CreateTargets"); return false; }
@@ -77,7 +77,7 @@ bool Game_overlay::Impl::CreateWindowAndDevices() {
   d2dCtx->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
   d2dCtx->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
 
-  if (FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown **>(dwFactory.GetAddressOf())))) { lg::werr(P_E, "DWriteCreateFactory"); return false; }
+  if (FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown **>(dwFactory.GetAddressOf())))){ lg::werr(P_E, "DWriteCreateFactory"); return false; }
 
   std::atomic_store_explicit(&current, std::make_shared<DrawList>(), std::memory_order_release);
 

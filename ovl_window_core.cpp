@@ -34,15 +34,7 @@ LRESULT CALLBACK Game_overlay::Impl::WndProc(HWND hWnd, UINT msg, WPARAM wParam,
   case WM_NCHITTEST: return HTTRANSPARENT;
   case WM_MOUSEACTIVATE: return MA_NOACTIVATE;
   case WM_SIZE:
-    if (self && self->swapChain) {
-      UINT w = LOWORD(lParam), h = HIWORD(lParam);
-      if (w > 0 && h > 0) {
-        self->ReleaseTargets();
-        self->swapChain->ResizeBuffers(0, w, h, DXGI_FORMAT_UNKNOWN, 0);
-        self->CreateTargets();
-        if (self->dcompDevice) self->dcompDevice->Commit();
-      }
-    }
+    if (self && self->swapChain){ UINT w=LOWORD(lParam), h=HIWORD(lParam); if(w>0 && h>0){ self->ReleaseTargets(); self->swapChain->ResizeBuffers(0,w,h,DXGI_FORMAT_UNKNOWN,0); self->CreateTargets(); if(self->dcompDevice) self->dcompDevice->Commit(); } }
     break;
   case WM_DESTROY:
     PostQuitMessage(0);

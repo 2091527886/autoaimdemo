@@ -13,11 +13,7 @@ BOOL WINAPI CtrlHandler(DWORD type) {
     case CTRL_LOGOFF_EVENT:
     case CTRL_SHUTDOWN_EVENT:
         g_exit_req.store(true, std::memory_order_relaxed);
-        // wait up to ~2s for graceful exit
-        for (int i = 0; i < 200; ++i) { // ~2s
-            if (g_exit_done.load(std::memory_order_relaxed)) return TRUE;
-            Sleep(10);
-        }
+        for (int i=0;i<200;++i){ if (g_exit_done.load(std::memory_order_relaxed)) return TRUE; Sleep(10);} // ~2s
         return FALSE; // not finished in time -> let system terminate
     default:
         return FALSE;

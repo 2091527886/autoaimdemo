@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <algorithm>
+#include <cmath>
 #include <opencv2/core.hpp>
 
 inline void trim_str(std::string& s){

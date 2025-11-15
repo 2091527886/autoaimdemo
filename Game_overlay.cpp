@@ -28,27 +28,6 @@ void Game_overlay::BeginFrame() { impl_->BeginFrame(); }
 void Game_overlay::EndFrame() { impl_->EndFrame(); }
 void Game_overlay::Tick() { impl_->RenderOne(); }
 
-void Game_overlay::AddRect(const OverlayRect &r, OverlayColor c, float t) {
-  DrawCmd cmd{};
-  cmd.type = DrawCmd::Rect;
-  cmd.color = c;
-  cmd.thickness = t;
-  cmd.rect = r;
-  impl_->AddCmd(cmd);
-}
-void Game_overlay::FillRect(const OverlayRect &r, OverlayColor c) {
-  DrawCmd cmd{};
-  cmd.type = DrawCmd::RectFilled;
-  cmd.color = c;
-  cmd.rect = r;
-  impl_->AddCmd(cmd);
-}
-void Game_overlay::AddText(float x, float y, const std::wstring &text, float sizePx, OverlayColor c, const std::wstring &font) {
-  DrawCmd cmd{};
-  cmd.type = DrawCmd::Text;
-  cmd.color = c;
-  cmd.text = text;
-  cmd.textPos = {x, y, sizePx};
-  cmd.fontName = font;
-  impl_->AddCmd(cmd);
-}
+void Game_overlay::AddRect(const OverlayRect &r, OverlayColor c, float t){ DrawCmd cmd{}; cmd.type=DrawCmd::Rect; cmd.color=c; cmd.thickness=t; cmd.rect=r; impl_->AddCmd(cmd); }
+void Game_overlay::FillRect(const OverlayRect &r, OverlayColor c){ DrawCmd cmd{}; cmd.type=DrawCmd::RectFilled; cmd.color=c; cmd.rect=r; impl_->AddCmd(cmd); }
+void Game_overlay::AddText(float x,float y,const std::wstring &text,float sizePx,OverlayColor c,const std::wstring &font){ DrawCmd cmd{}; cmd.type=DrawCmd::Text; cmd.color=c; cmd.text=text; cmd.textPos={x,y,sizePx}; cmd.fontName=font; impl_->AddCmd(cmd); }

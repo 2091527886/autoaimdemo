@@ -14,9 +14,7 @@ HRESULT Game_overlay::Impl::CreateTargets(){
   if(!d2dCtx){ if(FAILED(d2dDevice->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &d2dCtx))){ lg::werr(P_E, "CreateDeviceContext"); return E_FAIL; } }
   d2dCtx->SetUnitMode(D2D1_UNIT_MODE_PIXELS); d2dCtx->SetDpi(96.f,96.f);
   ComPtr<IDXGISurface> surf; if(FAILED(bb.As(&surf))){ lg::werr(P_E, "As(IdxgiSurface)"); return E_FAIL; }
-  D2D1_BITMAP_PROPERTIES1 props = D2D1::BitmapProperties1(
-    D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-    D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), 96.f, 96.f);
+  D2D1_BITMAP_PROPERTIES1 props = D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_TARGET|D2D1_BITMAP_OPTIONS_CANNOT_DRAW, D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), 96.f, 96.f);
   if(FAILED(d2dCtx->CreateBitmapFromDxgiSurface(surf.Get(), &props, &d2dTarget))){ lg::werr(P_E, "CreateBitmapFromDxgiSurface"); return E_FAIL; }
   d2dCtx->SetTarget(d2dTarget.Get());
   return S_OK;

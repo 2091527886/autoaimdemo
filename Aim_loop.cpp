@@ -29,8 +29,7 @@ void Aim::loop() {
     double ovl_ms = 0.0;
     fl.det_ms = c.timing ? (tm.infer_ms + tm.post_ms) : 0.0;
 
-    bool smooth_pressed = hk.SmoothPressed();
-    bool single = hk.SingleShotJustPressed();
+    bool smooth_pressed = hk.SmoothPressed(), single = hk.SingleShotJustPressed();
 
     auto tctl0 = (c.timing ? tn() : tp{});
     double ctl_cost_ms = 0.0;
@@ -49,14 +48,7 @@ void Aim::loop() {
         }
 
         // compute aim point and lock rect for overlay (no side-effect)
-        {
-          cv::Point2f ap = aim_no_pred(*target);
-          aim_pt_.x = ap.x;
-          aim_pt_.y = ap.y;
-          aim_ok_ = true;
-          lock_rect_ = { (float)(crop.x + target->box.x), (float)(crop.y + target->box.y), (float)target->box.width, (float)target->box.height };
-          lock_ = smooth_pressed || single;
-        }
+        { auto ap = aim_no_pred(*target); aim_pt_.x = ap.x; aim_pt_.y = ap.y; aim_ok_ = true; lock_rect_ = {(float)(crop.x + target->box.x), (float)(crop.y + target->box.y), (float)target->box.width, (float)target->box.height}; lock_ = smooth_pressed || single; }
 
         // compute dt once per frame for control
         double dt = get_dt();
@@ -64,20 +56,14 @@ void Aim::loop() {
         if (single) {
           bool use_pred = c.aim_single_use_pred;
           auto [dx, dy] = pred_err(*target, dt, use_pred);
-          int mx = (int)(dx * mfac);
-          int my = (int)(dy * mfac);
-          mv(mx, my, mou_cost_ms);
+          int mx = (int)(dx * mfac), my = (int)(dy * mfac); mv(mx, my, mou_cost_ms);
         } else if (smooth_pressed) {
           double h = (double)target->box.height;
           set_seg(h);
           auto [ex, ey] = pred_err(*target, dt, true);
           auto pr = algo.step(ex, ey, dt);
-          int mx = (int)(pr.first * mfac);
-          int my = (int)(pr.second * mfac);
-          if (!c.wind_enable)
-            mv(mx, my, mou_cost_ms);
-          else
-            mv_wind(mx, my, mou_cost_ms);
+          int mx = (int)(pr.first * mfac), my = (int)(pr.second * mfac);
+          if (!c.wind_enable) mv(mx, my, mou_cost_ms); else mv_wind(mx, my, mou_cost_ms);
         }
       }
     }
