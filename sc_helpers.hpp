@@ -14,3 +14,20 @@ inline bool map_stage(ID3D11DeviceContext* ctx, ID3D11Texture2D* stage0, ScreenC
   view.data = static_cast<unsigned char*>(mr.pData);
   view.pitch = mr.RowPitch; view.mapped = true; return true;
 }
+
+// Copy src->dst (with optional region and flush), then map dst into view; accumulate cp/mp
+inline bool cpmp(ID3D11DeviceContext* ctx,
+                 ID3D11Texture2D* dst,
+                 ID3D11Texture2D* src,
+                 const D3D11_BOX* region,
+                 ScreenCapturer::CapturedView& view,
+                 bool do_tim,
+                 double& cp,
+                 double& mp,
+                 bool flush_after_copy){
+  TSTART(t_copy_s, do_tim);
+  ctx->CopySubresourceRegion(dst, 0, 0, 0, 0, src, 0, region);
+  TELAPSE(cp, do_tim, t_copy_s);
+  if(flush_after_copy) ctx->Flush();
+  return map_stage(ctx, dst, view, do_tim, mp);
+}

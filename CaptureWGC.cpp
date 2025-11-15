@@ -102,17 +102,7 @@ bool ScreenCapturer::cap_wgc_view(ScreenCapturer::CapturedView &view, const cv::
 
         D3D11_BOX src = box_from_rect(crop_region);
 
-        auto copy_and_map = [&](ID3D11Texture2D *srcTex)->bool{
-          TSTART(t_copy_s, do_tim);
-          ctx->CopySubresourceRegion(stage[0], 0, 0, 0, 0, srcTex, 0, &src);
-          TELAPSE(cp, do_tim, t_copy_s);
-          if (cfg.capture_flush_after_copy) ctx->Flush();
-
-          if(!map_stage(ctx, stage[0], view, do_tim, mp)) return false;
-          return true;
-        };
-
-        if (!copy_and_map(tex.get())) {
+        if (!cpmp(ctx, stage[0], tex.get(), &src, view, do_tim, cp, mp, cfg.capture_flush_after_copy)) {
           view.aq_sum += aq;
           view.cp_sum += cp;
           view.mp_sum += mp;

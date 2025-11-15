@@ -2,10 +2,6 @@
 #include "pch.hpp"
 #include "sh.hpp"
 
-using std::clamp;
-using std::max;
-using std::min;
-
 double Aim::anch(double h) {
   if (!c.aim_dyn_anchor)
     return c.y_anchor_ratio;
@@ -70,13 +66,13 @@ void Aim::set_seg(double h) {
     double m = (far_h + near_h) * 0.5;
     auto lerp = [&](double a, double b, double t) { return a + (b - a) * t; };
     if (h <= m) {
-      double t = (h - far_h) / std::max(1e-6, (m - far_h));
-      t = std::clamp(t, 0.0, 1.0);
+      double t = (h - far_h) / MX(1e-6, (m - far_h));
+      t = CLP(t, 0.0, 1.0);
       setp(lerp(c.seg_far_kx, c.seg_mid_kx, t), lerp(c.seg_far_ky, c.seg_mid_ky, t),
            lerp(c.seg_far_tc_ms, c.seg_mid_tc_ms, t), lerp(c.seg_far_lim, c.seg_mid_lim, t));
     } else {
-      double t = (h - m) / std::max(1e-6, (near_h - m));
-      t = std::clamp(t, 0.0, 1.0);
+      double t = (h - m) / MX(1e-6, (near_h - m));
+      t = CLP(t, 0.0, 1.0);
       setp(lerp(c.seg_mid_kx, c.seg_near_kx, t), lerp(c.seg_mid_ky, c.seg_near_ky, t),
            lerp(c.seg_mid_tc_ms, c.seg_near_tc_ms, t), lerp(c.seg_mid_lim, c.seg_near_lim, t));
     }

@@ -2,10 +2,6 @@
 #include "pch.hpp"
 #include "sh.hpp"
 
-using std::clamp;
-using std::max;
-using std::min;
-
 #include "CtrlHandler.hpp"
 #include "target_pick.hpp"
 
@@ -69,7 +65,7 @@ void Aim::loop() {
     ctl_cost_ms = c.timing ? msd(tctl1 - tctl0).count() : 0.0;
 
     fl.mou_ms = mou_cost_ms;
-    fl.ctl_ms = std::max(0.0, ctl_cost_ms - mou_cost_ms);
+    fl.ctl_ms = MX(0.0, ctl_cost_ms - mou_cost_ms);
 
     draw_ovl(ovl_ms);
     fl.ovl_ms = ovl_ms;

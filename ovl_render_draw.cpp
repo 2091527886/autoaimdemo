@@ -10,11 +10,11 @@ void Game_overlay::Impl::RenderOne(){
   d2dCtx->Clear(D2D1::ColorF(0.f,0.f,0.f,0.f));
   D2D1_MATRIX_3X2_F __oldM; if(small_window){ d2dCtx->GetTransform(&__oldM); d2dCtx->SetTransform(D2D1::Matrix3x2F::Translation((float)-winX,(float)-winY)); }
   if(dl){ for(const auto& c : dl->cmds){ switch(c.type){
-    case DrawCmd::Rect: brush->SetColor(ToD2DColor(c.color)); d2dCtx->DrawRectangle(D2D1::RectF(c.rect.x, c.rect.y, c.rect.x+c.rect.w, c.rect.y+c.rect.h), brush.Get(), c.thickness); break;
-    case DrawCmd::RectFilled: brush->SetColor(ToD2DColor(c.color)); d2dCtx->FillRectangle(D2D1::RectF(c.rect.x, c.rect.y, c.rect.x+c.rect.w, c.rect.y+c.rect.h), brush.Get()); break;
+    case DrawCmd::Rect: brush->SetColor(C(c.color)); d2dCtx->DrawRectangle(RF(c.rect.x, c.rect.y, c.rect.w, c.rect.h), brush.Get(), c.thickness); break;
+    case DrawCmd::RectFilled: brush->SetColor(C(c.color)); d2dCtx->FillRectangle(RF(c.rect.x, c.rect.y, c.rect.w, c.rect.h), brush.Get()); break;
     case DrawCmd::Text: {
-      brush->SetColor(ToD2DColor(c.color)); ComPtr<IDWriteTextFormat> fmt; if(SUCCEEDED(CreateTextFormat(c.fontName.empty()?L"Segoe UI":c.fontName, c.textPos.size, &fmt))){
-        D2D1_RECT_F layout=D2D1::RectF(c.textPos.x,c.textPos.y,c.textPos.x+4000.f,c.textPos.y+1200.f);
+      brush->SetColor(C(c.color)); ComPtr<IDWriteTextFormat> fmt; if(SUCCEEDED(CreateTextFormat(c.fontName.empty()?L"Segoe UI":c.fontName, c.textPos.size, &fmt))){
+        D2D1_RECT_F layout=RF(c.textPos.x,c.textPos.y,4000.f,1200.f);
         d2dCtx->DrawTextW(c.text.c_str(), (UINT32)c.text.size(), fmt.Get(), layout, brush.Get());
       } } break; }
     }

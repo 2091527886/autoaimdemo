@@ -7,7 +7,7 @@ Aim::Aim()
   if (cap.w() < c.crop_size_px || cap.h() < c.crop_size_px) {
     throw std::runtime_error("Screen resolution is smaller than configured crop_size_px.");
   }
-  mfac = (c.hfov_deg / static_cast<double>(cap.w())) * (c.px_per_360 / 360.0);
+  mfac = (c.hfov_deg / (double)cap.w()) * (c.px_per_360 / 360.0);
   LO << "Detect center " << c.crop_size_px << "x" << c.crop_size_px << END;
   algo.setConfig(c);
   if (c.wind_rng_seed > 0) {

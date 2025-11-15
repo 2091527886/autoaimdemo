@@ -44,6 +44,8 @@
 #define HRF lg::hrfail
 // Check HRESULT and run onfail block if FAILED(hr)
 #define HR_CHK(hr, TAG, API, ONFAIL) do{ if(FAILED(hr)){ HRF(TAG, API, hr); ONFAIL; } }while(0)
+// Short return-on-fail helper
+#define HR_RET(hr, TAG, API, RET) do{ if(FAILED(hr)){ HRF(TAG, API, hr); return RET; } }while(0)
 
 namespace lg {
     inline std::ostream& o() noexcept { return std::cout; }

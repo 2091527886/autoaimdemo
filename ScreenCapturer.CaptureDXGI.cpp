@@ -59,17 +59,7 @@ bool ScreenCapturer::cap_dxgi_view(ScreenCapturer::CapturedView &view, const cv:
 
     D3D11_BOX sourceRegion = box_from_rect(crop_region);
 
-    auto copy_and_map = [&](ID3D11Texture2D *srcTex)->bool{
-      TSTART(t_copy_s, do_tim);
-      ctx->CopySubresourceRegion(stage[0], 0, 0, 0, 0, srcTex, 0, &sourceRegion);
-      TELAPSE(cp, do_tim, t_copy_s);
-      if (cfg.capture_flush_after_copy) ctx->Flush();
-
-      if(!map_stage(ctx, stage[0], view, do_tim, mp)) return false;
-      return true;
-    };
-
-    bool ok_copy = copy_and_map(pAcquiredDesktopImage);
+    bool ok_copy = cpmp(ctx, stage[0], pAcquiredDesktopImage, &sourceRegion, view, do_tim, cp, mp, cfg.capture_flush_after_copy);
 
     SafeRelease(&pAcquiredDesktopImage);
     dup->ReleaseFrame();

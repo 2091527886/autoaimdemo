@@ -42,7 +42,7 @@ bool Game_overlay::Impl::CreateWindowAndDevices() {
       if (FAILED(hr)) { lg::hrfail(P_E, "D3D11CreateDevice(pick)", hr); }
       else {
         DXGI_ADAPTER_DESC1 d{}; pick->GetDesc1(&d); std::wstring n(d.Description);
-        LO << P_I "OVL use GPU: " << ([](const std::wstring &ws){ int len = WideCharToMultiByte(CP_UTF8,0,ws.c_str(),(int)ws.size(),nullptr,0,nullptr,nullptr); std::string out; out.resize(std::max(0,len)); if(len>0) WideCharToMultiByte(CP_UTF8,0,ws.c_str(),(int)ws.size(),out.data(),len,nullptr,nullptr); return out; })(n) << END;
+        LO << P_I "OVL use GPU: " << w2u(n) << END;
       }
     }
     if (FAILED(hr)) {

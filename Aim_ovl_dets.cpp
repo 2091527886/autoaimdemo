@@ -23,7 +23,7 @@ void Aim::draw_ovl(double &ms) {
     auto col = ARGB((uint8_t)c.ovl_a, (uint8_t)rr, (uint8_t)gg, (uint8_t)bb);
     gover.AddRect({x, y, w, h}, col, (float)c.ovl_thick);
     float fsz = (float)std::max(1, c.ovl_font_px);
-    float ty = std::max(0.0f, y - fsz - 2.0f);
+    float ty = MX(0.0f, y - fsz - 2.0f);
     std::string lbl = c.name_or_id(cid);
     std::wstring wlbl(lbl.begin(), lbl.end());
     if (!wlbl.empty()) {
