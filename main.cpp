@@ -37,7 +37,7 @@ int main() {
         g_exit_done.store(true, std::memory_order_relaxed);
         return -1;
     }
-    lg::o() << lg::nl << P_I "Done" << lg::endl;
+    LO << lg::nl << P_I "Done" << END;
     g_exit_done.store(true, std::memory_order_relaxed);
     return 0;
 }

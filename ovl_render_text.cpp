@@ -1,4 +1,5 @@
 #include "ovl_impl.hpp"
+using std::lround;
 HRESULT Game_overlay::Impl::CreateTextFormat(const std::wstring& font,float size,IDWriteTextFormat** out){
   uint64_t key = (std::hash<std::wstring>{}(font) ^ (uint64_t(std::lround(size*100))<<1));
   auto it=textFormatCache.find(key); if(it!=textFormatCache.end()){ *out=it->second.Get(); (*out)->AddRef(); return S_OK; }

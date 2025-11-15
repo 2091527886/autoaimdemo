@@ -34,6 +34,17 @@
 // Conditional logging wrapper: LOG_IF(cond, stream_expr)
 #define LOG_IF(cond, expr) do { if (cond) { expr; } } while(0)
 
+// Short stream starters to reduce boilerplate in sources
+#define LO lg::o()
+#define LE lg::e()
+#define LWO lg::wo()
+#define END lg::endl
+
+// HRESULT helpers aliases
+#define HRF lg::hrfail
+// Check HRESULT and run onfail block if FAILED(hr)
+#define HR_CHK(hr, TAG, API, ONFAIL) do{ if(FAILED(hr)){ HRF(TAG, API, hr); ONFAIL; } }while(0)
+
 namespace lg {
     inline std::ostream& o() noexcept { return std::cout; }
     inline std::ostream& e() noexcept { return std::cerr; }

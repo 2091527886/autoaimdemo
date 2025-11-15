@@ -42,14 +42,14 @@ bool Game_overlay::Impl::CreateWindowAndDevices() {
       if (FAILED(hr)) { lg::hrfail(P_E, "D3D11CreateDevice(pick)", hr); }
       else {
         DXGI_ADAPTER_DESC1 d{}; pick->GetDesc1(&d); std::wstring n(d.Description);
-        lg::o() << P_I "OVL use GPU: " << ([](const std::wstring &ws){ int len = WideCharToMultiByte(CP_UTF8,0,ws.c_str(),(int)ws.size(),nullptr,0,nullptr,nullptr); std::string out; out.resize(std::max(0,len)); if(len>0) WideCharToMultiByte(CP_UTF8,0,ws.c_str(),(int)ws.size(),out.data(),len,nullptr,nullptr); return out; })(n) << lg::endl;
+        LO << P_I "OVL use GPU: " << ([](const std::wstring &ws){ int len = WideCharToMultiByte(CP_UTF8,0,ws.c_str(),(int)ws.size(),nullptr,0,nullptr,nullptr); std::string out; out.resize(std::max(0,len)); if(len>0) WideCharToMultiByte(CP_UTF8,0,ws.c_str(),(int)ws.size(),out.data(),len,nullptr,nullptr); return out; })(n) << END;
       }
     }
     if (FAILED(hr)) {
       hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, flags, fls, _countof(fls), D3D11_SDK_VERSION, &d3d, &flOut, &d3dCtx);
     }
   }
-  if (FAILED(hr)) { lg::hrfail(P_E, "D3D11CreateDevice", hr); return false; }
+  HR_CHK(hr, P_E, "D3D11CreateDevice", return false; );
 
   ComPtr<IDXGIDevice> dxgiDev; d3d.As(&dxgiDev);
   ComPtr<IDXGIAdapter> adapter; dxgiDev->GetAdapter(&adapter);
@@ -57,7 +57,7 @@ bool Game_overlay::Impl::CreateWindowAndDevices() {
 
   DXGI_SWAP_CHAIN_DESC1 scd{}; scd.Width=winW; scd.Height=winH; scd.Format=DXGI_FORMAT_B8G8R8A8_UNORM; scd.SampleDesc.Count=1; scd.BufferUsage=DXGI_USAGE_RENDER_TARGET_OUTPUT; scd.BufferCount=3; scd.SwapEffect=DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL; scd.AlphaMode=DXGI_ALPHA_MODE_PREMULTIPLIED; scd.Scaling=DXGI_SCALING_STRETCH; scd.Flags=0;
   HRESULT hr_sc = factory2->CreateSwapChainForComposition(d3d.Get(), &scd, nullptr, &swapChain);
-  if (FAILED(hr_sc)) { lg::hrfail(P_E, "CreateSwapChainForComposition", hr_sc); return false; }
+  HR_CHK(hr_sc, P_E, "CreateSwapChainForComposition", return false; );
 
   ComPtr<IDXGIDevice1> dxgiDev1; d3d.As(&dxgiDev1); if (dxgiDev1 && max_latency>0) dxgiDev1->SetMaximumFrameLatency((UINT)std::min(std::max(1, max_latency), 3));
 
@@ -82,7 +82,7 @@ bool Game_overlay::Impl::CreateWindowAndDevices() {
 }
 
 void Game_overlay::Impl::DestroyWindowAndDevices() {
-  lg::o() << P_I "Overlay.Destroy" << lg::endl;
+  LO << P_I "Overlay.Destroy" << END;
   ReleaseTargets();
   brush.Reset(); d2dCtx.Reset(); d2dDevice.Reset(); d2dFactory.Reset();
   rtv.Reset(); swapChain.Reset();

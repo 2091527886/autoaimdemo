@@ -17,17 +17,17 @@ ScreenCapturer::ScreenCapturer(const Config &cfg_ref, int crop_width, int crop_h
     throw std::runtime_error("Failed to enumerate adapters.");
 
   if (cfg.cap_enum) {
-    lg::o() << P_C "Adapters:" << lg::endl;
+    LO << P_C "Adapters:" << END;
     for (UINT i = 0;; ++i) {
       IDXGIAdapter1 *a = nullptr;
       if (fac->EnumAdapters1(i, &a) != S_OK)
         break;
       DXGI_ADAPTER_DESC1 d;
       a->GetDesc1(&d);
-      lg::o() << P_C "[" << i << "]" << lg::endl;
+      LO << P_C "[" << i << "]" << END;
       a->Release();
     }
-    lg::o() << P_C "Outputs on adapter " << aidx << ":" << lg::endl;
+    LO << P_C "Outputs on adapter " << aidx << ":" << END;
     for (UINT i = 0;; ++i) {
       IDXGIOutput *o = nullptr;
       if (adp->EnumOutputs(i, &o) != S_OK)
@@ -35,7 +35,7 @@ ScreenCapturer::ScreenCapturer(const Config &cfg_ref, int crop_width, int crop_h
       DXGI_OUTPUT_DESC od;
       o->GetDesc(&od);
       RECT r = od.DesktopCoordinates;
-      lg::o() << P_C "[" << i << "] " << r.right - r.left << "x" << r.bottom - r.top << lg::endl;
+      LO << P_C "[" << i << "] " << r.right - r.left << "x" << r.bottom - r.top << END;
       o->Release();
     }
   }
@@ -76,6 +76,6 @@ ScreenCapturer::ScreenCapturer(const Config &cfg_ref, int crop_width, int crop_h
       throw std::runtime_error("Failed to create staging texture[" + std::to_string(i) + "]");
   }
 
-  LOG_IF(cfg.log_init_verbose, lg::o() << P_C "Ready " << (useWgc ? "WGC " : "DDA ") << width << "x" << height << ", staging=" << kStageN << lg::endl);
+  LOG_IF(cfg.log_init_verbose, LO << P_C "Ready " << (useWgc ? "WGC " : "DDA ") << width << "x" << height << ", staging=" << kStageN << END);
   reporter.BootBanner(kStageN);
 }

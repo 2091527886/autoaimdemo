@@ -1,12 +1,5 @@
 #include "ObjDet.hpp"
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable : 4251)
-#endif
-#include <trtyolo.hpp>
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
+#include "trtyolo_inc.hpp"
 #include "Config.hpp"
 #include "objdet_helpers.hpp"
 using trtyolo::DetectModel;
@@ -15,7 +8,7 @@ using trtyolo::InferOption;
 ObjDet::ObjDet(const Config &cfg)
     : perf_(cfg) {
   const std::string engine = cfg.resolve_engine_path();
-  lg::o() << P_I "Load TRT: " << engine << lg::endl;
+  LO << P_I "Load TRT: " << engine << END;
 
   InferOption opt;
   if (cfg.trt_swap_rb)
@@ -41,15 +34,15 @@ ObjDet::ObjDet(const Config &cfg)
   {
     char cwd_buffer[MAX_PATH];
     if (GetCurrentDirectoryA(MAX_PATH, cwd_buffer)) {
-      lg::o() << P_D "cwd: " << cwd_buffer << lg::endl;
+      LO << P_D "cwd: " << cwd_buffer << END;
     }
     DWORD attrs = GetFileAttributesA(engine.c_str());
     if (attrs == INVALID_FILE_ATTRIBUTES) {
-      lg::e() << P_E "Engine not found: '" << engine << "'" << lg::endl;
+      LE << P_E "Engine not found: '" << engine << "'" << END;
     } else if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
-      lg::e() << P_E "Engine is dir: '" << engine << "'" << lg::endl;
+      LE << P_E "Engine is dir: '" << engine << "'" << END;
     } else {
-      lg::o() << P_D "Engine found: '" << engine << "'" << lg::endl;
+      LO << P_D "Engine found: '" << engine << "'" << END;
     }
   }
 
@@ -80,16 +73,16 @@ ObjDet::ObjDet(const Config &cfg)
   opt_ref.setLetterboxBlockXY(final_bx, final_by);
   opt_ref.setLetterboxLaunchBounds(final_use_lb, final_minb);
   opt_ref.enableLetterboxOccupancy(final_use_occ);
-  lg::o() << P_I "Letterbox kernel config: block_x=" << final_bx
+  LO << P_I "Letterbox kernel config: block_x=" << final_bx
           << ", block_y=" << final_by
           << ", min_blocks_per_sm=" << final_minb
           << ", use_launch_bounds=" << (final_use_lb ? "1" : "0")
           << ", use_occupancy=" << (final_use_occ ? "1" : "0")
-          << lg::endl;
+          << END;
 
   try {
     model_ = std::make_unique<DetectModel>(engine.c_str(), opt);
-    lg::o() << P_I "Engine OK" << lg::endl;
+    LO << P_I "Engine OK" << END;
   } catch (const std::exception &e) {
     std::ostringstream oss;
     oss << P_F "DetectModel failed: '" << engine << "'\nerr: " << e.what();

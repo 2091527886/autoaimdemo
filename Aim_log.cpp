@@ -6,7 +6,7 @@ void Aim::log_lat(FrameLat& fl) {
     lat.push(fl);
     ++fcnt;
     int n = std::max(1, c.log_latency_every_n);
-    if (fcnt % (size_t)n == 0){ size_t drop_now = fc.drop - drop_prev; lg::o() << lg::fx2 << P_L "[fps] " << "drop=" << drop_now << " | ovr=" << fc.ovr << "ms" << lg::endl << lg::df; drop_prev = fc.drop; }
+    if (fcnt % (size_t)n == 0){ size_t drop_now = fc.drop - drop_prev; LO << lg::fx2 << P_L "[fps] " << "drop=" << drop_now << " | ovr=" << fc.ovr << "ms" << END << lg::df; drop_prev = fc.drop; }
 }
 
 void Aim::trt_log() {

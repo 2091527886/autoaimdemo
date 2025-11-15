@@ -4,14 +4,8 @@
 #include "sh.hpp"
 #include "objdet_helpers.hpp"
 
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable : 4251)
-#endif
-#include <trtyolo.hpp>
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
+#include "trtyolo_inc.hpp"
+using R = cv::Rect;
 
 void objdet_perf(trtyolo::DetectModel* model,
                  metrics::TrtPerfReporting& perf,
@@ -19,8 +13,8 @@ void objdet_perf(trtyolo::DetectModel* model,
                  bool perf_report,
                  Timing& tm);
 
-using trtyolo::DetectRes;
-using trtyolo::Image;
+using DR = trtyolo::DetectRes;
+using Img = trtyolo::Image;
 
 void ObjDet::detect_view(unsigned char *data,
                          int width,
@@ -38,7 +32,7 @@ void ObjDet::detect_view(unsigned char *data,
         if (score < cfg.conf_thresh) continue;
         int cls = (i < (int)res.classes.size()? res.classes[i] : -1);
         const auto &b = res.boxes[i];
-        cv::Rect r = rect_from_box_clamped(b, width, height);
+        R r = rect_from_box_clamped(b, width, height);
         if (r.width>0 && r.height>0) out.emplace_back(Detection{r, score, cls});
       }
     }
@@ -46,8 +40,8 @@ void ObjDet::detect_view(unsigned char *data,
 
   if (cfg.timing) {
     auto t0 = tn();
-    Image input(data, width, height, pitch);
-    DetectRes res = model_->predict(input);
+    Img input(data, width, height, pitch);
+    DR res = model_->predict(input);
     auto t1 = tn();
     tm.infer_ms = msd(t1 - t0).count();
     auto t2 = tn();
@@ -55,8 +49,8 @@ void ObjDet::detect_view(unsigned char *data,
     auto t3 = tn();
     tm.post_ms = msd(t3 - t2).count();
   } else {
-    Image input(data, width, height, pitch);
-    DetectRes res = model_->predict(input);
+    Img input(data, width, height, pitch);
+    DR res = model_->predict(input);
     fill(res);
     tm.infer_ms = 0.0;
     tm.post_ms = 0.0;

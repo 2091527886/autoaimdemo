@@ -7,6 +7,6 @@ bool ScreenCapturer::init_dxgi() {
   }
   HRESULT hr = out1->DuplicateOutput(dev, &dup);
   if (FAILED(hr)){ lg::hrfail(P_C, "DuplicateOutput", hr); throw std::runtime_error("Failed to create output duplication."); }
-  else { lg::o() << P_C "DuplicateOutput OK" << lg::endl; }
+  else { LO << P_C "DuplicateOutput OK" << END; }
   return true;
 }

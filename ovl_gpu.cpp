@@ -19,8 +19,7 @@ static bool parse_luid(const wstring &s, LUID &out){ size_t p=s.find(L':'); if (
 static vector<GpuInfo> list_adapters() {
   std::vector<GpuInfo> v;
   ComPtr<IDXGIFactory1> fac;
-  if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&fac))))
-    return v;
+  HR_CHK(CreateDXGIFactory1(IID_PPV_ARGS(&fac)), P_E, "CreateDXGIFactory1", return {}; );
   for (UINT i=0;; ++i){ ComPtr<IDXGIAdapter1> a; DXGI_ADAPTER_DESC1 d{}; if (fac->EnumAdapters1(i, &a) == DXGI_ERROR_NOT_FOUND) break; if (!a) break; if (FAILED(a->GetDesc1(&d))) continue; if (d.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) continue; v.push_back({a,d,(int)i}); }
   return v;
 }
@@ -29,13 +28,13 @@ static void log_adapters(const vector<GpuInfo> &v) {
   for (auto &g : v) {
     wstring name(g.desc.Description);
     double mb = (double)g.desc.DedicatedVideoMemory / (1024.0 * 1024.0);
-    lg::o() << P_I "OVL GPU[" << g.idx << "] "
+    LO << P_I "OVL GPU[" << g.idx << "] "
             << ws_to_utf8(name)
             << " | ven=0x" << std::hex << std::uppercase << g.desc.VendorId
             << " dev=0x" << g.desc.DeviceId << std::dec << std::nouppercase
             << " | memMB=" << (int)mb
             << " | luid=" << g.desc.AdapterLuid.HighPart << ":" << g.desc.AdapterLuid.LowPart
-            << lg::endl;
+            << END;
   }
 }
 

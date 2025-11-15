@@ -7,7 +7,7 @@ using T = Send::SendType;
 using M = Send::MoveMode;
 
 Mouse::Mouse() {
-  lg::o() << P_M "Init driver" << lg::endl;
+  LO << P_M "Init driver" << END;
   dll_ = LoadLibrary(L"IbInputSimulator.dll");
   if(!dll_) throw std::runtime_error(P_M "Load IbInputSimulator.dll failed");
 
@@ -18,11 +18,11 @@ Mouse::Mouse() {
   if(!init_ || !destroy_ || !move_){ FreeLibrary(dll_); dll_=nullptr; throw std::runtime_error(P_M "Required functions not found in IbInputSimulator.dll"); }
   E error = init_(T::Logitech, static_cast<Send::InitFlags>(0), nullptr);
   if (error != E::Success){ FreeLibrary(dll_); dll_=nullptr; throw std::runtime_error(P_M "Init failed: " + std::to_string((int)error)); }
-  lg::o() << P_M "Driver OK" << lg::endl;
+  LO << P_M "Driver OK" << END;
 }
 
 Mouse::~Mouse() {
-  if (dll_){ if (destroy_) destroy_(); FreeLibrary(dll_); lg::o() << P_M "Driver bye" << lg::endl; }
+  if (dll_){ if (destroy_) destroy_(); FreeLibrary(dll_); LO << P_M "Driver bye" << END; }
 }
 
 void Mouse::Move(int dx, int dy) {
