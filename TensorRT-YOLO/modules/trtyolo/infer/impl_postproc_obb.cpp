@@ -11,15 +11,11 @@ OBBRes BaseModel::Impl::postProcessOBB(int idx) {
     auto& affine_transform = pick_affine(backend_->infer_config, backend_->affine_transforms, idx);
 
     for (int i = 0; i < p.num; ++i) {
-        int   base_index = i * p.box_size;
-        float left = p.boxes[base_index], top = p.boxes[base_index + 1];
-        float right = p.boxes[base_index + 2], bottom = p.boxes[base_index + 3];
+        int base_index = i * p.box_size;
+        TRTYOLO_EXTRACT_LTRB(p, base_index, left, top, right, bottom);
         float theta = p.boxes[base_index + 4];
-        affine_transform.applyTransform(left, top, &left, &top);
-        affine_transform.applyTransform(right, bottom, &right, &bottom);
-        result.boxes.emplace_back(RotatedBox{left, top, right, bottom, theta});
-        result.scores.push_back(p.scores[i]);
-        result.classes.push_back(p.classes[i]);
+        TRTYOLO_AFFINE4(affine_transform, left, top, right, bottom);
+        TRTYOLO_PUSH_OBB(result, p, i, left, top, right, bottom, theta);
     }
 
     return result;

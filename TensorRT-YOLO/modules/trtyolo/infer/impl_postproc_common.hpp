@@ -38,4 +38,28 @@ static inline PostprocPtrs get_ptrs(const std::vector<TensorInfo>& tins, int idx
     return p;
 }
 
+// 公共宏：提取、变换并写入结果，尽量减少每个实现文件的重复行
+#define TRTYOLO_EXTRACT_LTRB(P, BASE, L, T, R, B) \
+    float L = (P).boxes[(BASE)]; \
+    float T = (P).boxes[(BASE) + 1]; \
+    float R = (P).boxes[(BASE) + 2]; \
+    float B = (P).boxes[(BASE) + 3];
+
+#define TRTYOLO_AFFINE4(AFF, L, T, R, B) do{ \
+    (AFF).applyTransform((L), (T), &(L), &(T)); \
+    (AFF).applyTransform((R), (B), &(R), &(B)); \
+}while(0)
+
+#define TRTYOLO_PUSH_DET(RES, P, I, L, T, R, B) do{ \
+    (RES).boxes.emplace_back(Box{(L),(T),(R),(B)}); \
+    (RES).scores.push_back((P).scores[(I)]); \
+    (RES).classes.push_back((P).classes[(I)]); \
+}while(0)
+
+#define TRTYOLO_PUSH_OBB(RES, P, I, L, T, R, B, THETA) do{ \
+    (RES).boxes.emplace_back(RotatedBox{(L),(T),(R),(B),(THETA)}); \
+    (RES).scores.push_back((P).scores[(I)]); \
+    (RES).classes.push_back((P).classes[(I)]); \
+}while(0)
+
 } // namespace trtyolo

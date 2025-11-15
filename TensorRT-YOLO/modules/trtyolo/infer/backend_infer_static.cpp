@@ -1,9 +1,8 @@
 #include "infer/backend.hpp"
 #include "letterbox.hpp"
 #include "core/core.hpp"
-#include <cstring>
-#include <cstdint>
-#include <stdexcept>
+#include "infer/backend_utils.hpp"
+#include "infer/pch_infer.hpp"
 
 namespace trtyolo {
 
@@ -32,50 +31,34 @@ void TrtBackend::staticInfer(const std::vector<Image>& inputs) {
                 cuda_graph_.updateKernelNodeParams(idx, kernelParams);
             }
         } else {
-            for (int idx = 0; idx < num; ++idx) {
-                uint8_t* dst = static_cast<uint8_t*>(inputs_buffer_->host()) + idx * input_image_bytes_;
-                const uint8_t* src = static_cast<const uint8_t*>(inputs[idx].ptr);
-                size_t row_bytes = input_row_bytes_;
-                for (int r = 0; r < infer_config.input_shape->x; ++r) {
-                    std::memcpy(dst + r * row_bytes, src + r * inputs[idx].pitch, row_bytes);
-                }
-            }
+            copy_fixed_to_staging(inputs_buffer_.get(), inputs, input_image_bytes_, input_row_bytes_, infer_config);
         }
     } else {
         if (!infer_config.cuda_mem) {
             int              total_size = 0;
-            std::vector<int> input_sizes(num);
-            for (int idx = 0; idx < num; ++idx) {
-                input_sizes[idx]  = inputs[idx].height * inputs[idx].pitch;
-                total_size       += input_sizes[idx];
-            }
+            std::vector<int> input_sizes;
+            compute_sizes_and_affines(inputs, max_shape, input_sizes, total_size, affine_transforms);
             inputs_buffer_->allocate(total_size);
             uint8_t* input_ptr = static_cast<uint8_t*>(inputs_buffer_->host());
             for (int idx = 0; idx < num; ++idx) {
                 std::memcpy(input_ptr, inputs[idx].ptr, input_sizes[idx]);
                 input_ptr += input_sizes[idx];
             }
-            if (buffer_type_ == BufferType::Discrete) {
-                cuda_graph_.updateMemcpyNodeParams(0, inputs_buffer_->host(), inputs_buffer_->device(), total_size);
-            }
+            update_memcpy_node_if_needed(cuda_graph_, 0, inputs_buffer_->host(), inputs_buffer_->device(), total_size, buffer_type_);
         }
 
         uint8_t* input_ptr = !infer_config.cuda_mem ? static_cast<uint8_t*>(inputs_buffer_->device()) : nullptr;
         for (int idx = 0; idx < num; ++idx) {
             affine_transforms[idx].updateParams(inputs[idx].width, inputs[idx].height, max_shape.w, max_shape.z);
             void* infer_device_ptr = static_cast<void*>(static_cast<uint16_t*>(tensor_infos.front().buffer->device()) + idx * infer_size_);
-            void* kernelParams[] = {
-                infer_config.cuda_mem ? (void*)&inputs[idx].ptr : (void*)&input_ptr,
-                (void*)&inputs[idx].width,
-                (void*)&inputs[idx].height,
-                (void*)&inputs[idx].pitch,
-                (void*)&infer_device_ptr,
-                (void*)&max_shape.w,
-                (void*)&max_shape.z,
-                (void*)&affine_transforms[idx],
-                (void*)&infer_config.config};
             int node_idx = (infer_config.cuda_mem || buffer_type_ != BufferType::Discrete) ? idx : idx + 1;
-            cuda_graph_.updateKernelNodeParams(node_idx, kernelParams);
+            const void* src_ptr = infer_config.cuda_mem ? inputs[idx].ptr : input_ptr;
+            update_kernel_params_single(cuda_graph_, node_idx,
+                                       src_ptr,
+                                       inputs[idx].width, inputs[idx].height, inputs[idx].pitch,
+                                       infer_device_ptr,
+                                       max_shape.w, max_shape.z,
+                                       &affine_transforms[idx], &infer_config.config);
             if (!infer_config.cuda_mem) {
                 input_ptr += inputs[idx].height * inputs[idx].pitch;
             }

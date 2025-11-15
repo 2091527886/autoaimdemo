@@ -2,6 +2,7 @@
 #include "utils/common.hpp"
 #include "core/core.hpp"
 #include "letterbox.hpp"
+#include "infer/backend_utils.hpp"
 #include <cstdint>
 #include <utility>
 
@@ -19,14 +20,13 @@ void TrtBackend::captureCudaGraph() {
         CHECK(cudaStreamSynchronize(stream));
     }
 
-    // Lambda: Calculate input size and device pointers
-    auto calculate_input_size_and_device = [&](int idx, int input_width, int input_height) {
+    // Lambda: Calculate input size and device pointer (only need dst base; src pointer differs per path)
+    auto calc_src_offset = [&](int idx, int input_width, int input_height) {
         size_t input_size = (infer_config.input_shape.has_value() && !infer_config.cuda_mem)
                                 ? input_image_bytes_
                                 : static_cast<size_t>(input_height) * input_width * max_shape.y;
         void*  input_device = static_cast<uint8_t*>(inputs_buffer_->device()) + idx * input_size;
-        void*  infer_device = static_cast<void*>(static_cast<uint16_t*>(tensor_infos.front().buffer->device()) + idx * infer_size_);
-        return std::make_pair(input_device, infer_device);
+        return input_device;
     };
 
     // Lambda: Perform WarpAffine operation
@@ -49,18 +49,12 @@ void TrtBackend::captureCudaGraph() {
                 stream);
         } else {
             for (int idx = 0; idx < max_shape.x; ++idx) {
-                auto [input_device, infer_device] = calculate_input_size_and_device(idx, input_width, input_height);
-                cudaLetterboxHalf(
-                    input_device,
-                    input_width,
-                    input_height,
-                    src_pitch,
-                    infer_device,
-                    max_shape.w,
-                    max_shape.z,
-                    affine_transforms[idx],
-                    infer_config.config,
-                    stream);
+                void* input_device = calc_src_offset(idx, input_width, input_height);
+                launch_letterbox_idx(input_device, input_width, input_height, src_pitch,
+                                     tensor_infos.front().buffer->device(),
+                                     max_shape.w, max_shape.z,
+                                     infer_size_, idx,
+                                     affine_transforms[idx], infer_config.config, stream);
             }
         }
     };

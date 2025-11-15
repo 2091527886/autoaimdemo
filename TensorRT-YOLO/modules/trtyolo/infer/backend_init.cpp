@@ -2,9 +2,7 @@
 #include "utils/common.hpp"
 #include "core/core.hpp"
 #include "letterbox.hpp"
-#include <algorithm>
-#include <cstring>
-#include <cstdint>
+#include "infer/pch_infer.hpp"
 
 namespace trtyolo {
 

@@ -1,5 +1,5 @@
 #include "infer/trtyolo.hpp"
-#include <stdexcept>
+#include "infer/pch_infer.hpp"
 #include "utils/common.hpp"
 
 namespace trtyolo {
