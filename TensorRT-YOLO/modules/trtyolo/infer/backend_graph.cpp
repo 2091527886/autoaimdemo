@@ -1,5 +1,7 @@
 #include "infer/backend.hpp"
 #include "utils/common.hpp"
+#include "core/core.hpp"
+#include "letterbox.hpp"
 #include <cstdint>
 #include <utility>
 
@@ -12,7 +14,7 @@ void TrtBackend::captureCudaGraph() {
             manager_->setTensorAddress(tensor_info.name.c_str(), tensor_info.buffer->device());
         }
         if (!manager_->enqueueV3(stream)) {
-            throw std::runtime_error("captureCudaGraph: EnqueueV3 failed before graph creation.");
+            throw std::runtime_error("graph pre err");
         }
         CHECK(cudaStreamSynchronize(stream));
     }
@@ -80,7 +82,7 @@ void TrtBackend::captureCudaGraph() {
 
     // Step 4: Enqueue inference
     if (!manager_->enqueueV3(stream)) {
-        throw std::runtime_error("captureCudaGraph: EnqueueV3 failed when graph creation.");
+        throw std::runtime_error("graph build err");
     }
 
     // Step 5: Copy output tensors to host if required

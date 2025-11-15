@@ -10,17 +10,24 @@
 
 #pragma once
 
-#include <NvInferRuntime.h>
-
 #include <memory>
 #include <string>
 #include <vector>
+#include <cuda_runtime_api.h>
 
-#include "core/buffer.hpp"
-#include "core/core.hpp"
-#include "trtyolo.hpp"
-#include "utils/common.hpp"
-#include "letterbox.hpp"
+#include "core/buffer.hpp" // TensorInfo, BufferType
+#include "core/core.hpp"   // CudaGraph
+#include "letterbox.hpp"   // LetterboxTransform
+#include "types.hpp"       // Image
+#include "utils/common.hpp"// InferConfig
+
+namespace trtyolo {
+// forward declarations to reduce header weight
+struct InferConfig;
+struct Image;
+class TRTManager;
+class BaseBuffer;
+} // namespace trtyolo
 
 namespace trtyolo {
 

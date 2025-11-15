@@ -1,4 +1,6 @@
 #include "infer/backend.hpp"
+#include "letterbox.hpp"
+#include "core/core.hpp"
 #include <cstring>
 #include <cstdint>
 #include <stdexcept>
@@ -10,7 +12,7 @@ void TrtBackend::dynamicInfer(const std::vector<Image>& inputs) {
 
     // validate
     if (num < min_shape.x || num > max_shape.x) {
-        throw std::invalid_argument("Number of inputs out of range");
+        throw std::invalid_argument("bad n");
     }
 
     // update shapes and addresses
@@ -101,7 +103,7 @@ void TrtBackend::dynamicInfer(const std::vector<Image>& inputs) {
 
     // enqueue
     if (!manager_->enqueueV3(stream)) {
-        throw std::runtime_error("Infer Error.");
+        throw std::runtime_error("infer err");
     }
 
     // d2h

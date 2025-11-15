@@ -1,4 +1,6 @@
 #include "infer/backend.hpp"
+#include "letterbox.hpp"
+#include "core/core.hpp"
 #include <cstring>
 #include <cstdint>
 #include <stdexcept>

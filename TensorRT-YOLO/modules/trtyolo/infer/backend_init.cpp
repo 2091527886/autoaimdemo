@@ -1,5 +1,7 @@
 #include "infer/backend.hpp"
 #include "utils/common.hpp"
+#include "core/core.hpp"
+#include "letterbox.hpp"
 #include <algorithm>
 #include <cstring>
 #include <cstdint>
