@@ -1,6 +1,7 @@
 #include "ovl_impl.hpp"
 #include "ovl_gpu.hpp"
 #include "ovl_util.hpp"
+#include "sh.hpp"
 bool Game_overlay::Impl::CreateWindowAndDevices() {
   if (small_window) {
     useVirtual = false;
@@ -39,7 +40,7 @@ bool Game_overlay::Impl::CreateWindowAndDevices() {
     ComPtr<IDXGIAdapter1> pick = pick_adapter_cfg(gpu_name, gpu_luid, gpu_idx, gpu_enum);
     if (pick) {
       hr = D3D11CreateDevice(pick.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, flags, fls, _countof(fls), D3D11_SDK_VERSION, &d3d, &flOut, &d3dCtx);
-      if (FAILED(hr)) { lg::hrfail(P_E, "D3D11CreateDevice(pick)", hr); }
+      if(FAILED(hr)){ lg::hrfail(P_E, "D3D11CreateDevice(pick)", hr); }
       else {
         DXGI_ADAPTER_DESC1 d{}; pick->GetDesc1(&d); std::wstring n(d.Description);
         LO << P_I "OVL use GPU: " << w2u(n) << END;
@@ -59,7 +60,7 @@ bool Game_overlay::Impl::CreateWindowAndDevices() {
   HRESULT hr_sc = factory2->CreateSwapChainForComposition(d3d.Get(), &scd, nullptr, &swapChain);
   HR_CHK(hr_sc, P_E, "CreateSwapChainForComposition", return false; );
 
-  ComPtr<IDXGIDevice1> dxgiDev1; d3d.As(&dxgiDev1); if (dxgiDev1 && max_latency>0) dxgiDev1->SetMaximumFrameLatency((UINT)std::min(std::max(1, max_latency), 3));
+  ComPtr<IDXGIDevice1> dxgiDev1; d3d.As(&dxgiDev1); if (dxgiDev1 && max_latency>0) dxgiDev1->SetMaximumFrameLatency((UINT)MN(MX(1, max_latency), 3));
 
   if (FAILED(DCompositionCreateDevice(dxgiDev.Get(), IID_PPV_ARGS(&dcompDevice)))) { lg::werr(P_E, "DCompositionCreateDevice"); return false; }
   if (FAILED(dcompDevice->CreateTargetForHwnd(hwnd, TRUE, &dcompTarget))){ lg::werr(P_E, "CreateTargetForHwnd"); return false; }

@@ -1,11 +1,12 @@
 #include "Aim.hpp"
 #include "Log.hpp"
+#include "sh.hpp"
 
 void Aim::log_lat(FrameLat& fl) {
     if (!(c.timing && c.log_latency)) return;
     lat.push(fl);
     ++fcnt;
-    int n = std::max(1, c.log_latency_every_n);
+    int n = MX(1, c.log_latency_every_n);
     if (fcnt % (size_t)n == 0){ size_t drop_now = fc.drop - drop_prev; LO << lg::fx2 << P_L "[fps] " << "drop=" << drop_now << " | ovr=" << fc.ovr << "ms" << END << lg::df; drop_prev = fc.drop; }
 }
 

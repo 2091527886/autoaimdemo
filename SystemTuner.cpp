@@ -1,4 +1,5 @@
 #include "SystemTuner.hpp"
+#include "sh.hpp"
 void SetProcPrioHigh() {
   BOOL ok = SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
   lg::ok_or_werr(P_B, "ProcPrio(HIGH)", ok);
@@ -51,17 +52,8 @@ void TuneDxgi(ID3D11Device *dev, int gpu_prio, int max_latency) {
     return;
   IDXGIDevice1 *dxgi1 = nullptr;
   HRESULT hr = dev->QueryInterface(__uuidof(IDXGIDevice1), (void **)&dxgi1);
-  if (FAILED(hr) || !dxgi1) {
-    lg::hrfail(P_E, "QueryInterface(IDXGIDevice1)", hr);
-    return;
-  }
-  hr = dxgi1->SetGPUThreadPriority(gpu_prio);
-  if (FAILED(hr)) {
-    lg::hrfail(P_E, "SetGPUThreadPriority(7)", hr);
-  }
-  hr = dxgi1->SetMaximumFrameLatency(max_latency);
-  if (FAILED(hr)) {
-    lg::hrfail(P_E, "SetMaximumFrameLatency(1)", hr);
-  }
+  if (FAILED(hr) || !dxgi1) { lg::hrfail(P_E, "QueryInterface(IDXGIDevice1)", hr); return; }
+  hr = dxgi1->SetGPUThreadPriority(gpu_prio); if (FAILED(hr)) { lg::hrfail(P_E, "SetGPUThreadPriority(7)", hr); }
+  hr = dxgi1->SetMaximumFrameLatency(max_latency); if (FAILED(hr)) { lg::hrfail(P_E, "SetMaximumFrameLatency(1)", hr); }
   dxgi1->Release();
 }

@@ -42,10 +42,12 @@
 
 // HRESULT helpers aliases
 #define HRF lg::hrfail
-// Check HRESULT and run onfail block if FAILED(hr)
-#define HR_CHK(hr, TAG, API, ONFAIL) do{ if(FAILED(hr)){ HRF(TAG, API, hr); ONFAIL; } }while(0)
-// Short return-on-fail helper
-#define HR_RET(hr, TAG, API, RET) do{ if(FAILED(hr)){ HRF(TAG, API, hr); return RET; } }while(0)
+// Check HRESULT and run onfail block if FAILED(expr)
+#define HR_CHK(expr, TAG, API, ONFAIL) do{ HRESULT __hr__ = (expr); if(FAILED(__hr__)){ HRF(TAG, API, __hr__); ONFAIL; } }while(0)
+// Return-on-fail helper (expr evaluated once)
+#define HR_RET(expr, TAG, API, RET) do{ HRESULT __hr__ = (expr); if(FAILED(__hr__)){ HRF(TAG, API, __hr__); return RET; } }while(0)
+// Throw-on-fail helper (for constructors/when throwing; expr evaluated once)
+#define HR_THROW(expr, TAG, API, EXPR) do{ HRESULT __hr__ = (expr); if(FAILED(__hr__)){ HRF(TAG, API, __hr__); EXPR; } }while(0)
 
 namespace lg {
     inline std::ostream& o() noexcept { return std::cout; }

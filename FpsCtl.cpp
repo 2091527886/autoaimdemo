@@ -1,9 +1,10 @@
 #include "FpsCtl.hpp"
+#include "sh.hpp"
 using clk = std::chrono::steady_clock;
 using msd = std::chrono::duration<double, std::milli>;
 
 FpsCtl::FpsCtl(const Config &cfg) {
-  tgt_ms = 1000.0 / std::max(1, cfg.fps);
+  tgt_ms = 1000.0 / MX(1, cfg.fps);
   per = std::chrono::duration_cast<clk::duration>(msd(tgt_ms));
   next_tp = clk::now() + per;
 }

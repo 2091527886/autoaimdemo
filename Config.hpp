@@ -1,5 +1,6 @@
 #pragma once
 #include "pch.hpp"
+#include "sh.hpp"
 #include "Log.hpp"
 #include <vector>
 #include <string>
@@ -180,38 +181,38 @@ public:
 
     void validate() {
         v_basic(); v_overlay(); v_dxgi();
-        dist_near_h = std::max(1.0, dist_near_h);
-        dist_far_h  = std::max(1.0, std::min(dist_near_h-1.0, dist_far_h));
-        dist_hys_h  = std::max(0.0, dist_hys_h);
-        aim_hys_h   = std::max(0.0, aim_hys_h);
-        pred_dt_max_ms = std::max(0.0, pred_dt_max_ms);
-        pred_v_tc_ms  = std::max(0.0, pred_v_tc_ms);
-        pred_v_lim_px = std::max(0.0, pred_v_lim_px);
+        dist_near_h = MX(1.0, dist_near_h);
+        dist_far_h  = MX(1.0, MN(dist_near_h-1.0, dist_far_h));
+        dist_hys_h  = MX(0.0, dist_hys_h);
+        aim_hys_h   = MX(0.0, aim_hys_h);
+        pred_dt_max_ms = MX(0.0, pred_dt_max_ms);
+        pred_v_tc_ms  = MX(0.0, pred_v_tc_ms);
+        pred_v_lim_px = MX(0.0, pred_v_lim_px);
         if (!(conf_thresh >= 0.0f && conf_thresh <= 1.0f)) { lg::e()<< P_E "conf_thresh out of [0,1]"<<lg::endl; }
         if (!(y_anchor_ratio >= 0.0 && y_anchor_ratio <= 1.0)) { lg::e()<< P_E "y_anchor_ratio out of [0,1]"<<lg::endl; }
     }
 private:
     void v_basic() {
-        fps = std::max(1, fps);
-        capture_timeout_ms_dxgi = std::max(0, capture_timeout_ms_dxgi);
-        cap_retry = std::max(0, cap_retry);
-        log_latency_every_n = std::max(1, log_latency_every_n);
-        capture_timing_every_n = std::max(1, capture_timing_every_n);
-        perf_report_every_n = std::max(1, perf_report_every_n);
-        opt_report_every_n = std::max(1, opt_report_every_n);
+        fps = MX(1, fps);
+        capture_timeout_ms_dxgi = MX(0, capture_timeout_ms_dxgi);
+        cap_retry = MX(0, cap_retry);
+        log_latency_every_n = MX(1, log_latency_every_n);
+        capture_timing_every_n = MX(1, capture_timing_every_n);
+        perf_report_every_n = MX(1, perf_report_every_n);
+        opt_report_every_n = MX(1, opt_report_every_n);
         cap = (cap==1)?1:0;
-        cap_out = std::max(0, cap_out);
+        cap_out = MX(0, cap_out);
         if (trt_mean.size()!=3) trt_mean = {0.f,0.f,0.f};
         if (trt_std.size()!=3)  trt_std  = {1.f,1.f,1.f};
-        lb_block_x = std::max(1, lb_block_x);
-        lb_block_y = std::max(1, lb_block_y);
-        lb_min_blocks_per_sm = std::max(1, lb_min_blocks_per_sm);
+        lb_block_x = MX(1, lb_block_x);
+        lb_block_y = MX(1, lb_block_y);
+        lb_min_blocks_per_sm = MX(1, lb_min_blocks_per_sm);
     }
     void v_overlay() {
         if (ovl_cls) { size_t n = classes.size(); pad(ovl_cr,n,ovl_r); pad(ovl_cg,n,ovl_g); pad(ovl_cb,n,ovl_b); }
-        cross_size = std::max(1, cross_size);
-        cross_th   = std::max(0.5f, cross_th);
-        lock_th    = std::max(1.0f, lock_th);
+        cross_size = MX(1, cross_size);
+        cross_th   = MX(0.5f, cross_th);
+        lock_th    = MX(1.0f, lock_th);
         auto clampc = [](int& v){ v = std::max(0, std::min(255, v)); };
         clampc(cross_a); clampc(cross_r); clampc(cross_g); clampc(cross_b);
         clampc(lock_a);  clampc(lock_r);  clampc(lock_g);  clampc(lock_b);

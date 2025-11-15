@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <opencv2/core.hpp>
+#include "sh.hpp"
 
 inline void trim_str(std::string& s){
   size_t a = s.find_first_not_of(" \t\r\n");
@@ -14,11 +15,11 @@ inline void trim_str(std::string& s){
 // From TRT DetectRes box {left,top,right,bottom} produce clamped cv::Rect within width/height
 template<typename BoxT>
 inline cv::Rect rect_from_box_clamped(const BoxT& b, int width, int height){
-  int x = std::max(0, (int)std::floor(b.left));
-  int y = std::max(0, (int)std::floor(b.top));
-  int w = std::max(0, (int)std::round(b.right - b.left));
-  int h = std::max(0, (int)std::round(b.bottom - b.top));
-  w = std::min(w, width - x);
-  h = std::min(h, height - y);
+  int x = MX(0, (int)std::floor(b.left));
+  int y = MX(0, (int)std::floor(b.top));
+  int w = MX(0, (int)std::round(b.right - b.left));
+  int h = MX(0, (int)std::round(b.bottom - b.top));
+  w = MN(w, width - x);
+  h = MN(h, height - y);
   return (w>0 && h>0) ? cv::Rect(x,y,w,h) : cv::Rect();
 }

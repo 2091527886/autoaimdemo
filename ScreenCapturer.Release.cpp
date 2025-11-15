@@ -20,7 +20,7 @@ void ScreenCapturer::dbgTick(){
   static size_t n=0;
   if(!cfg.capture_debug) return;
   n++;
-  int m=std::max(1, cfg.capture_debug_every_n);
+  int m=MX(1, cfg.capture_debug_every_n);
   if(n % (size_t)m == 0){
     LO << P_C "dbg ds=" << statSkipDirty
             << " ew=" << statCopyPend

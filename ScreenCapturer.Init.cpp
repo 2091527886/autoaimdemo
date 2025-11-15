@@ -4,17 +4,16 @@
 #include "Log.hpp"
 #include "Reporting.hpp"
 #include "SystemTuner.hpp"
+#include "sh.hpp"
 ScreenCapturer::ScreenCapturer(const Config &cfg_ref, int crop_width, int crop_height)
     : cfg(cfg_ref), reporter(cfg_ref) {
   HRESULT hr;
 
   hr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void **)&fac);
-  if (FAILED(hr))
-    throw std::runtime_error("Failed to create DXGI Factory.");
+  HR_THROW(hr, P_C, "CreateDXGIFactory1", throw std::runtime_error("Failed to create DXGI Factory."); );
 
-  UINT aidx = (cfg.cap_gpu >= 0) ? static_cast<UINT>(cfg.cap_gpu) : 0u;
-  if (FAILED(fac->EnumAdapters1(aidx, &adp)))
-    throw std::runtime_error("Failed to enumerate adapters.");
+  UINT aidx = (cfg.cap_gpu >= 0) ? (UINT)cfg.cap_gpu : 0u;
+  HR_THROW(fac->EnumAdapters1(aidx, &adp), P_C, "EnumAdapters1", throw std::runtime_error("Failed to enumerate adapters."); );
 
   if (cfg.cap_enum) {
     LO << P_C "Adapters:" << END;
@@ -40,16 +39,14 @@ ScreenCapturer::ScreenCapturer(const Config &cfg_ref, int crop_width, int crop_h
     }
   }
 
-  if (FAILED(adp->EnumOutputs(cfg.cap_out, &out)))
-    throw std::runtime_error("Failed to enumerate outputs.");
+  HR_THROW(adp->EnumOutputs(cfg.cap_out, &out), P_C, "EnumOutputs", throw std::runtime_error("Failed to enumerate outputs."); );
 
   DXGI_OUTPUT_DESC outputDesc;
   out->GetDesc(&outputDesc);
   width = outputDesc.DesktopCoordinates.right - outputDesc.DesktopCoordinates.left;
   height = outputDesc.DesktopCoordinates.bottom - outputDesc.DesktopCoordinates.top;
 
-  if (FAILED(D3D11CreateDevice(adp, D3D_DRIVER_TYPE_UNKNOWN, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &dev, nullptr, &ctx)))
-    throw std::runtime_error("Failed to create D3D11 device.");
+  HR_THROW(D3D11CreateDevice(adp, D3D_DRIVER_TYPE_UNKNOWN, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &dev, nullptr, &ctx), P_C, "D3D11CreateDevice", throw std::runtime_error("Failed to create D3D11 device."); );
   TuneDxgi(dev, cfg.dxgi_gpu_prio, cfg.dxgi_max_latency);
 
   useWgc = (cfg.cap == 1);
@@ -72,8 +69,7 @@ ScreenCapturer::ScreenCapturer(const Config &cfg_ref, int crop_width, int crop_h
 
   for (size_t i = 0; i < kStageN; ++i) {
     HRESULT hr_local = dev->CreateTexture2D(&desc, NULL, &stage[i]);
-    if (FAILED(hr_local))
-      throw std::runtime_error("Failed to create staging texture[" + std::to_string(i) + "]");
+    HR_THROW(hr_local, P_C, "CreateTexture2D", throw std::runtime_error("Failed to create staging texture[" + std::to_string(i) + "]"); );
   }
 
   LOG_IF(cfg.log_init_verbose, LO << P_C "Ready " << (useWgc ? "WGC " : "DDA ") << width << "x" << height << ", staging=" << kStageN << END);

@@ -8,6 +8,7 @@
 #include <string>
 #include <cmath>
 #include "Log.hpp"
+#include "sh.hpp"
 
 struct Timing { double infer_ms=0, post_ms=0, loop_ms=0; std::string trt_throughput, trt_cpu_lat, trt_gpu_lat; };
 
@@ -37,7 +38,7 @@ private:
     template<typename Getter>
     std::tuple<double,double,double> stat(Getter g) const{
         if(buf.empty()) return {0,0,0}; double sum=0,mn=std::numeric_limits<double>::infinity(),mx=0; 
-        for(const auto& f:buf){ double v=g(f); sum+=v; mn=std::min(mn,v); mx=std::max(mx,v);} 
+        for(const auto& f:buf){ double v=g(f); sum+=v; mn=MN(mn,v); mx=MX(mx,v);} 
         return { sum/double(buf.size()), (std::isinf(mn)?0.0:mn), mx}; }
     size_t wnd; std::vector<FrameLat> buf; };
 
