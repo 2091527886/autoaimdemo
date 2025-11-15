@@ -1,6 +1,4 @@
 #include "SystemTuner.hpp"
-#include "pch.hpp"
-
 void SetProcPrioHigh() {
   BOOL ok = SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
   lg::ok_or_werr(P_B, "ProcPrio(HIGH)", ok);

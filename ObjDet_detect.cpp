@@ -1,6 +1,4 @@
 #include "ObjDet.hpp"
-#include "pch.hpp"
-
 #include "Config.hpp"
 #include "Timing.hpp"
 #include "sh.hpp"
@@ -15,7 +13,6 @@
 #pragma warning(pop)
 #endif
 
-// perf helper
 void objdet_perf(trtyolo::DetectModel* model,
                  metrics::TrtPerfReporting& perf,
                  bool timing,

@@ -1,7 +1,5 @@
 #include "ovl_impl.hpp"
 #include "ovl_util.hpp"
-#include "pch.hpp"
-
 bool Game_overlay::Impl::Start() {
   if (running.load()) return true;
   running = true;

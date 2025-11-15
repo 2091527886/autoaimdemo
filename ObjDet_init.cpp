@@ -1,7 +1,4 @@
 #include "ObjDet.hpp"
-#include "pch.hpp"
-
-#include "Log.hpp"
 #ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable : 4251)
@@ -79,7 +76,7 @@ ObjDet::ObjDet(const Config &cfg)
       }
     }
   }
-  InferOption &opt_ref = opt; // keep logic identical
+  InferOption &opt_ref = opt;
   opt_ref.setLetterboxBlockXY(final_bx, final_by);
   opt_ref.setLetterboxLaunchBounds(final_use_lb, final_minb);
   opt_ref.enableLetterboxOccupancy(final_use_occ);

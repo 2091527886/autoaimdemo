@@ -2,8 +2,7 @@
 #include "sh.hpp"
 
 bool Aim::capture(FrameLat &fl, ScreenCapturer::CapturedView &view) {
-  double cap_ms = 0.0;
-  bool got = false;
+  double cap_ms = 0.0; bool got = false;
   if (c.timing) {
     auto t0 = tn();
     got = cap.capture_view(view, crop);

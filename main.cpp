@@ -1,12 +1,8 @@
 #include "pch.hpp"
-#include <iostream>
 #include "Log.hpp"
 #include "Config.hpp"
-#include "Timing.hpp"
 #include "SystemTuner.hpp"
 #include "Reporting.hpp"
-#include "Detection.hpp"
-
 #include "CtrlHandler.hpp"
 #include "Aim.hpp"
 
@@ -20,7 +16,7 @@ int main() {
     SetProcPrioHigh();
     SetThreadPrioHighest();
 
-    HANDLE hMmcss = nullptr; // MMCSS disabled
+    HANDLE hMmcss = nullptr;
 
    if (boot_cfg.enable_thread_mem_prio) {
        SetThreadMemPrioNormal();

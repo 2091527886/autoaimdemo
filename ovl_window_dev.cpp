@@ -1,9 +1,6 @@
 #include "ovl_impl.hpp"
 #include "ovl_gpu.hpp"
 #include "ovl_util.hpp"
-#include "Log.hpp"
-#include "pch.hpp"
-
 bool Game_overlay::Impl::CreateWindowAndDevices() {
   if (small_window) {
     useVirtual = false;

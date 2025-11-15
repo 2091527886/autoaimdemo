@@ -1,5 +1,4 @@
 #include "ScreenCapturer.hpp"
-#include "pch.hpp"
 #include "sh.hpp"
 
 bool ScreenCapturer::capture_view(ScreenCapturer::CapturedView &view, const cv::Rect &crop_region) {

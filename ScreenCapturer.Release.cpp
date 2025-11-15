@@ -2,7 +2,6 @@
 #include "ComHelpers.hpp"
 #include "Config.hpp"
 #include "Log.hpp"
-#include "pch.hpp"
 #include "sh.hpp"
 
 ScreenCapturer::~ScreenCapturer(){

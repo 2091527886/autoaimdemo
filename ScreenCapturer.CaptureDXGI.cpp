@@ -15,7 +15,7 @@ bool ScreenCapturer::cap_dxgi_view(ScreenCapturer::CapturedView &view, const cv:
   auto report_fail = [&](double aq_add){ if (do_tim && !cfg.capture_timing_on_success){ double tt = msd(tn() - view.t_total_start).count(); rpt_add(view, tt, aq_add);} };
   bool success=false, fatal=false;
   auto body = [&]() -> bool {
-    double aq=0.0, qi=0.0, cp=0.0, mp=0.0; // cv=0
+    double aq=0.0, qi=0.0, cp=0.0, mp=0.0;
 
     IDXGIResource* pDesktopResource=nullptr;
     DXGI_OUTDUPL_FRAME_INFO frameInfo{};
@@ -31,7 +31,7 @@ bool ScreenCapturer::cap_dxgi_view(ScreenCapturer::CapturedView &view, const cv:
     if (FAILED(hr)) {
       report_fail(aq);
       fatal = true;
-      return true; // fail outer
+      return true;
     }
 
     ID3D11Texture2D* pAcquiredDesktopImage=nullptr;
@@ -89,7 +89,7 @@ bool ScreenCapturer::cap_dxgi_view(ScreenCapturer::CapturedView &view, const cv:
     ++statOk;
     dbgTick();
     success = true;
-    return true; // exit loop
+    return true;
   };
   if (try_n(tries, body)) return true;
   if (fatal) return false;

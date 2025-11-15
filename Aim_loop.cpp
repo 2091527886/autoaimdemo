@@ -47,10 +47,8 @@ void Aim::loop() {
           last_tp_valid_ = false;
         }
 
-        // compute aim point and lock rect for overlay (no side-effect)
         { auto ap = aim_no_pred(*target); aim_pt_.x = ap.x; aim_pt_.y = ap.y; aim_ok_ = true; lock_rect_ = {(float)(crop.x + target->box.x), (float)(crop.y + target->box.y), (float)target->box.width, (float)target->box.height}; lock_ = smooth_pressed || single; }
 
-        // compute dt once per frame for control
         double dt = get_dt();
 
         if (single) {

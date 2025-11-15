@@ -6,7 +6,6 @@ void Aim::draw_ovl(double &ms) {
   if (!c.ovl) { ms = 0.0; return; }
   auto t0 = (c.timing ? tn() : tp{});
   gover.BeginFrame();
-  // 绘制检测框与标签（成员可直接访问私有状态）
   for (const auto &d : ds) {
     if (c.ovl_only >= 0 && d.class_id != c.ovl_only)
       continue;
@@ -33,7 +32,6 @@ void Aim::draw_ovl(double &ms) {
       else gover.AddText(x, ty, wlbl, fsz, tcol);
     }
   }
-  // 其余部分在其他拆分单元里通过显式调用
   extern void aim_draw_cross(Aim* self);
   extern void aim_draw_lock(Aim* self);
   aim_draw_cross(this);

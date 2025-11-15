@@ -1,5 +1,4 @@
 #include "Aim.hpp"
-#include "pch.hpp"
 void aim_draw_lock(Aim* self) {
   const auto& c = self->c;
   if (!self->lock_) return;
