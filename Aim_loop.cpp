@@ -25,7 +25,7 @@ void Aim::loop() {
     double ovl_ms = 0.0;
     fl.det_ms = c.timing ? (tm.infer_ms + tm.post_ms) : 0.0;
 
-    bool smooth_pressed = hk.SmoothPressed(), single = hk.SingleShotJustPressed();
+    bool smooth_pressed = hk.SmoothPressed();
 
     auto tctl0 = (c.timing ? tn() : tp{});
     double ctl_cost_ms = 0.0;
@@ -36,10 +36,9 @@ void Aim::loop() {
         on_no_target();
       } else {
         if (!smooth_pressed) { algo.reset(); last_tp_valid_ = false; }
-        { auto ap = aim_no_pred(*target); aim_pt_.x = ap.x; aim_pt_.y = ap.y; aim_ok_ = true; lock_rect_ = {(float)(crop.x + target->box.x), (float)(crop.y + target->box.y), (float)target->box.width, (float)target->box.height}; lock_ = smooth_pressed || single; }
+        { auto ap = aim_no_pred(*target); aim_pt_.x = ap.x; aim_pt_.y = ap.y; aim_ok_ = true; lock_rect_ = {(float)(crop.x + target->box.x), (float)(crop.y + target->box.y), (float)target->box.width, (float)target->box.height}; lock_ = smooth_pressed; }
         double dt = get_dt();
-        if (single) { on_single(*target, dt, mou_cost_ms); }
-        else if (smooth_pressed) { on_smooth(*target, dt, mou_cost_ms); }
+        if (smooth_pressed) { on_smooth(*target, dt, mou_cost_ms); }
       }
     }
     auto tctl1 = (c.timing ? tn() : tctl0);

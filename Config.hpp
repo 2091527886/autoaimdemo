@@ -80,8 +80,6 @@ public:
     const float conf_thresh = 0.5f;
 
     const int aim_key = VK_RBUTTON;
-    const int test_move_key = VK_F8;
-
     const double y_anchor_ratio = 0.6;
     const double px_per_360     = 3600;
     const double hfov_deg       = 85.461056;
