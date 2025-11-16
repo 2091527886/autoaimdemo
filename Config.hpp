@@ -27,6 +27,27 @@ public:
     int  fps = 60;
 public:
     std::string engine_path = "m.engine";
+
+    // Pose options (use TRT PoseModel; all performance-critical, 3060 focus)
+    bool pose_enable = true;
+    std::string pose_engine_path = "spose.engine"; // your provided engine name
+    bool pose_trt_swap_rb = true;
+    bool pose_trt_use_normalize = false;
+    std::vector<float> pose_trt_mean {0.f,0.f,0.f};
+    std::vector<float> pose_trt_std  {1.f,1.f,1.f};
+    bool pose_trt_cuda_mem = false;
+    bool pose_trt_managed_mem = false;
+    int  pose_trt_input_w = 640;
+    int  pose_trt_input_h = 640;
+    bool pose_full_view = true;        // true: full-view pose once per frame; false: crop-topK pose
+    float pose_match_iou_thresh = 0.2f; // IoU threshold to match pose box to det box
+    float pose_kpt_conf_thresh = 0.1f; // kpt conf threshold
+    bool  pose_aim_pref_nose = true;   // true: aim nose first, then chest; false: chest first
+    int   pose_run_topk = 1;           // run pose for top-K candidates per frame
+    int   pose_min_box_px = 12;        // skip very small boxes for pose
+    bool  pose_prior_center = true;     // prioritize nearer to center
+    double pose_center_lambda = 0.002;  // center bias factor in ranking (score - lambda*dist)
+    int    pose_center_radius_px = 0;    // >0: prefer within radius (0 = disable)
     std::string resolve_engine_path() const { return engine_path; }
 
     bool trt_swap_rb = true;
@@ -48,7 +69,7 @@ public:
     int  trt_input_h = 0;
 
     const int   crop_size_px = 640;
-    const float conf_thresh = 0.7f;
+    const float conf_thresh = 0.5f;
 
     const int aim_key = VK_RBUTTON;
     const int test_move_key = VK_F8;

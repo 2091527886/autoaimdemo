@@ -20,7 +20,7 @@ struct IDWriteFactory; struct IDWriteTextFormat; struct IDCompositionDevice; str
 #include <wrl/client.h>
 using Microsoft::WRL::ComPtr;
 
-struct DrawCmd{ enum Type{Rect,RectFilled,Text} type; OverlayColor color=0; float thickness=1.0f; union{ OverlayRect rect; struct{float x,y,size;} textPos; }; std::wstring text; std::wstring fontName; };
+struct DrawCmd{ enum Type{Rect,RectFilled,Text,Line} type; OverlayColor color=0; float thickness=1.0f; union{ OverlayRect rect; struct{float x1,y1,x2,y2;} line; struct{float x,y,size;} textPos; }; std::wstring text; std::wstring fontName; };
 struct DrawList{ std::vector<DrawCmd> cmds; };
 
 class Config;

@@ -1,4 +1,21 @@
 #pragma once
+#include "pch.hpp"
+
+inline float box_iou(const cv::Rect& a, const cv::Rect& b){
+    int x1 = std::max(a.x, b.x);
+    int y1 = std::max(a.y, b.y);
+    int x2 = std::min(a.x + a.width,  b.x + b.width);
+    int y2 = std::min(a.y + a.height, b.y + b.height);
+    int w = std::max(0, x2 - x1);
+    int h = std::max(0, y2 - y1);
+    int inter = w * h;
+    int ua = a.width * a.height;
+    int ub = b.width * b.height;
+    int uni = ua + ub - inter;
+    if (uni <= 0) return 0.0f;
+    return (float)inter / (float)uni;
+}
+
 #include <string>
 #include <algorithm>
 #include <cmath>

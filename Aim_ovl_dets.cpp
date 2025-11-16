@@ -7,7 +7,7 @@ void Aim::draw_ovl(double &ms) {
   if (!c.ovl) { ms = 0.0; return; }
   auto t0 = (c.timing ? tn() : tp{});
   gover.BeginFrame();
-  for (const auto &d : ds) {
+  for (size_t i=0;i<ds.size();++i) { const auto &d = ds[i];
     if (c.ovl_only >= 0 && d.class_id != c.ovl_only)
       continue;
     float x = (float)(crop.x + d.box.x);
@@ -31,6 +31,28 @@ void Aim::draw_ovl(double &ms) {
       OverlayColor tcol = ARGB(255, (uint8_t)rr, (uint8_t)gg, (uint8_t)bb);
       if (!c.ovl_font_name.empty()) gover.AddText(x, ty, wlbl, fsz, tcol, c.ovl_font_name);
       else gover.AddText(x, ty, wlbl, fsz, tcol);
+    }
+
+    // draw pose keypoints and skeleton lines (COCO-17 fixed edges)
+    if (i < pose_ok.size() && i < pose_kpts.size() && pose_ok[i]){
+      const auto& k = pose_kpts[i];
+      OverlayColor pcol = ARGB(220, 0, 255, 255);
+      auto vis = [&](int id){ return id<(int)k.size() && (!k[id].conf || *k[id].conf >= c.pose_kpt_conf_thresh); };
+      auto kp  = [&](int id){ return std::pair<float,float>((float)(crop.x + k[id].x), (float)(crop.y + k[id].y)); };
+      auto line = [&](int a,int b){ if (vis(a)&&vis(b)){ auto pa=kp(a), pb=kp(b); gover.AddLine(pa.first, pa.second, pb.first, pb.second, (float)c.ovl_thick, pcol); }};
+
+      // draw points
+      for (size_t ki=0; ki<k.size(); ++ki){
+        if (k[ki].conf && *k[ki].conf < c.pose_kpt_conf_thresh) continue;
+        float px = (float)(crop.x + k[ki].x) - 1.5f;
+        float py = (float)(crop.y + k[ki].y) - 1.5f;
+        gover.FillRect({px, py, 3.0f, 3.0f}, pcol);
+      }
+      // COCO-17 skeleton edges (hard-coded)
+      line(5,6); line(5,11); line(6,12); line(11,12);
+      line(5,7); line(7,9); line(6,8); line(8,10);
+      line(11,13); line(13,15); line(12,14); line(14,16);
+      line(0,5); line(0,6);
     }
   }
   aim_draw_cross(this);

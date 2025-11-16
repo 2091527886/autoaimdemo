@@ -88,7 +88,7 @@ add_executable(aimassistant
   Aim_cap.cpp
   Aim_time.cpp
   Aim_anchor.cpp
-  Aim_pred_err.cpp
+   Aim_pred_err.cpp
   Aim_move.cpp
   Aim_ovl_dets.cpp
   Aim_ovl_cross.cpp
@@ -102,6 +102,7 @@ add_executable(aimassistant
   ObjDet_init.cpp
   ObjDet_detect.cpp
   ObjDet_perf.cpp
+  Pose.cpp
   ScreenCapturer.Init.cpp
   ScreenCapturer.Release.cpp
   ScreenCapturer.Dispatch.cpp

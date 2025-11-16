@@ -13,7 +13,8 @@ void Game_overlay::Impl::RenderOne(){
   if(dl){ for(const auto& c : dl->cmds){ switch(c.type){
     case DrawCmd::Rect: brush->SetColor(C(c.color)); d2dCtx->DrawRectangle(RF(c.rect.x, c.rect.y, c.rect.w, c.rect.h), brush.Get(), c.thickness); break;
     case DrawCmd::RectFilled: brush->SetColor(C(c.color)); d2dCtx->FillRectangle(RF(c.rect.x, c.rect.y, c.rect.w, c.rect.h), brush.Get()); break;
-    case DrawCmd::Text: { brush->SetColor(C(c.color)); OVL_DRAW_TEXT(d2dCtx, c.text, c.textPos.x, c.textPos.y, c.textPos.size, c.color, c.fontName); } break; }
+    case DrawCmd::Text: { brush->SetColor(C(c.color)); OVL_DRAW_TEXT(d2dCtx, c.text, c.textPos.x, c.textPos.y, c.textPos.size, c.color, c.fontName); } break; 
+    case DrawCmd::Line: brush->SetColor(C(c.color)); d2dCtx->DrawLine(D2D1::Point2F(c.line.x1, c.line.y1), D2D1::Point2F(c.line.x2, c.line.y2), brush.Get(), c.thickness); break; }
     }
   }
   if(small_window){ d2dCtx->SetTransform(__oldM); }

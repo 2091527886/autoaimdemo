@@ -1,0 +1,4 @@
+trtyolo export -v yolo11 -w posebest.pt -o . -b -1 --imgsz 640 -s
+cmake -S . -B build -D TRT_PATH="C:\cuda\TensorRT-10.9.0.34" -D BUILD_PYTHON=ON -D CMAKE_INSTALL_PREFIX=tmp
+cmake --build build -j --config Release --target install
+trtexec --onnx=posebest.onnx --saveEngine=spose.engine --fp16 --inputIOFormats=fp16:chw  --staticPlugins="C:\Users\233h\Downloads\TensorRT-YOLO\tmp\bin\custom_plugins.dll" --setPluginsToSerialize="C:\Users\233h\Downloads\TensorRT-YOLO\tmp\bin\custom_plugins.dll" --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640                    --maxShapes=images:16x3x640x640

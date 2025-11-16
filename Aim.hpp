@@ -12,6 +12,7 @@
 #include "HotkeyManager.hpp"
 #include "ScreenCapturer.hpp"
 #include "ObjDet.hpp"
+#include "Pose.hpp"
 #include "Game_overlay.h"
 #include "FpsCtl.hpp"
 
@@ -48,11 +49,14 @@ private:
     void trt_log();
     // pure aim point for overlay, no state change
     cv::Point2f aim_no_pred(const Detection& d) const;
+    // map detection reference to index in ds (linear scan; ds small)
+    int det_index(const Detection& d) const;
 
     // state
     Config c;
     ScreenCapturer cap;
     ObjDet od;
+    PoseInfer pose;
     Mouse mouse;
     AimAlgo algo;
     HotkeyManager hk;
@@ -60,6 +64,8 @@ private:
     const cv::Point ctr;
     double mfac = 1.0;
     std::vector<Detection> ds;
+    std::vector<std::vector<trtyolo::KeyPoint>> pose_kpts; // same size as ds when filled
+    std::vector<bool> pose_ok;
     Timing tm;
     LatAgg lat;
 

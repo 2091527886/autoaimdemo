@@ -27,6 +27,7 @@ public:
     void FillRect(const OverlayRect& rc, OverlayColor color);
     void AddText(float x, float y, const std::wstring& text, float sizePx,
         OverlayColor color, const std::wstring& font = L"Segoe UI");
+    void AddLine(float x1, float y1, float x2, float y2, float thickness, OverlayColor color);
 
     void UseVirtualScreen();
 

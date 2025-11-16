@@ -1,0 +1,7 @@
+path: /home/a2091527886/Downloads/Auto_aim/dataset
+train: images/train
+val: images/val
+nc: 2
+names:
+  0: class_0
+  1: class_1
