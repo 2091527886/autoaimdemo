@@ -12,30 +12,35 @@ class Config {
 public:
     bool timing = true;
 public:
-    unsigned long long frame_idx = 0;
-    bool log_init_verbose = true;
-    int  capture_timeout_ms_dxgi = 0;
-    int  cap = 0;
-    bool cap_enum = false;
-    int  cap_gpu = -1;
-    int  cap_out = 0;
-    bool cap_cursor = false;
-    bool cap_border = false;
-    int  cap_retry = 3;
+    // ==================== [Basic & Capture] ====================
+    unsigned long long frame_idx = 0;  // 全局帧计数
+    bool log_init_verbose = true;      // 初始化日志更详细
+    int  capture_timeout_ms_dxgi = 0;  // DXGI捕获超时（ms）
+    int  cap = 0;                      // 捕获方式（0=DXGI, 1=WGC）
+    bool cap_enum = false;             // 列举可用捕获设备
+    int  cap_gpu = -1;                 // 捕获所用GPU（-1=自动）
+    int  cap_out = 0;                  // 捕获输出索引
+    bool cap_cursor = false;           // 是否捕获鼠标指针
+    bool cap_border = false;           // 是否绘制捕获边框
+    int  cap_retry = 3;                // 捕获失败重试次数
 
-    bool fps_lock = true;
-    int  fps = 60;
+    bool fps_lock = true;              // 是否锁帧
+    int  fps = 60;                     // 目标帧率
 public:
+    // ==================== [Detection (TRT YOLO)] ====================
+
     std::string engine_path = "m.engine";
 
-    // Pose options (use TRT PoseModel; all performance-critical, 3060 focus)
+    // ==================== [Pose (TRT YOLO PoseModel)] ====================
+    // 部位选择与骨架可视化，仅参与瞄准点选择；不影响 det 敌友分类
+
     bool pose_enable = true;
     std::string pose_engine_path = "spose.engine"; // your provided engine name
     bool pose_trt_swap_rb = true;
     bool pose_trt_use_normalize = false;
     std::vector<float> pose_trt_mean {0.f,0.f,0.f};
     std::vector<float> pose_trt_std  {1.f,1.f,1.f};
-    bool pose_trt_cuda_mem = false;
+    bool pose_trt_cuda_mem = false;  // 内存策略（与 det 对齐；3060 建议开 cuda_mem）
     bool pose_trt_managed_mem = false;
     int  pose_trt_input_w = 640;
     int  pose_trt_input_h = 640;
@@ -49,6 +54,8 @@ public:
     double pose_center_lambda = 0.002;  // center bias factor in ranking (score - lambda*dist)
     int    pose_center_radius_px = 0;    // >0: prefer within radius (0 = disable)
     std::string resolve_engine_path() const { return engine_path; }
+
+    // ==================== [Detection Runtime (TRT通用)] ====================
 
     bool trt_swap_rb = true;
     bool trt_use_normalize = false;
@@ -68,6 +75,7 @@ public:
     int  trt_input_w = 0;
     int  trt_input_h = 0;
 
+    // ==================== [Model Input & Thresholds] ====================
     const int   crop_size_px = 640;
     const float conf_thresh = 0.5f;
 
@@ -78,6 +86,8 @@ public:
     const double px_per_360     = 3600;
     const double hfov_deg       = 85.461056;
 
+    // ==================== [Aim Control & Prediction] ====================
+    // 运动学、预测、距离分段与锚点等行为控制
     bool   prop = true;
     double prop_k_x = 0.8;
     double prop_k_y = 0.8;
@@ -109,6 +119,8 @@ public:
     bool   aim_single_use_pred = true;
     bool   aim_only_with_key = true;
 
+    // ==================== [Wind (Mouse micro-movement)] ====================
+    // 鼠标微扰控制（平滑/随机/风力）
     bool   wind_enable = true;
     int    wind_rng_seed = 0;
     double wind_step_min_px = 0.6;
@@ -131,9 +143,13 @@ public:
     bool   wind_use_seg_scale = true;
     double wind_out_limit_px = 340.0;
 
+    // ==================== [Classes & Targets] ====================
+    // 类别列表与目标ID（det 用于敌友识别）
     std::vector<std::string> classes { "enemy","teammate" };
     std::vector<int>         target_ids { 0 };
 
+    // ==================== [Logging & Performance] ====================
+    // 捕获/延迟/性能日志开关与频率
     bool capture_debug = false;
     int  capture_debug_every_n = 30;
     bool log_latency = true;
@@ -155,6 +171,8 @@ public:
     bool opt_report_system = true;
     int  opt_report_every_n = 30;
 
+    // ==================== [Overlay] ====================
+    // 叠加层绘制（颜色/线宽/窗口参数/字体）
     bool      ovl = true;
     int       ovl_a = 160;
     int       ovl_r = 0, ovl_g = 255, ovl_b = 0;
@@ -192,6 +210,8 @@ public:
     bool  lock_show_text = true;
     std::wstring lock_text = L"locked";
 
+    // ==================== [System & DXGI] ====================
+    // 线程优先级、DXGI 捕获延迟/优先级
     bool enable_thread_mem_prio = false;
 
     int dxgi_gpu_prio = 5;
