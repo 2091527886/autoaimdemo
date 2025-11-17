@@ -24,15 +24,15 @@ void Aim::draw_ovl(double &ms) {
       if (cid < (int)c.ovl_cb.size()) bb = c.ovl_cb[cid];
     }
     auto col = ARGB((uint8_t)c.ovl_a, (uint8_t)rr, (uint8_t)gg, (uint8_t)bb);
-    gover.AddRect({x, y, w, h}, col, (float)c.ovl_thick);
+    gover.AddRectL({x, y, w, h}, col, (float)c.ovl_thick, (uint16_t)c.ovl_layer_obs);
     float fsz = (float)std::max(1, c.ovl_font_px);
     float ty = MX(0.0f, y - fsz - 2.0f);
     std::string lbl = c.name_or_id(cid);
     std::wstring wlbl(lbl.begin(), lbl.end());
     if (!wlbl.empty()) {
       OverlayColor tcol = ARGB(255, (uint8_t)rr, (uint8_t)gg, (uint8_t)bb);
-      if (!c.ovl_font_name.empty()) gover.AddText(x, ty, wlbl, fsz, tcol, c.ovl_font_name);
-      else gover.AddText(x, ty, wlbl, fsz, tcol);
+      if (!c.ovl_font_name.empty()) gover.AddTextL(x, ty, wlbl, fsz, tcol, c.ovl_font_name, (uint16_t)c.ovl_layer_text);
+      else gover.AddTextL(x, ty, wlbl, fsz, tcol, (uint16_t)c.ovl_layer_text);
     }
 
     // draw pose keypoints and skeleton lines (COCO-17 fixed edges)
@@ -41,14 +41,14 @@ void Aim::draw_ovl(double &ms) {
       OverlayColor pcol = ARGB(220, 0, 255, 255);
       auto vis = [&](int id){ return id<(int)k.size() && (!k[id].conf || *k[id].conf >= c.pose_kpt_conf_thresh); };
       auto kp  = [&](int id){ return std::pair<float,float>((float)(crop.x + k[id].x), (float)(crop.y + k[id].y)); };
-      auto line = [&](int a,int b){ if (vis(a)&&vis(b)){ auto pa=kp(a), pb=kp(b); gover.AddLine(pa.first, pa.second, pb.first, pb.second, (float)c.ovl_thick, pcol); }};
+      auto line = [&](int a,int b){ if (vis(a)&&vis(b)){ auto pa=kp(a), pb=kp(b); gover.AddLineL(pa.first, pa.second, pb.first, pb.second, (float)c.ovl_thick, pcol, (uint16_t)c.ovl_layer_pose); }};
 
       // draw points
       for (size_t ki=0; ki<k.size(); ++ki){
         if (k[ki].conf && *k[ki].conf < c.pose_kpt_conf_thresh) continue;
         float px = (float)(crop.x + k[ki].x) - 1.5f;
         float py = (float)(crop.y + k[ki].y) - 1.5f;
-        gover.FillRect({px, py, 3.0f, 3.0f}, pcol);
+        gover.FillRectL({px, py, 3.0f, 3.0f}, pcol, (uint16_t)c.ovl_layer_pose);
       }
       // COCO-17 skeleton edges (hard-coded)
       line(5,6); line(5,11); line(6,12); line(11,12);
@@ -77,14 +77,14 @@ void Aim::draw_ovl(double &ms) {
         float y = (float)(crop.y + t.trk.y);
         float w = (float)t.trk.width;
         float h = (float)t.trk.height;
-        gover.AddRect({x,y,w,h}, col, (float)c.ovl_thick);
+        gover.AddRectL({x,y,w,h}, col, (float)c.ovl_thick, (uint16_t)c.ovl_layer_trk_all);
         std::string text = std::string("id=") + std::to_string(t.id) + " " + c.name_or_id(t.cls);
         std::wstring wtxt(text.begin(), text.end());
         float fsz = (float)std::max(1, c.ovl_font_px);
         float ty = MX(0.0f, y - fsz - 2.0f);
         OverlayColor tcol = ARGB(255, (uint8_t)rr, (uint8_t)gg, (uint8_t)bb);
-        if (!c.ovl_font_name.empty()) gover.AddText(x, ty, wtxt, fsz, tcol, c.ovl_font_name);
-        else gover.AddText(x, ty, wtxt, fsz, tcol);
+        if (!c.ovl_font_name.empty()) gover.AddTextL(x, ty, wtxt, fsz, tcol, c.ovl_font_name, (uint16_t)c.ovl_layer_text);
+        else gover.AddTextL(x, ty, wtxt, fsz, tcol, (uint16_t)c.ovl_layer_text);
       }
     }
     // 绘制当前选择的 track（锁定目标用黄色+加粗）
@@ -100,9 +100,9 @@ void Aim::draw_ovl(double &ms) {
       // 如果正在锁定，则用黄色加粗绘制 track 框
       if (lock_ && cur_sel.track_id == locked_track_id) {
         OverlayColor ycol = ARGB((uint8_t)c.lock_a, (uint8_t)c.lock_r, (uint8_t)c.lock_g, (uint8_t)c.lock_b);
-        gover.AddRect({x,y,w,h}, ycol, (float)c.lock_th);
+        gover.AddRectL({x,y,w,h}, ycol, (float)c.lock_th, (uint16_t)c.ovl_layer_lock);
       } else {
-        gover.AddRect({x,y,w,h}, col, (float)c.ovl_thick);
+        gover.AddRectL({x,y,w,h}, col, (float)c.ovl_thick, (uint16_t)c.ovl_layer_trk_sel);
       }
       // 显示 id 与 cls
       std::string text = std::string("id=") + std::to_string(cur_sel.track_id) + " " + c.name_or_id(cur_sel.cls);
@@ -112,8 +112,8 @@ void Aim::draw_ovl(double &ms) {
       OverlayColor tcol = (lock_ && cur_sel.track_id == locked_track_id)
         ? ARGB(255, (uint8_t)c.lock_r, (uint8_t)c.lock_g, (uint8_t)c.lock_b)
         : ARGB(255, (uint8_t)rr, (uint8_t)gg, (uint8_t)bb);
-      if (!c.ovl_font_name.empty()) gover.AddText(x, ty, wtxt, fsz, tcol, c.ovl_font_name);
-      else gover.AddText(x, ty, wtxt, fsz, tcol);
+      if (!c.ovl_font_name.empty()) gover.AddTextL(x, ty, wtxt, fsz, tcol, c.ovl_font_name, (uint16_t)(lock_ && cur_sel.track_id == locked_track_id ? c.ovl_layer_lock : c.ovl_layer_text));
+      else gover.AddTextL(x, ty, wtxt, fsz, tcol, (uint16_t)(lock_ && cur_sel.track_id == locked_track_id ? c.ovl_layer_lock : c.ovl_layer_text));
     }
  }
 

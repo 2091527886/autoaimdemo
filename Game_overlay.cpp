@@ -29,6 +29,11 @@ void Game_overlay::EndFrame() { impl_->EndFrame(); }
 void Game_overlay::Tick() { impl_->RenderOne(); }
 
 void Game_overlay::AddRect(const OverlayRect &r, OverlayColor c, float t){ DrawCmd cmd{}; cmd.type=DrawCmd::Rect; cmd.color=c; cmd.thickness=t; cmd.rect=r; impl_->AddCmd(cmd); }
+void Game_overlay::AddRectL(const OverlayRect &r, OverlayColor c, float t, uint16_t layer){ DrawCmd cmd{}; cmd.type=DrawCmd::Rect; cmd.color=c; cmd.thickness=t; cmd.layer=layer; cmd.rect=r; impl_->AddCmd(cmd); }
 void Game_overlay::FillRect(const OverlayRect &r, OverlayColor c){ DrawCmd cmd{}; cmd.type=DrawCmd::RectFilled; cmd.color=c; cmd.rect=r; impl_->AddCmd(cmd); }
+void Game_overlay::FillRectL(const OverlayRect &r, OverlayColor c, uint16_t layer){ DrawCmd cmd{}; cmd.type=DrawCmd::RectFilled; cmd.color=c; cmd.layer=layer; cmd.rect=r; impl_->AddCmd(cmd); }
 void Game_overlay::AddText(float x,float y,const std::wstring &text,float sizePx,OverlayColor c,const std::wstring &font){ DrawCmd cmd{}; cmd.type=DrawCmd::Text; cmd.color=c; cmd.text=text; cmd.textPos={x,y,sizePx}; cmd.fontName=font; impl_->AddCmd(cmd); }
+void Game_overlay::AddTextL(float x,float y,const std::wstring &text,float sizePx,OverlayColor c,const std::wstring &font,uint16_t layer){ DrawCmd cmd{}; cmd.type=DrawCmd::Text; cmd.color=c; cmd.text=text; cmd.textPos={x,y,sizePx}; cmd.fontName=font; cmd.layer=layer; impl_->AddCmd(cmd); }
+void Game_overlay::AddTextL(float x,float y,const std::wstring &text,float sizePx,OverlayColor c,uint16_t layer){ DrawCmd cmd{}; cmd.type=DrawCmd::Text; cmd.color=c; cmd.text=text; cmd.textPos={x,y,sizePx}; cmd.layer=layer; impl_->AddCmd(cmd); }
 void Game_overlay::AddLine(float x1,float y1,float x2,float y2,float th,OverlayColor c){ DrawCmd cmd{}; cmd.type=DrawCmd::Line; cmd.color=c; cmd.thickness=th; cmd.line={x1,y1,x2,y2}; impl_->AddCmd(cmd); }
+void Game_overlay::AddLineL(float x1,float y1,float x2,float y2,float th,OverlayColor c,uint16_t layer){ DrawCmd cmd{}; cmd.type=DrawCmd::Line; cmd.color=c; cmd.thickness=th; cmd.layer=layer; cmd.line={x1,y1,x2,y2}; impl_->AddCmd(cmd); }

@@ -13,6 +13,6 @@ void aim_draw_cross(Aim* self) {
   const float s = (float)c.cross_size;
   const float th = (float)c.cross_th;
   OverlayColor col = ARGB((uint8_t)c.cross_a, (uint8_t)c.cross_r, (uint8_t)c.cross_g, (uint8_t)c.cross_b);
-  self->gover.FillRect({px - s, py - th * 0.5f, 2*s, th}, col);
-  self->gover.FillRect({px - th * 0.5f, py - s, th, 2*s}, col);
+  self->gover.FillRectL({px - s, py - th * 0.5f, 2*s, th}, col, (uint16_t)c.ovl_layer_cross);
+  self->gover.FillRectL({px - th * 0.5f, py - s, th, 2*s}, col, (uint16_t)c.ovl_layer_cross);
 }

@@ -10,8 +10,8 @@ void aim_draw_lock(Aim* self) {
     float ty = MX(0.0f, self->lock_rect_.y - fsz - 2.0f);
     const std::wstring& wtxt = c.lock_text;
     if (!c.ovl_font_name.empty())
-      self->gover.AddText(self->lock_rect_.x, ty, wtxt, fsz, ycol, c.ovl_font_name);
+      self->gover.AddTextL(self->lock_rect_.x, ty, wtxt, fsz, ycol, c.ovl_font_name, (uint16_t)c.ovl_layer_lock);
     else
-      self->gover.AddText(self->lock_rect_.x, ty, wtxt, fsz, ycol);
+      self->gover.AddTextL(self->lock_rect_.x, ty, wtxt, fsz, ycol, (uint16_t)c.ovl_layer_lock);
   }
 }

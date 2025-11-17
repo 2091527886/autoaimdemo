@@ -24,10 +24,17 @@ public:
     void Tick();
 
     void AddRect(const OverlayRect& rc, OverlayColor color, float thickness = 1.0f);
+    void AddRectL(const OverlayRect& rc, OverlayColor color, float thickness, uint16_t layer);
     void FillRect(const OverlayRect& rc, OverlayColor color);
+    void FillRectL(const OverlayRect& rc, OverlayColor color, uint16_t layer);
     void AddText(float x, float y, const std::wstring& text, float sizePx,
         OverlayColor color, const std::wstring& font = L"Segoe UI");
+    void AddTextL(float x, float y, const std::wstring& text, float sizePx,
+        OverlayColor color, const std::wstring& font, uint16_t layer);
+    void AddTextL(float x, float y, const std::wstring& text, float sizePx,
+        OverlayColor color, uint16_t layer);
     void AddLine(float x1, float y1, float x2, float y2, float thickness, OverlayColor color);
+    void AddLineL(float x1, float y1, float x2, float y2, float thickness, OverlayColor color, uint16_t layer);
 
     void UseVirtualScreen();
 

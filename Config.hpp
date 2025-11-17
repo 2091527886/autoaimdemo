@@ -205,6 +205,14 @@ public:
     int       ovl_a = 160;
     int       ovl_r = 0, ovl_g = 255, ovl_b = 0;
     float     ovl_thick = 2.0f;
+    // overlay 层配置（值越大越靠上）
+    int       ovl_layer_obs      = 10;
+    int       ovl_layer_pose     = 15;
+    int       ovl_layer_trk_all  = 20;
+    int       ovl_layer_trk_sel  = 30;
+    int       ovl_layer_text     = 200;
+    int       ovl_layer_cross    = 240;
+    int       ovl_layer_lock     = 250;
 
     bool         ovl_gpu_enum = false;
     int          ovl_gpu_idx  = 1;
@@ -289,6 +297,16 @@ private:
         lb_min_blocks_per_sm = MX(1, lb_min_blocks_per_sm);
     }
     void v_overlay() {
+        // clamp overlay layers to [0,1000]
+        auto clampL=[&](int& v){ v=std::max(0,std::min(1000,v)); };
+        clampL(ovl_layer_obs);
+        clampL(ovl_layer_pose);
+        clampL(ovl_layer_trk_all);
+        clampL(ovl_layer_trk_sel);
+        clampL(ovl_layer_text);
+        clampL(ovl_layer_cross);
+        clampL(ovl_layer_lock);
+
         if (ovl_cls) { size_t n = classes.size(); pad(ovl_cr,n,ovl_r); pad(ovl_cg,n,ovl_g); pad(ovl_cb,n,ovl_b); }
         cross_size = MX(1, cross_size);
         cross_th   = MX(0.5f, cross_th);
