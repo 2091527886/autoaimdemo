@@ -18,5 +18,6 @@ void InferOption::setLetterboxLaunchBounds(bool enable, int min_blocks_per_sm) {
 void InferOption::enableLetterboxOccupancy(bool enable) { impl_->enableLetterboxOccupancy(enable); }
 void InferOption::setNormalizeParams(const std::vector<float>& mean, const std::vector<float>& std) { impl_->setNormalizeParams(mean, std); }
 void InferOption::setInputDimensions(int width, int height) { impl_->setInputDimensions(height, width); }
+void InferOption::enableExportGPUDet() { impl_->enableExportGPUDet(); }
 
 } // namespace trtyolo

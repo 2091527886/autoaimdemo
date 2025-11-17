@@ -7,7 +7,9 @@ void Aim::draw_ovl(double &ms) {
   if (!c.ovl) { ms = 0.0; return; }
   auto t0 = (c.timing ? tn() : tp{});
   gover.BeginFrame();
-  for (size_t i=0;i<ds.size();++i) { const auto &d = ds[i];
+  // 绘制原始检测框（obs）
+  if (c.ovl_show_obs){
+    for (size_t i=0;i<ds.size();++i) { const auto &d = ds[i];
     if (c.ovl_only >= 0 && d.class_id != c.ovl_only)
       continue;
     float x = (float)(crop.x + d.box.x);
@@ -55,6 +57,66 @@ void Aim::draw_ovl(double &ms) {
       line(0,5); line(0,6);
     }
   }
+  }
+
+  // 绘制跟踪框
+  if (c.ovl_show_trk) {
+
+    if (c.ovl_show_trk_all) {
+      // 绘制全部 track 框与 id
+      for (const auto& t : last_trks_) {
+        int rr = c.ovl_r, gg = c.ovl_g, bb = c.ovl_b;
+        if (c.ovl_cls && t.cls >= 0) {
+          if (t.cls < (int)c.ovl_cr.size()) rr = c.ovl_cr[t.cls];
+          if (t.cls < (int)c.ovl_cg.size()) gg = c.ovl_cg[t.cls];
+          if (t.cls < (int)c.ovl_cb.size()) bb = c.ovl_cb[t.cls];
+        }
+        auto col = ARGB((uint8_t)c.ovl_a, (uint8_t)rr, (uint8_t)gg, (uint8_t)bb);
+        // add crop offset to track box to align with obs drawing
+        float x = (float)(crop.x + t.trk.x);
+        float y = (float)(crop.y + t.trk.y);
+        float w = (float)t.trk.width;
+        float h = (float)t.trk.height;
+        gover.AddRect({x,y,w,h}, col, (float)c.ovl_thick);
+        std::string text = std::string("id=") + std::to_string(t.id) + " " + c.name_or_id(t.cls);
+        std::wstring wtxt(text.begin(), text.end());
+        float fsz = (float)std::max(1, c.ovl_font_px);
+        float ty = MX(0.0f, y - fsz - 2.0f);
+        OverlayColor tcol = ARGB(255, (uint8_t)rr, (uint8_t)gg, (uint8_t)bb);
+        if (!c.ovl_font_name.empty()) gover.AddText(x, ty, wtxt, fsz, tcol, c.ovl_font_name);
+        else gover.AddText(x, ty, wtxt, fsz, tcol);
+      }
+    }
+    // 绘制当前选择的 track（锁定目标用黄色+加粗）
+    if (cur_sel.valid()){
+      int rr = c.ovl_r, gg = c.ovl_g, bb = c.ovl_b;
+      if (c.ovl_cls && cur_sel.cls >= 0) {
+        if (cur_sel.cls < (int)c.ovl_cr.size()) rr = c.ovl_cr[cur_sel.cls];
+        if (cur_sel.cls < (int)c.ovl_cg.size()) gg = c.ovl_cg[cur_sel.cls];
+        if (cur_sel.cls < (int)c.ovl_cb.size()) bb = c.ovl_cb[cur_sel.cls];
+      }
+      auto col = ARGB((uint8_t)c.ovl_a, (uint8_t)rr, (uint8_t)gg, (uint8_t)bb);
+      float x = (float)(crop.x + cur_sel.trk.x), y = (float)(crop.y + cur_sel.trk.y), w = (float)cur_sel.trk.width, h = (float)cur_sel.trk.height;
+      // 如果正在锁定，则用黄色加粗绘制 track 框
+      if (lock_ && cur_sel.track_id == locked_track_id) {
+        OverlayColor ycol = ARGB((uint8_t)c.lock_a, (uint8_t)c.lock_r, (uint8_t)c.lock_g, (uint8_t)c.lock_b);
+        gover.AddRect({x,y,w,h}, ycol, (float)c.lock_th);
+      } else {
+        gover.AddRect({x,y,w,h}, col, (float)c.ovl_thick);
+      }
+      // 显示 id 与 cls
+      std::string text = std::string("id=") + std::to_string(cur_sel.track_id) + " " + c.name_or_id(cur_sel.cls);
+      std::wstring wtxt(text.begin(), text.end());
+      float fsz = (float)std::max(1, c.ovl_font_px);
+      float ty = MX(0.0f, y - fsz - 2.0f);
+      OverlayColor tcol = (lock_ && cur_sel.track_id == locked_track_id)
+        ? ARGB(255, (uint8_t)c.lock_r, (uint8_t)c.lock_g, (uint8_t)c.lock_b)
+        : ARGB(255, (uint8_t)rr, (uint8_t)gg, (uint8_t)bb);
+      if (!c.ovl_font_name.empty()) gover.AddText(x, ty, wtxt, fsz, tcol, c.ovl_font_name);
+      else gover.AddText(x, ty, wtxt, fsz, tcol);
+    }
+ }
+
   aim_draw_cross(this);
   aim_draw_lock(this);
   gover.EndFrame();

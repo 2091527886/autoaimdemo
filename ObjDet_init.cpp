@@ -30,6 +30,8 @@ ObjDet::ObjDet(const Config &cfg)
   if (cfg.perf_report) {
     opt.enablePerformanceReport();
   }
+  // 导出设备侧检测结果视图（用于与 OCSort 零拷贝对接）
+  opt.enableExportGPUDet();
 
   {
     char cwd_buffer[MAX_PATH];

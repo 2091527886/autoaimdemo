@@ -27,6 +27,42 @@ public:
     bool fps_lock = true;              // 是否锁帧
     int  fps = 60;                     // 目标帧率
 public:
+    // ==================== [OC-SORT Tracker] ====================
+    bool  ocs_enable = true;
+    int   ocs_max_age = 30;
+    int   ocs_min_hits = 3;
+    float ocs_iou_th = 0.3f;
+    float ocs_inertia = 0.2f; // VDC weight
+    float ocs_kf_q_pos = 0.01f;
+    float ocs_kf_q_size = 0.01f;
+    float ocs_kf_r_pos = 1.0f;
+    float ocs_kf_r_size = 1.0f;
+    bool  ocs_use_byte = false;
+    float ocs_byte_iou_th = 0.15f; // BYTE 二阶段匹配 IOU 阈值（官方常用较低阈值）
+    std::string ocs_asso = "iou"; // iou|giou|ciou|diou|ct_dist
+    bool  ocs_oru = true;   // Observation-centric Re-Update
+    bool  ocs_ocm = true;   // Observation-Centric Momentum
+    bool  ocs_ocr = true;   // Observation-Centric Recovery
+    float ocs_recover_relax = 1.0f; // 1.0=no relax; <1.0 relax iou_th for recovery
+    int   ocs_auction_rounds = 64;   // CUDA Auction 迭代回合上限
+    float ocs_ocr_slope = 0.05f;     // OCR 动态阈值斜率
+    float ocs_oru_alpha = 0.85f;     // ORU 融合系数（0=不用ORU，>0与obs融合）
+
+    // ==================== [Selector] ====================
+    // 默认 center_win，按键按下=锁定/维持
+    std::string sel_mode = "center_win"; // center_win | area_first | conf_first
+    int   sel_center_win_w = 220;
+    int   sel_center_win_h = 220;
+    float sel_area_w = 1.0f;
+    float sel_conf_w = 1.0f;
+    bool  sel_keep_lock = true;
+
+    // Overlay 显示控制
+    bool  ovl_show_obs = true; // 原始检测框（obs）
+    bool  ovl_show_trk = true; // 跟踪框（track）
+    bool  ovl_show_trk_all = true; // 显示全部 track 框与 id
+
+public:
     // ==================== [Detection (TRT YOLO)] ====================
 
     std::string engine_path = "m.engine";
@@ -229,6 +265,17 @@ public:
         pred_v_lim_px = MX(0.0, pred_v_lim_px);
         if (!(conf_thresh >= 0.0f && conf_thresh <= 1.0f)) { lg::e()<< P_E "conf_thresh out of [0,1]"<<lg::endl; }
         if (!(y_anchor_ratio >= 0.0 && y_anchor_ratio <= 1.0)) { lg::e()<< P_E "y_anchor_ratio out of [0,1]"<<lg::endl; }
+        // 新增字段的 clamp
+        ocs_iou_th = (float)CLP((double)ocs_iou_th, 0.0, 1.0);
+        sel_center_win_w = MX(1, sel_center_win_w);
+        sel_center_win_h = MX(1, sel_center_win_h);
+        sel_area_w = (float)MX(0.0, (double)sel_area_w);
+        sel_conf_w = (float)MX(0.0, (double)sel_conf_w);
+        ocs_byte_iou_th = (float)CLP((double)ocs_byte_iou_th, 0.0, 1.0);
+        ocs_recover_relax = (float)CLP((double)ocs_recover_relax, 0.5, 1.0);
+        ocs_auction_rounds = MX(1, ocs_auction_rounds);
+        ocs_ocr_slope = (float)CLP((double)ocs_ocr_slope, 0.0, 1.0);
+
     }
 private:
     void v_basic() {

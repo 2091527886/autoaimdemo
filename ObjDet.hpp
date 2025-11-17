@@ -9,6 +9,7 @@
 class Config;
 struct Timing;
 namespace trtyolo { class DetectModel; }
+#include <cuda_runtime_api.h>
 
 class ObjDet {
 public:
@@ -26,7 +27,12 @@ public:
                      const Config& cfg,
                      Timing& tm);
 
+public:
+    struct DevView { const float* xyxy=nullptr; const float* scores=nullptr; const int* classes=nullptr; int num=0; };
+    const DevView& get_last_dev() const { return last_dev_; }
+    cudaStream_t get_stream() const;
 private:
     std::unique_ptr<trtyolo::DetectModel> model_;
     metrics::TrtPerfReporting perf_;
+    DevView last_dev_;
 };

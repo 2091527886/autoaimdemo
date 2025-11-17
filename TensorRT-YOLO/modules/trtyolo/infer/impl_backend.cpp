@@ -7,14 +7,16 @@
 namespace trtyolo {
 
 BaseModel::Impl::Impl() = default;
-BaseModel::Impl::~Impl() = default;
+// dtor is defined in trtyolo.cpp to free per-batch device buffers
+// BaseModel::Impl::~Impl() is defined elsewhere
 
 BaseModel::Impl::Impl(const std::string& trt_engine_file, const InferOption& infer_option)
     : backend_(std::make_unique<TrtBackend>(trt_engine_file, infer_option.impl_->getInferConfig())) {
-    if (backend_->infer_config.enable_performance_report) {
-        infer_gpu_trace_ = std::make_unique<GpuTimer>(backend_->stream);
+    if (backend()->infer_config.enable_performance_report) {
+        infer_gpu_trace_ = std::make_unique<GpuTimer>(backend()->stream);
         infer_cpu_trace_ = std::make_unique<CpuTimer>();
     }
+    return;
 }
 
 std::unique_ptr<BaseModel::Impl> BaseModel::Impl::clone() const {

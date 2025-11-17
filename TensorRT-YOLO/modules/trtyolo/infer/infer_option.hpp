@@ -15,6 +15,7 @@ public:
     void enableCudaMem();
     void enableManagedMemory();
     void enablePerformanceReport();
+    void enableExportGPUDet();
     void set_rb();
     void enableSwapRB(); // 保持对外 API（内部仍可调用 set_rb）
     void setBorderValue(float border_value);

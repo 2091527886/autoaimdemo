@@ -245,7 +245,7 @@ public:
      *
      */
     void update() {
-        bytes_ = std::accumulate(shape.d, shape.d + shape.nbDims, 1, std::multiplies<int>()) * dtype_to_bytes(dtype_);
+        bytes_ = std::accumulate(shape.d, shape.d + shape.nbDims, size_t(1), std::multiplies<size_t>()) * dtype_to_bytes(dtype_);
         buffer->allocate(bytes_);
     }
 

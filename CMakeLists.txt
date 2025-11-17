@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(AimAssistant LANGUAGES CXX)
+project(AimAssistant LANGUAGES CXX CUDA)
 
 
 include(CheckCXXCompilerFlag)
@@ -42,6 +42,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(OpenCV REQUIRED)
+# CUDA toolkit for host includes (cuda_runtime[/_api].h) used by host C++ files
+find_package(CUDAToolkit REQUIRED)
 
 # TensorRT-YOLO as submodule build
 # Force CUDA to target only RTX 3060 (SM 86). We don't care other GPUs.
@@ -93,9 +95,11 @@ add_executable(aimassistant
   Aim_ovl_dets.cpp
   Aim_ovl_cross.cpp
   Aim_ovl_lock.cpp
+  OCSort.cpp
   Aim_log.cpp
   FpsCtl.cpp
-  target_pick.cpp
+  OCSort.hpp
+  target_selector.hpp
   Mouse.cpp
   HotkeyManager.cpp
   SystemTuner.cpp
@@ -130,6 +134,7 @@ set(PROJECT_ROOT_INCLUDE "${CMAKE_SOURCE_DIR}")
 
 target_include_directories(aimassistant PRIVATE
   ${PROJECT_ROOT_INCLUDE}
+  ${CUDAToolkit_INCLUDE_DIRS}
 )
 
 # 常见 Windows 定义，防止宏冲突并启用 Unicode
@@ -153,10 +158,32 @@ target_include_directories(aimassistant PRIVATE
 )
 
 # 私有链接库
-target_link_libraries(aimassistant PRIVATE
-    ${OpenCV_LIBS}
-    trtyolo
+# 编译 GPU 核心（接口先行，可逐步完善）
+add_library(ocsort_cuda STATIC
+ ocs_iou.cu
+ ocs_assign.cu
+ ocs_kf.cu
+ ocs_ocm.cu
+ ocs_byte.cu
+ ocs_out.cu
+ ocs_state.cu
 )
+set_target_properties(ocsort_cuda PROPERTIES CUDA_SEPARABLE_COMPILATION ON POSITION_INDEPENDENT_CODE ON)
+
+# MSVC: 让 NVCC 调用 MSVC 时使用 /utf-8，避免中文注释/不可见字符触发 C4819
+if(MSVC)
+  target_compile_options(ocsort_cuda PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/utf-8>)
+endif()
+
+
+# 链接
+target_link_libraries(aimassistant PRIVATE
+   ${OpenCV_LIBS}
+   trtyolo
+   ocsort_cuda
+   CUDA::cudart
+)
+
 
 
 # 7) 复制运行所需 DLL 至运行目录

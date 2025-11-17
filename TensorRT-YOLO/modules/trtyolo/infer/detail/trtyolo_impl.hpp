@@ -25,6 +25,7 @@ public:
     void enableCudaMem();
     void enableManagedMemory();
     void enablePerformanceReport();
+    void enableExportGPUDet();
     void setInputDimensions(int width, int height);
     void set_rb();
     void setBorderValue(float value);
@@ -39,9 +40,15 @@ private:
 };
 
 class BaseModel::Impl {
+ public:
+     TrtBackend* backend() { return backend_.get(); }
+     const TrtBackend* backend() const { return backend_.get(); }
 public:
     Impl();
     ~Impl();
+    // Per-batch device buffers for detect_dev xyxy outputs (owned, freed in dtor)
+    std::vector<float*> dev_boxes_per_batch_;
+    std::vector<size_t> dev_boxes_capacity_bytes_; // capacity per batch for boxes_dev buffer
     Impl(const std::string& trt_engine_file, const InferOption& infer_option);
 
     std::unique_ptr<Impl> clone() const;
@@ -59,17 +66,17 @@ public:
     // Decorator template kept inline to ensure visibility across TUs
     template <typename Func, typename ReturnType>
     ReturnType withPerformanceReport(const std::vector<Image>& images, Func func) {
-        if (backend_->infer_config.enable_performance_report) {
-            total_request_ += (backend_->dynamic ? images.size() : backend_->max_shape.x);
+        if (backend()->infer_config.enable_performance_report) {
+            total_request_ += (backend()->dynamic ? images.size() : backend()->max_shape.x);
             infer_cpu_trace_->start();
             infer_gpu_trace_->start();
         }
 
-        backend_->infer(images);
+        backend()->infer(images);
         ReturnType result = func(images.size());
 
-        if (backend_->infer_config.enable_performance_report) {
-            infer_gpu_trace_->stop();
+        if (backend()->infer_config.enable_performance_report) {
+           infer_gpu_trace_->stop();
             infer_cpu_trace_->stop();
         }
         return result;

@@ -13,6 +13,8 @@
 #include "ScreenCapturer.hpp"
 #include "ObjDet.hpp"
 #include "Pose.hpp"
+#include "OCSort.hpp"
+#include "target_selector.hpp"
 #include "Game_overlay.h"
 #include "FpsCtl.hpp"
 
@@ -64,6 +66,9 @@ private:
     const cv::Point ctr;
     double mfac = 1.0;
     std::vector<Detection> ds;
+    OCSort ocs;
+    int    locked_track_id = -1; // 当前锁定的 track（按键按下维持）
+    SelectedTarget cur_sel;      // 当前选择结果（obs+trk）
     std::vector<std::vector<trtyolo::KeyPoint>> pose_kpts; // same size as ds when filled
     std::vector<bool> pose_ok;
     Timing tm;
@@ -87,6 +92,10 @@ private:
     OverlayRect lock_rect_{0,0,0,0};
     cv::Point2f aim_pt_{0.f, 0.f};
     bool aim_ok_ = false;
+
+    // cache trks for overlay draw
+    struct CachedTrk { cv::Rect trk; int id; int cls; float score; };
+    std::vector<CachedTrk> last_trks_;
 
     WindState wind_;
 

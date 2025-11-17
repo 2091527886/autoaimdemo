@@ -28,6 +28,14 @@ struct TRTYOLOAPI ClassifyRes : public BaseRes {
     friend std::ostream& operator<<(std::ostream& os, const ClassifyRes& r){ os<<"ClassifyRes(\n    num="<<r.num<<",\n    classes=["; pv(os,r.classes); os<<"],\n    scores=["; pvf(os,r.scores); os<<"]\n)"; return os; }
 };
 
+// 设备侧检测结果视图（可选导出，避免 Host 往返）
+struct TRTYOLOAPI DetectResDev {
+    const float* xyxy = nullptr;   // device pointer, N x 4
+    const float* scores = nullptr; // device pointer, N
+    const int*   classes = nullptr;// device pointer, N
+    int num = 0;
+};
+
 struct TRTYOLOAPI DetectRes : public BaseRes {
     std::vector<Box> boxes;
 

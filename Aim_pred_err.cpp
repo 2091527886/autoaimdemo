@@ -5,7 +5,7 @@
 using P2 = cv::Point2d;
 using P2f = cv::Point2f;
 std::pair<double, double> Aim::pred_err(const Detection &d, double dt, bool enable_pred) {
-  double h = (double)d.box.height;
+  // double h = (double)d.box.height; // unused
   // prefer pose point (same as aim_no_pred) as tracking target, fallback to bbox anchor
   cv::Point2f ap = aim_no_pred(d);
   P2 tp(ap.x - crop.x, ap.y - crop.y);

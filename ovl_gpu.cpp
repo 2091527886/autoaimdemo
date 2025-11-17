@@ -13,7 +13,24 @@ struct GpuInfo {
 
 static wstring wlower(wstring s){ std::transform(s.begin(), s.end(), s.begin(), [](wchar_t c){ return std::towlower(c); }); return s; }
 
-static bool parse_luid(const wstring &s, LUID &out){ size_t p=s.find(L':'); if (p==wstring::npos) return false; auto sh=s.substr(0,p), sl=s.substr(p+1); auto to_u32=[](const wstring &t, DWORD &v)->bool{ try{ size_t idx=0; int base=10; if(t.size()>2 && (t.rfind(L"0x",0)==0 || t.rfind(L"0X",0)==0)) base=16; v=(DWORD)std::stoul(t,&idx,base); return idx==t.size(); }catch(...){ return false; } }; DWORD hi=0, lo=0; if(!to_u32(sh,hi) || !to_u32(sl,lo)) return false; out.HighPart=(LONG)hi; out.LowPart=lo; return true; }
+static bool parse_luid(const wstring &s, LUID &out){
+  size_t p = s.find(L':');
+  if (p == wstring::npos) return false;
+  auto sh = s.substr(0, p), sl = s.substr(p + 1);
+  auto to_u32 = [](const wstring &t, DWORD &v)->bool{
+    try{
+      size_t idx = 0; int base = 10;
+      if (t.size() > 2 && (t.rfind(L"0x",0) == 0 || t.rfind(L"0X",0) == 0)) base = 16;
+      v = (DWORD)std::stoul(t, &idx, base);
+      return idx == t.size();
+    }catch(...){ return false; }
+  };
+  DWORD hi = 0, lo = 0;
+  if (!to_u32(sh, hi) || !to_u32(sl, lo)) return false;
+  out.HighPart = (LONG)hi;
+  out.LowPart  = lo;
+  return true;
+}
 
 static vector<GpuInfo> list_adapters() {
   std::vector<GpuInfo> v;

@@ -10,6 +10,7 @@ void InferOption::Impl::setDeviceId(int id) { infer_config.device_id = id; }
 void InferOption::Impl::enableCudaMem() { infer_config.cuda_mem = true; }
 void InferOption::Impl::enableManagedMemory() { infer_config.enable_managed_memory = true; }
 void InferOption::Impl::enablePerformanceReport() { infer_config.enable_performance_report = true; }
+void InferOption::Impl::enableExportGPUDet() { infer_config.export_gpu_det = true; }
 void InferOption::Impl::setInputDimensions(int width, int height) { infer_config.input_shape = make_int2(height, width); }
 void InferOption::Impl::set_rb() { infer_config.config.rb = true; }
 void InferOption::Impl::setBorderValue(float value) { infer_config.config.border_value = value; }

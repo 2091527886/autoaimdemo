@@ -5,16 +5,16 @@
 namespace trtyolo {
 
 SegmentRes BaseModel::Impl::postProcessSegment(int idx) {
-    auto& mask_tensor  = backend_->tensor_infos[5];
+    auto& mask_tensor  = backend()->tensor_infos[5];
     int   mask_height  = mask_tensor.shape.d[2];
     int   mask_width   = mask_tensor.shape.d[3];
 
-    auto p = get_ptrs(backend_->tensor_infos, idx);
+    auto p = get_ptrs(backend()->tensor_infos, idx);
     uint8_t* masks = static_cast<uint8_t*>(mask_tensor.buffer->host()) + idx * mask_tensor.shape.d[1] * mask_height * mask_width;
 
     SegmentRes result; reserve_common(result, p.num);
 
-    auto& affine_transform = pick_affine(backend_->infer_config, backend_->affine_transforms, idx);
+    auto& affine_transform = pick_affine(backend()->infer_config, backend()->affine_transforms, idx);
 
     for (int i = 0; i < p.num; ++i) {
         int base_index = i * p.box_size;

@@ -4,11 +4,11 @@
 namespace trtyolo {
 
 DetectRes BaseModel::Impl::postProcessDetect(int idx) {
-    auto p = get_ptrs(backend_->tensor_infos, idx);
+    auto p = get_ptrs(backend()->tensor_infos, idx);
 
     DetectRes result; reserve_common(result, p.num);
 
-    auto& affine_transform = pick_affine(backend_->infer_config, backend_->affine_transforms, idx);
+    auto& affine_transform = pick_affine(backend()->infer_config, backend()->affine_transforms, idx);
 
     for (int i = 0; i < p.num; ++i) {
         int base_index = i * p.box_size;

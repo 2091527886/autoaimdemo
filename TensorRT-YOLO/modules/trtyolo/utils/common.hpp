@@ -87,6 +87,7 @@ struct InferConfig {
     bool                enable_performance_report = false;  // < 是否启用性能报告
     std::optional<int2> input_shape;                        // < 输入数据的高、宽，未设置时表示宽度可变（用于输入数据宽高确定的任务场景：监控视频分析，AI外挂等）
     ProcessConfig       config;                             // < 图像预处理配置
+    bool                export_gpu_det         = false;     // < 导出设备侧检测结果视图（用于零拷贝）
 };
 
 /**

@@ -3,7 +3,7 @@
 namespace trtyolo {
 
 ClassifyRes BaseModel::Impl::postProcessClassify(int idx) {
-    auto&  tensor_info = backend_->tensor_infos[1];
+    auto&  tensor_info = backend()->tensor_infos[1];
     float* topk        = static_cast<float*>(tensor_info.buffer->host()) + idx * tensor_info.shape.d[1] * tensor_info.shape.d[2];
 
     ClassifyRes result;

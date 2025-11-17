@@ -4,7 +4,7 @@ void aim_draw_lock(Aim* self) {
   const auto& c = self->c;
   if (!self->lock_) return;
   OverlayColor ycol = ARGB((uint8_t)c.lock_a, (uint8_t)c.lock_r, (uint8_t)c.lock_g, (uint8_t)c.lock_b);
-  self->gover.AddRect(self->lock_rect_, ycol, (float)c.lock_th);
+  // rectangle drawn in draw_ovl when locked; avoid duplicate box here
   if (c.lock_show_text) {
     float fsz = (float)std::max(1, c.ovl_font_px);
     float ty = MX(0.0f, self->lock_rect_.y - fsz - 2.0f);

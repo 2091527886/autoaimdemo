@@ -14,6 +14,7 @@ Aim::Aim()
     wind_.rng.seed(static_cast<uint32_t>(c.wind_rng_seed));
   }
   if (c.ovl){ gover.UseVirtualScreen(); gover.SetConfig(c); bool ok = gover.Start(); lg::ok_or_werr(P_B, "Overlay.Start", ok); }
+  ocs.configure(c);
 }
 
 Aim::~Aim() {
