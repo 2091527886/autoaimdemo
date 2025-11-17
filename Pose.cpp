@@ -25,13 +25,7 @@ PoseInfer::PoseInfer(const Config& cfg)
     if (cfg.pose_trt_cuda_mem) opt.enableCudaMem();
     if (cfg.pose_trt_managed_mem) opt.enableManagedMemory();
 
-    if (cfg.pose_trt_input_w>0 && cfg.pose_trt_input_h>0){
-        opt.setInputDimensions(cfg.pose_trt_input_w, cfg.pose_trt_input_h);
-    } else if (cfg.trt_input_w>0 && cfg.trt_input_h>0){
-        opt.setInputDimensions(cfg.trt_input_w, cfg.trt_input_h);
-    } else {
-        opt.setInputDimensions(cfg.crop_size_px, cfg.crop_size_px);
-    }
+    opt.setInputDimensions(640, 640);
     if (cfg.perf_report) opt.enablePerformanceReport();
 
     try{
@@ -75,73 +69,3 @@ bool PoseInfer::run_on_view(unsigned char* data,
     }
 }
 
-void PoseInfer::run_on_crops(unsigned char* data,
-                             int view_w,
-                             int view_h,
-                             size_t pitch,
-                             const std::vector<Detection>& dets,
-                             const std::vector<int>& sel_idx,
-                             std::vector<std::vector<trtyolo::KeyPoint>>& out_kpts,
-                             std::vector<bool>& out_ok,
-                             const Config& cfg,
-                             Timing& tm){
-    out_kpts.assign(dets.size(), {});
-    out_ok.assign(dets.size(), false);
-    if (!model_) return;
-    if (sel_idx.empty()) return;
-
-    std::vector<Img> batch;
-    batch.reserve(sel_idx.size());
-    struct CropInfo{ int idx; int x; int y; int w; int h; size_t off; };
-    std::vector<CropInfo> infos;
-
-    for(int idx : sel_idx){
-        if (idx < 0 || idx >= (int)dets.size()) continue;
-        const auto& d = dets[idx];
-        if (d.box.width < 8 || d.box.height < 8) continue; // tiny skip
-        int x = d.box.x, y = d.box.y, w = d.box.width, h = d.box.height;
-        // clamp to view
-        x = MX(0, MN(x, view_w-1)); y = MX(0, MN(y, view_h-1));
-        w = MX(0, MN(w, view_w - x)); h = MX(0, MN(h, view_h - y));
-        if (w<=0 || h<=0) continue;
-        unsigned char* ptr = data + (size_t)y * pitch + (size_t)x * 4;
-        batch.emplace_back(ptr, w, h, pitch);
-        infos.push_back({idx,x,y,w,h,(size_t)y * pitch + (size_t)x * 4});
-    }
-
-    if (batch.empty()) return;
-
-    auto do_predict = [&](const std::vector<Img>& imgs){ return model_->predict(imgs); };
-
-    if (cfg.timing){
-        auto t0 = tn();
-        auto results = do_predict(batch);
-        auto t1 = tn();
-        tm.infer_ms += msd(t1 - t0).count();
-        for(size_t bi=0; bi<results.size() && bi<infos.size(); ++bi){
-            const auto& r = results[bi];
-            const auto& inf = infos[bi];
-            if (r.num<=0 || r.kpts.empty()) { out_ok[inf.idx]=false; continue; }
-            // take the first instance in crop
-            const auto& kpts = r.kpts.front();
-            auto& dst = out_kpts[inf.idx];
-            dst.reserve(kpts.size());
-            for(const auto& kp : kpts){
-                dst.emplace_back(kp.x + inf.x, kp.y + inf.y, kp.conf);
-            }
-            out_ok[inf.idx]=true;
-        }
-    } else {
-        auto results = do_predict(batch);
-        for(size_t bi=0; bi<results.size() && bi<infos.size(); ++bi){
-            const auto& r = results[bi];
-            const auto& inf = infos[bi];
-            if (r.num<=0 || r.kpts.empty()) { out_ok[inf.idx]=false; continue; }
-            const auto& kpts = r.kpts.front();
-            auto& dst = out_kpts[inf.idx];
-            dst.reserve(kpts.size());
-            for(const auto& kp : kpts){ dst.emplace_back(kp.x + inf.x, kp.y + inf.y, kp.conf); }
-            out_ok[inf.idx]=true;
-        }
-    }
-}

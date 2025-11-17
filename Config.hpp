@@ -80,15 +80,9 @@ public:
     bool pose_trt_managed_mem = false;
     int  pose_trt_input_w = 640;
     int  pose_trt_input_h = 640;
-    bool pose_full_view = true;        // true: full-view pose once per frame; false: crop-topK pose
     float pose_match_iou_thresh = 0.2f; // IoU threshold to match pose box to det box
     float pose_kpt_conf_thresh = 0.1f; // kpt conf threshold
     bool  pose_aim_pref_nose = true;   // true: aim nose first, then chest; false: chest first
-    int   pose_run_topk = 1;           // run pose for top-K candidates per frame
-    int   pose_min_box_px = 12;        // skip very small boxes for pose
-    bool  pose_prior_center = true;     // prioritize nearer to center
-    double pose_center_lambda = 0.002;  // center bias factor in ranking (score - lambda*dist)
-    int    pose_center_radius_px = 0;    // >0: prefer within radius (0 = disable)
     std::string resolve_engine_path() const { return engine_path; }
 
     // ==================== [Detection Runtime (TRT通用)] ====================

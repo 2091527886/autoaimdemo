@@ -21,16 +21,6 @@ public:
     // inputs are the full captured view buffer and detections in the same view coordinates (0..view_w/h)
     // For each index in sel_idx, will fill out_kpts[idx] with kpts relative to the view (not full screen),
     // i.e., (x + det.box.x, y + det.box.y). If failed, out_ok[idx]=false.
-    void run_on_crops(unsigned char* data,
-                      int view_w,
-                      int view_h,
-                      size_t pitch,
-                      const std::vector<Detection>& dets,
-                      const std::vector<int>& sel_idx,
-                      std::vector<std::vector<trtyolo::KeyPoint>>& out_kpts,
-                      std::vector<bool>& out_ok,
-                      const Config& cfg,
-                      Timing& tm);
 
     // full-view mode: predict once for the whole view
     bool run_on_view(unsigned char* data,
