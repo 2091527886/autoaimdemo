@@ -32,10 +32,12 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
 find_package(CUDAToolkit REQUIRED)
 
 # 默认的 CUDA 架构
-set(CMAKE_CUDA_ARCHITECTURES 72 75 80 86 87 89 90 CACHE STRING "CUDA architectures" FORCE)
-if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 12.8)
-    list(APPEND CMAKE_CUDA_ARCHITECTURES 100 120)
-endif()
+# Use only the local GPU architecture (RTX 3060: sm_86)
+# Keep it overridable from command line by not using FORCE
+set(CMAKE_CUDA_ARCHITECTURES 86-real CACHE STRING "CUDA architectures")
+# Do not append future architectures to avoid unnecessary analysis/build time
+# (If needed, pass -DCMAKE_CUDA_ARCHITECTURES on the command line)
+
 message(STATUS "CUDA code for default SMs: ${CMAKE_CUDA_ARCHITECTURES}")
 
 # TensorRT 路径配置
