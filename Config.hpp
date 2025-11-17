@@ -80,8 +80,8 @@ public:
     bool pose_trt_managed_mem = false;
     int  pose_trt_input_w = 640;
     int  pose_trt_input_h = 640;
-    float pose_match_iou_thresh = 0.2f; // IoU threshold to match pose box to det box
-    float pose_kpt_conf_thresh = 0.1f; // kpt conf threshold
+    float pose_match_iou_thresh = 0.3f; // IoU threshold to match pose box to det box
+    float pose_kpt_conf_thresh = 0.05f; // kpt conf threshold
     bool  pose_aim_pref_nose = true;   // true: aim nose first, then chest; false: chest first
     std::string resolve_engine_path() const { return engine_path; }
 
@@ -93,9 +93,9 @@ public:
     std::vector<float> trt_std  {1.f,1.f,1.f};
     float trt_border_value = 114.f;
 
-    int  lb_block_x = 32;
-    int  lb_block_y = 8;
-    bool lb_use_launch_bounds = true;
+    int  lb_block_x = 16;
+    int  lb_block_y = 16;
+    bool lb_use_launch_bounds = false;
     int  lb_min_blocks_per_sm = 2;
     bool lb_use_occupancy = false;
     std::string lb_block_cfg_path = "blocks_default.cfg";
@@ -107,7 +107,7 @@ public:
 
     // ==================== [Model Input & Thresholds] ====================
     const int   crop_size_px = 640;
-    const float conf_thresh = 0.5f;
+    const float conf_thresh = 0.7f;
 
     const int aim_key = VK_RBUTTON;
     const double y_anchor_ratio = 0.6;
