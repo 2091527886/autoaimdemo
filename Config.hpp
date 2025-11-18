@@ -82,7 +82,7 @@ public:
     int  pose_trt_input_h = 640;
     float pose_match_iou_thresh = 0.3f; // IoU threshold to match pose box to det box
     float pose_kpt_conf_thresh = 0.05f; // kpt conf threshold
-    bool  pose_aim_pref_nose = true;   // true: aim nose first, then chest; false: chest first
+    bool  pose_aim_pref_nose = false;   // true: aim nose first, then chest; false: chest first
     std::string resolve_engine_path() const { return engine_path; }
 
     // ==================== [Detection Runtime (TRT通用)] ====================
