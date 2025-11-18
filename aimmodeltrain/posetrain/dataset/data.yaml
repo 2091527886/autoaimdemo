@@ -1,8 +1,0 @@
-kpt_shape:
-- 17
-- 3
-names:
-  0: pfperson
-path: posetrain/dataset
-train: images/train
-val: images/val

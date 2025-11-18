@@ -1,6 +1,8 @@
 # C/C++ build artifacts
 build/
 build-*/
+aimmodeltrain/
+aimmodeltrain/cvat
 cmake-build-*/
 CMakeFiles/
 CMakeCache.txt
