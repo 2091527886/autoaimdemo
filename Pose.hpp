@@ -29,6 +29,8 @@ public:
                      size_t pitch,
                      std::vector<std::vector<trtyolo::KeyPoint>>& out_kpts,
                      std::vector<cv::Rect>& out_boxes,
+                     std::vector<int>& out_classes,
+                     std::vector<float>& out_scores,
                      const Config& cfg,
                      Timing& tm);
 

@@ -1,6 +1,6 @@
 #include "Aim.hpp"
 Aim::Aim()
-    : c(), cap(c, c.crop_size_px, c.crop_size_px), od(c), pose(c), hk(c),
+    : c(), cap(c, c.crop_size_px, c.crop_size_px), pose(c), hk(c),
       crop((cap.w() - c.crop_size_px) / 2, (cap.h() - c.crop_size_px) / 2, c.crop_size_px, c.crop_size_px),
       ctr(c.crop_size_px / 2, c.crop_size_px / 2),
       lat(static_cast<size_t>(std::max(1, c.log_latency_every_n))), fc(c) {

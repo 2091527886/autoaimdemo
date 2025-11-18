@@ -1,7 +1,6 @@
 #include "Aim.hpp"
 #include "sh.hpp"
 #include <algorithm>
-#include "objdet_helpers.hpp"
 
 bool Aim::capture(FrameLat &fl, ScreenCapturer::CapturedView &view) {
   double cap_ms = 0.0; bool got = false;
@@ -28,31 +27,32 @@ bool Aim::capture(FrameLat &fl, ScreenCapturer::CapturedView &view) {
 
 bool Aim::infer_view(ScreenCapturer::CapturedView &view) {
   if (view.mapped && view.data) {
-    od.detect_view(view.data, view.width, view.height, view.pitch, ds, c, tm);
-    // run pose
+    // 使用 pose 作为唯一检测来源（mpose.engine）
     pose_kpts.clear();
     pose_ok.clear();
-    if (c.pose_enable) {
-      std::vector<std::vector<trtyolo::KeyPoint>> all_kpts;
-      std::vector<cv::Rect> all_boxes;
-      if (pose.run_on_view(view.data, view.width, view.height, view.pitch, all_kpts, all_boxes, c, tm)) {
-        pose_kpts.assign(ds.size(), {});
-        pose_ok.assign(ds.size(), false);
-        std::vector<int> used(all_boxes.size(), -1);
-        for (size_t i = 0; i < ds.size(); ++i) {
-          if (!c.is_target(ds[i].class_id)) continue;
-          int best = -1; float best_iou = 0.f;
-          for (size_t j = 0; j < all_boxes.size(); ++j) {
-            float iou = box_iou(ds[i].box, all_boxes[j]);
-            if (iou > best_iou) { best_iou = iou; best = (int)j; }
-          }
-          if (best >= 0 && best_iou >= c.pose_match_iou_thresh && used[best] == -1) {
-            pose_kpts[i] = all_kpts[best];
-            pose_ok[i] = true;
-            used[best] = (int)i;
-          }
-        }
+    std::vector<std::vector<trtyolo::KeyPoint>> all_kpts;
+    std::vector<cv::Rect> all_boxes;
+    std::vector<int> all_classes;
+    std::vector<float> all_scores;
+    if (c.pose_enable && pose.run_on_view(view.data, view.width, view.height, view.pitch, all_kpts, all_boxes, all_classes, all_scores, c, tm)) {
+      // build ds 1:1 from pose results
+      ds.clear();
+      ds.reserve(all_boxes.size());
+      for (size_t i=0;i<all_boxes.size();++i){
+        if (i < all_scores.size() && all_scores[i] < c.conf_thresh) continue;
+        Detection d; d.box = all_boxes[i]; d.class_id = (i<(size_t)all_classes.size()? all_classes[i] : 0); d.confidence = (i<(size_t)all_scores.size()? all_scores[i] : 0.f);
+        if (d.box.width>0 && d.box.height>0) ds.emplace_back(d);
       }
+      // pose keypoints align with ds; as we filtered by conf, rebuild kpts accordingly
+      pose_kpts.assign(ds.size(), {});
+      pose_ok.assign(ds.size(), false);
+      size_t k=0;
+      for (size_t i=0;i<all_boxes.size();++i){
+        if (i < all_scores.size() && all_scores[i] < c.conf_thresh) continue;
+        if (k < ds.size()) { pose_kpts[k] = (i<all_kpts.size()? all_kpts[i] : std::vector<trtyolo::KeyPoint>{}); pose_ok[k] = !pose_kpts[k].empty(); ++k; }
+      }
+    } else {
+      ds.clear();
     }
 
     cap.release_view(view);

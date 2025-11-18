@@ -11,7 +11,6 @@
 #include "AimAlgo.hpp"
 #include "HotkeyManager.hpp"
 #include "ScreenCapturer.hpp"
-#include "ObjDet.hpp"
 #include "Pose.hpp"
 #include "OCSort.hpp"
 #include "target_selector.hpp"
@@ -57,7 +56,6 @@ private:
     // state
     Config c;
     ScreenCapturer cap;
-    ObjDet od;
     PoseInfer pose;
     Mouse mouse;
     AimAlgo algo;

@@ -2,7 +2,6 @@
 #include "Config.hpp"
 #include "Timing.hpp"
 #include "Detection.hpp"
-#include "objdet_helpers.hpp"
 
 #include "trtyolo_inc.hpp"
 
@@ -25,7 +24,7 @@ PoseInfer::PoseInfer(const Config& cfg)
     if (cfg.pose_trt_cuda_mem) opt.enableCudaMem();
     if (cfg.pose_trt_managed_mem) opt.enableManagedMemory();
 
-    opt.setInputDimensions(640, 640);
+    opt.setInputDimensions(cfg.pose_trt_input_w, cfg.pose_trt_input_h);
     if (cfg.perf_report) opt.enablePerformanceReport();
 
     try{
@@ -45,6 +44,8 @@ bool PoseInfer::run_on_view(unsigned char* data,
                             size_t pitch,
                             std::vector<std::vector<trtyolo::KeyPoint>>& out_kpts,
                             std::vector<cv::Rect>& out_boxes,
+                            std::vector<int>& out_classes,
+                            std::vector<float>& out_scores,
                             const Config& cfg,
                             Timing& tm){
     out_kpts.clear(); out_boxes.clear();
@@ -58,6 +59,15 @@ bool PoseInfer::run_on_view(unsigned char* data,
         out_kpts = r.kpts; // already in view coords
         out_boxes.clear(); out_boxes.reserve(r.boxes.size());
         for (const auto& b : r.boxes) out_boxes.emplace_back((int)b.left, (int)b.top, (int)(b.right - b.left), (int)(b.bottom - b.top));
+        out_classes = r.classes;
+        out_scores  = r.scores;
+        // fetch TRT perf strings for this frame (if enabled)
+        if (cfg.perf_report) {
+            auto pr = model_->performanceReport();
+            tm.trt_throughput = std::get<0>(pr);
+            tm.trt_cpu_lat    = std::get<1>(pr);
+            tm.trt_gpu_lat    = std::get<2>(pr);
+        }
         return true;
     } else {
         auto res=do_predict(batch); if (res.empty()) return false; const auto& r = res[0];
@@ -65,6 +75,14 @@ bool PoseInfer::run_on_view(unsigned char* data,
         out_kpts = r.kpts;
         out_boxes.clear(); out_boxes.reserve(r.boxes.size());
         for (const auto& b : r.boxes) out_boxes.emplace_back((int)b.left, (int)b.top, (int)(b.right - b.left), (int)(b.bottom - b.top));
+        out_classes = r.classes;
+        out_scores  = r.scores;
+        if (cfg.perf_report) {
+            auto pr = model_->performanceReport();
+            tm.trt_throughput = std::get<0>(pr);
+            tm.trt_cpu_lat    = std::get<1>(pr);
+            tm.trt_gpu_lat    = std::get<2>(pr);
+        }
         return true;
     }
 }

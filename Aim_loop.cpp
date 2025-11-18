@@ -5,6 +5,7 @@
 #include "CtrlHandler.hpp"
 #include "OCSort.hpp"
 #include "target_selector.hpp"
+#include "PoseOCSBridge.hpp"
 
 void Aim::loop() {
   while (true) {
@@ -14,6 +15,13 @@ void Aim::loop() {
     auto loop_start_time = tn();
 
     FrameLat fl;
+
+    // reset per-frame timing accumulators to avoid cross-frame accumulation
+    tm.infer_ms = 0.0;
+    tm.post_ms = 0.0;
+    tm.trt_throughput.clear();
+    tm.trt_cpu_lat.clear();
+    tm.trt_gpu_lat.clear();
 
     ScreenCapturer::CapturedView view;
     if (!capture(fl, view)) {
@@ -35,15 +43,16 @@ void Aim::loop() {
     {
       // 0) 将 Timing 帧间隔传给 OCSort KF
       ocs.set_dt((float)dt_frame);
-      // 1) 使用设备侧检测结果视图，直接调用 OCSort::update_dev（真·零拷贝链路）
+      // 使用 Pose→Host→Device 桥接接入 OCSort（仅用于目标选择，不参与瞄准追踪）
       std::vector<OCSort::Trk> trks;
-      const auto& dv = od.get_last_dev();
-      if (dv.num > 0 && dv.xyxy && dv.scores && dv.classes) {
-        // 与 trtyolo 串联同一流，端到端零等待
-        ocs.update_dev(dv.xyxy, dv.scores, dv.classes, dv.num, trks, cap.w(), cap.h(), od.get_stream());
+      if (c.ocs_enable) {
+        (void)ocs_update_from_pose_host(ds, ocs, cap.w(), cap.h(), trks, 0);
       } else {
-        // 若无设备视图（极端情况），不进行 CPU 路径回退，直接输出空轨迹
-        trks.clear();
+        trks.reserve(ds.size());
+        for (const auto& d : ds){
+          OCSort::Trk t{}; t.x1=d.box.x; t.y1=d.box.y; t.x2=d.box.x+d.box.width; t.y2=d.box.y+d.box.height;
+          t.ox1=t.x1; t.oy1=t.y1; t.ox2=t.x2; t.oy2=t.y2; t.score=d.confidence; t.cls=d.class_id; t.id=-1; t.valid=true; trks.push_back(t);
+        }
       }
 
       // 更新 overlay 缓存的全部 track 框（用于 ovl_show_trk_all）
@@ -82,28 +91,28 @@ void Aim::loop() {
 
         // 叠加层用 track 框；鼠标与瞄准完全使用“原始检测框 obs”
         lock_rect_ = { (float)(crop.x + sel.obs.x), (float)(crop.y + sel.obs.y), (float)sel.obs.width, (float)sel.obs.height };
-        // 优先在本帧 ds 中找到与 sel.obs 对应的元素，确保 aim_no_pred 能利用 pose 关键点
-        auto iou_rect = [](const cv::Rect& a, const cv::Rect& b)->double{
-          int x1 = std::max(a.x, b.x);
-          int y1 = std::max(a.y, b.y);
-          int x2 = std::min(a.x + a.width,  b.x + b.width);
-          int y2 = std::min(a.y + a.height, b.y + b.height);
-          int w = std::max(0, x2 - x1);
-          int h = std::max(0, y2 - y1);
-          double inter = 1.0 * w * h;
-          double uni = 1.0 * a.area() + 1.0 * b.area() - inter + 1e-6;
-          return inter / uni;
+        
+        // 优先几何近似匹配 ds 中的检测，避免严格相等导致姿态丢失
+        auto geom_match = [&](const cv::Rect& a, const cv::Rect& b){
+          auto ca = cv::Point2f((float)a.x + a.width*0.5f, (float)a.y + a.height*0.5f);
+          auto cb = cv::Point2f((float)b.x + b.width*0.5f, (float)b.y + b.height*0.5f);
+          float dc = std::hypot(ca.x-cb.x, ca.y-cb.y);
+          float sa = (float)a.area(), sb = (float)b.area();
+          float srel = (sa>1 && sb>1) ? std::abs(sa-sb) / std::max(sa,sb) : 0.0f;
+          return (dc <= c.sel_geom_center_eps_px) && (srel <= c.sel_geom_area_rel_eps);
         };
+        
         const Detection* pDet = nullptr;
-        int best_i = -1; double best_iou = -1.0;
-        for (int i = 0; i < (int)ds.size(); ++i){
-          const auto& d = ds[i];
-          if (d.class_id != sel.cls) continue;
-          double u = iou_rect(d.box, sel.obs);
-          if (u > best_iou){ best_iou = u; best_i = i; }
+        if (sel.ds_idx >= 0 && sel.ds_idx < (int)ds.size()){
+          const auto& d = ds[sel.ds_idx];
+          if (d.class_id == sel.cls && geom_match(d.box, sel.obs)) pDet = &d;
         }
-        if (best_i >= 0 && best_iou >= (double)c.pose_match_iou_thresh){
-          pDet = &ds[best_i];
+        if (!pDet){
+          for (int i = 0; i < (int)ds.size(); ++i){
+            const auto& d = ds[i];
+            if (d.class_id != sel.cls) continue;
+            if (geom_match(d.box, sel.obs)){ pDet = &d; break; }
+          }
         }
         Detection det_fallback; det_fallback.box = sel.obs; det_fallback.confidence = sel.score; det_fallback.class_id = sel.cls;
         const Detection& det_for_aim = pDet ? *pDet : det_fallback;

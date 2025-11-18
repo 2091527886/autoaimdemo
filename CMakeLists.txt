@@ -96,6 +96,7 @@ add_executable(aimassistant
   Aim_ovl_cross.cpp
   Aim_ovl_lock.cpp
   OCSort.cpp
+  PoseOCSBridge.cpp
   Aim_log.cpp
   FpsCtl.cpp
   OCSort.hpp
@@ -103,9 +104,6 @@ add_executable(aimassistant
   Mouse.cpp
   HotkeyManager.cpp
   SystemTuner.cpp
-  ObjDet_init.cpp
-  ObjDet_detect.cpp
-  ObjDet_perf.cpp
   Pose.cpp
   ScreenCapturer.Init.cpp
   ScreenCapturer.Release.cpp

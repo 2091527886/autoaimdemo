@@ -56,22 +56,23 @@ public:
     float sel_area_w = 1.0f;
     float sel_conf_w = 1.0f;
     bool  sel_keep_lock = true;
+    // obs 与 ds 的几何近似匹配阈值（用于从选中目标回找姿态/检测项）
+    float sel_geom_center_eps_px = 2.0f;   // 中心点距离阈值（像素）
+    float sel_geom_area_rel_eps = 0.02f;   // 面积相对误差阈值 [0,1]
 
     // Overlay 显示控制
     bool  ovl_show_obs = true; // 原始检测框（obs）
     bool  ovl_show_trk = true; // 跟踪框（track）
     bool  ovl_show_trk_all = true; // 显示全部 track 框与 id
+    bool  ovl_show_pose = true; // 独立的骨架开关（默认开启）
 
 public:
-    // ==================== [Detection (TRT YOLO)] ====================
-
-    std::string engine_path = "m.engine";
-
     // ==================== [Pose (TRT YOLO PoseModel)] ====================
-    // 部位选择与骨架可视化，仅参与瞄准点选择；不影响 det 敌友分类
+    // 统一以 pose 作为检测来源：bbox+关键点
+
 
     bool pose_enable = true;
-    std::string pose_engine_path = "spose.engine"; // your provided engine name
+    std::string pose_engine_path = "mpose.engine"; // YOLO11m-pose
     bool pose_trt_swap_rb = true;
     bool pose_trt_use_normalize = false;
     std::vector<float> pose_trt_mean {0.f,0.f,0.f};
@@ -80,30 +81,13 @@ public:
     bool pose_trt_managed_mem = false;
     int  pose_trt_input_w = 640;
     int  pose_trt_input_h = 640;
-    float pose_match_iou_thresh = 0.3f; // IoU threshold to match pose box to det box
+    // 已移除 det/pose IoU 匹配；不再需要 pose_match_iou_thresh
     float pose_kpt_conf_thresh = 0.05f; // kpt conf threshold
     bool  pose_aim_pref_nose = false;   // true: aim nose first, then chest; false: chest first
-    std::string resolve_engine_path() const { return engine_path; }
 
     // ==================== [Detection Runtime (TRT通用)] ====================
 
-    bool trt_swap_rb = true;
-    bool trt_use_normalize = false;
-    std::vector<float> trt_mean {0.f,0.f,0.f};
-    std::vector<float> trt_std  {1.f,1.f,1.f};
     float trt_border_value = 114.f;
-
-    int  lb_block_x = 16;
-    int  lb_block_y = 16;
-    bool lb_use_launch_bounds = false;
-    int  lb_min_blocks_per_sm = 2;
-    bool lb_use_occupancy = false;
-    std::string lb_block_cfg_path = "blocks_default.cfg";
-
-    bool trt_cuda_mem = false;
-    bool trt_managed_mem = false;
-    int  trt_input_w = 0;
-    int  trt_input_h = 0;
 
     // ==================== [Model Input & Thresholds] ====================
     const int   crop_size_px = 640;
@@ -172,9 +156,10 @@ public:
     double wind_out_limit_px = 340.0;
 
     // ==================== [Classes & Targets] ====================
-    // 类别列表与目标ID（det 用于敌友识别）
+    // pose 模型类别：0=enemy, 1=teammate
     std::vector<std::string> classes { "enemy","teammate" };
     std::vector<int>         target_ids { 0 };
+    int                      track_id_filter = -1; // -1: 不限制；>=0: 仅命中特定 track id
 
     // ==================== [Logging & Performance] ====================
     // 捕获/延迟/性能日志开关与频率
@@ -290,11 +275,6 @@ private:
         opt_report_every_n = MX(1, opt_report_every_n);
         cap = (cap==1)?1:0;
         cap_out = MX(0, cap_out);
-        if (trt_mean.size()!=3) trt_mean = {0.f,0.f,0.f};
-        if (trt_std.size()!=3)  trt_std  = {1.f,1.f,1.f};
-        lb_block_x = MX(1, lb_block_x);
-        lb_block_y = MX(1, lb_block_y);
-        lb_min_blocks_per_sm = MX(1, lb_min_blocks_per_sm);
     }
     void v_overlay() {
         // clamp overlay layers to [0,1000]
