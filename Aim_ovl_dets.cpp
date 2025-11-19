@@ -2,11 +2,44 @@
 #include "sh.hpp"
 #include "ovl_util.hpp"
 #include "aim_ovl.hpp"
+#include <unordered_map>
+#include <unordered_set>
+#include <algorithm>
 
 void Aim::draw_ovl(double &ms) {
   if (!c.ovl) { ms = 0.0; return; }
   auto t0 = (c.timing ? tn() : tp{});
   gover.BeginFrame();
+  // 统一文字收集器（每帧）
+  struct TxtEnt { int x=0,y=0; uint16_t layer=0; OverlayColor col=0; int pri=-1; std::vector<std::wstring> lines; };
+  std::unordered_map<uint64_t, TxtEnt> txtm;
+  auto kxy = [](float xf, float yf){ int ix = (int)std::lround(xf); int iy = (int)std::lround(yf); return (uint64_t(uint32_t(ix))<<32) | uint32_t(iy); };
+  enum { PRI_OBS=0, PRI_TRK=1, PRI_SEL=2, PRI_LOCK=3 };
+  auto ord_of = [&](int pri){ return (pri==PRI_LOCK?0:(pri==PRI_SEL?1:(pri==PRI_TRK?2:3))); };
+  auto add_txt = [&](float x, float y, const std::wstring& line, OverlayColor col, uint16_t layer, int pri){
+    float fsz = (float)std::max(1, c.ovl_font_px);
+    int ix = (int)std::lround(x); int iy = (int)std::lround(y);
+    // 网格量化，减小轻微抖动带来的分裂
+    int grid = std::max(8, (int)std::lround(fsz * 0.8f));
+    auto q = [&](int v){ return (v>=0)? ((v + grid/2)/grid*grid) : ((v - grid/2)/grid*grid); };
+    int qx = q(ix), qy = q(iy);
+    // 非对称阈值：横向小、纵向大，更符合标签位移特性
+    int ex = std::max(8,  (int)std::lround(fsz * 0.5f));
+    int ey = std::max(10, (int)std::lround(fsz * 1.2f));
+    auto best_it = txtm.end(); int best_sc = 1e9;
+    for (auto it = txtm.begin(); it != txtm.end(); ++it){
+      const auto &e = it->second; int dx = std::abs(e.x - qx), dy = std::abs(e.y - qy);
+      if (dx <= ex && dy <= ey){ int sc = dx + dy; if (sc < best_sc){ best_sc = sc; best_it = it; } }
+    }
+    if (best_it == txtm.end()){
+      uint64_t k = kxy((float)qx,(float)qy);
+      TxtEnt e; e.x=qx; e.y=qy; e.layer=layer; e.col=col; e.pri=pri; if(!line.empty()) e.lines.push_back(line); txtm.emplace(k, std::move(e));
+    } else {
+      auto &e = best_it->second;
+      if (pri > e.pri){ e.pri = pri; e.layer = layer; e.col = col; }
+      if (!line.empty()) e.lines.push_back(line);
+    }
+  };
   auto fmt_conf = [](float s){
     if (!(s >= 0.0f)) s = 0.0f;
     int v = (int)std::round(s * 100.0f);
@@ -17,6 +50,7 @@ void Aim::draw_ovl(double &ms) {
     r += std::to_string(b);
     return r;
   };
+
 
   // 绘制原始检测框（obs）
   if (c.ovl_show_obs){
@@ -42,8 +76,7 @@ void Aim::draw_ovl(double &ms) {
     std::wstring wlbl(lbl.begin(), lbl.end());
     if (!wlbl.empty()) {
       OverlayColor tcol = ARGB(255, (uint8_t)rr, (uint8_t)gg, (uint8_t)bb);
-      if (!c.ovl_font_name.empty()) gover.AddTextL(x, ty, wlbl, fsz, tcol, c.ovl_font_name, (uint16_t)c.ovl_layer_text);
-      else gover.AddTextL(x, ty, wlbl, fsz, tcol, (uint16_t)c.ovl_layer_text);
+      add_txt(x, ty, wlbl, tcol, (uint16_t)c.ovl_layer_text, PRI_OBS);
     }
     }
   }
@@ -88,8 +121,7 @@ void Aim::draw_ovl(double &ms) {
         float fsz = (float)std::max(1, c.ovl_font_px);
         float ty = MX(0.0f, y - fsz - 2.0f);
         OverlayColor tcol = ARGB(255, (uint8_t)rr, (uint8_t)gg, (uint8_t)bb);
-        if (!c.ovl_font_name.empty()) gover.AddTextL(x, ty, wtxt, fsz, tcol, c.ovl_font_name, (uint16_t)c.ovl_layer_text);
-        else gover.AddTextL(x, ty, wtxt, fsz, tcol, (uint16_t)c.ovl_layer_text);
+        add_txt(x, ty, wtxt, tcol, (uint16_t)c.ovl_layer_text, PRI_TRK);
       }
     }
     // 绘制当前选择的 track（锁定目标用黄色+加粗）
@@ -131,10 +163,34 @@ void Aim::draw_ovl(double &ms) {
       OverlayColor tcol = (lock_ && cur_sel.track_id == locked_track_id)
         ? ARGB(255, (uint8_t)c.lock_r, (uint8_t)c.lock_g, (uint8_t)c.lock_b)
         : ARGB(255, (uint8_t)rr, (uint8_t)gg, (uint8_t)bb);
-      if (!c.ovl_font_name.empty()) gover.AddTextL(x, ty, wtxt, fsz, tcol, c.ovl_font_name, (uint16_t)(lock_ && cur_sel.track_id == locked_track_id ? c.ovl_layer_lock : c.ovl_layer_text));
-      else gover.AddTextL(x, ty, wtxt, fsz, tcol, (uint16_t)(lock_ && cur_sel.track_id == locked_track_id ? c.ovl_layer_lock : c.ovl_layer_text));
+      uint16_t layer_txt = (uint16_t)(lock_ && cur_sel.track_id == locked_track_id ? c.ovl_layer_lock : c.ovl_layer_text);
+      int pri = (lock_ && cur_sel.track_id == locked_track_id) ? PRI_LOCK : PRI_SEL;
+      add_txt(x, ty, wtxt, tcol, layer_txt, pri);
     }
  }
+
+  // 合并来自外部模块（如锁定提示）的待下发文本
+  if (!pending_texts_.empty()){
+    // 按 ord 固定行序（锁定提示最上）
+    std::stable_sort(pending_texts_.begin(), pending_texts_.end(), [](const PendingText& a, const PendingText& b){ return a.ord < b.ord; });
+    for (auto &pt : pending_texts_) add_txt(pt.x, pt.y, pt.text, pt.col, pt.layer, pt.pri);
+    pending_texts_.clear();
+  }
+
+  // 统一下发合并后的多行文本
+  if (!txtm.empty()){
+    float fsz = (float)std::max(1, c.ovl_font_px);
+    for (auto &kv : txtm){
+      const auto &e = kv.second;
+      if (e.lines.empty()) continue;
+      // 去重并保持顺序：避免重复的“类名 置信度”等
+      std::wstring wtxt;
+      std::unordered_set<std::wstring> seen;
+      for (const auto& ln : e.lines){ if (seen.insert(ln).second){ if (!wtxt.empty()) wtxt.push_back(L'\n'); wtxt += ln; } }
+      if (!c.ovl_font_name.empty()) gover.AddTextL((float)e.x, (float)e.y, wtxt, fsz, e.col, c.ovl_font_name, e.layer);
+      else gover.AddTextL((float)e.x, (float)e.y, wtxt, fsz, e.col, e.layer);
+    }
+  }
 
   aim_draw_cross(this);
   aim_draw_lock(this);

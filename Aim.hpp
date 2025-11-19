@@ -95,7 +95,10 @@ private:
     struct CachedTrk { cv::Rect trk; int id; int cls; float score; };
     std::vector<CachedTrk> last_trks_;
 
-    WindState wind_;
+   struct PendingText { float x; float y; std::wstring text; OverlayColor col; uint16_t layer; int pri; int ord; };
+   std::vector<PendingText> pending_texts_;
+
+   WindState wind_;
 
     // grant access to helper free functions defined in separate units
     friend void aim_draw_cross(Aim* self);

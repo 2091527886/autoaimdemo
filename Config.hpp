@@ -215,7 +215,7 @@ public:
     std::vector<int> ovl_cg { 0, 255 };
     std::vector<int> ovl_cb { 0, 0 };
 
-    int          ovl_font_px = 40;
+    int          ovl_font_px = 20;
     std::wstring ovl_font_name;
 
     int ovl_only = -1;

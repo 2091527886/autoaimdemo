@@ -9,9 +9,8 @@ void aim_draw_lock(Aim* self) {
     float fsz = (float)std::max(1, c.ovl_font_px);
     float ty = MX(0.0f, self->lock_rect_.y - fsz - 2.0f);
     const std::wstring& wtxt = c.lock_text;
-    if (!c.ovl_font_name.empty())
-      self->gover.AddTextL(self->lock_rect_.x, ty, wtxt, fsz, ycol, c.ovl_font_name, (uint16_t)c.ovl_layer_lock);
-    else
-      self->gover.AddTextL(self->lock_rect_.x, ty, wtxt, fsz, ycol, (uint16_t)c.ovl_layer_lock);
+    // 推入统一文本管道，优先级使用 3（与 PRI_LOCK 对齐）
+    Aim::PendingText pt{ (float)self->lock_rect_.x, ty, wtxt, ycol, (uint16_t)c.ovl_layer_lock, 3, 0 };
+    self->pending_texts_.push_back(std::move(pt));
   }
 }
