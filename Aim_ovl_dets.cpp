@@ -7,6 +7,17 @@ void Aim::draw_ovl(double &ms) {
   if (!c.ovl) { ms = 0.0; return; }
   auto t0 = (c.timing ? tn() : tp{});
   gover.BeginFrame();
+  auto fmt_conf = [](float s){
+    if (!(s >= 0.0f)) s = 0.0f;
+    int v = (int)std::round(s * 100.0f);
+    int a = v / 100; int b = std::abs(v % 100);
+    std::string r = std::to_string(a);
+    r.push_back('.');
+    if (b < 10) r.push_back('0');
+    r += std::to_string(b);
+    return r;
+  };
+
   // 绘制原始检测框（obs）
   if (c.ovl_show_obs){
     for (size_t i=0;i<ds.size();++i) { const auto &d = ds[i];
@@ -27,7 +38,7 @@ void Aim::draw_ovl(double &ms) {
     gover.AddRectL({x, y, w, h}, col, (float)c.ovl_thick, (uint16_t)c.ovl_layer_obs);
     float fsz = (float)std::max(1, c.ovl_font_px);
     float ty = MX(0.0f, y - fsz - 2.0f);
-    std::string lbl = c.name_or_id(cid);
+    std::string lbl = c.name_or_id(cid) + " " + fmt_conf(d.confidence);
     std::wstring wlbl(lbl.begin(), lbl.end());
     if (!wlbl.empty()) {
       OverlayColor tcol = ARGB(255, (uint8_t)rr, (uint8_t)gg, (uint8_t)bb);
@@ -72,7 +83,7 @@ void Aim::draw_ovl(double &ms) {
         float w = (float)t.trk.width;
         float h = (float)t.trk.height;
         gover.AddRectL({x,y,w,h}, col, (float)c.ovl_thick, (uint16_t)c.ovl_layer_trk_all);
-        std::string text = std::string("id=") + std::to_string(t.id) + " " + c.name_or_id(t.cls);
+        std::string text = std::string("id=") + std::to_string(t.id) + " " + c.name_or_id(t.cls) + " " + fmt_conf(t.score);
         std::wstring wtxt(text.begin(), text.end());
         float fsz = (float)std::max(1, c.ovl_font_px);
         float ty = MX(0.0f, y - fsz - 2.0f);
@@ -98,8 +109,22 @@ void Aim::draw_ovl(double &ms) {
       } else {
         gover.AddRectL({x,y,w,h}, col, (float)c.ovl_thick, (uint16_t)c.ovl_layer_trk_sel);
       }
-      // 显示 id 与 cls
-      std::string text = std::string("id=") + std::to_string(cur_sel.track_id) + " " + c.name_or_id(cur_sel.cls);
+      // 显示 id 与 cls + 置信度（优先 last_trks_ 的 score，回退匹配 ds.confidence，再回退 0.00）
+      float sc_show = 0.0f;
+      bool sc_ok = false;
+      for (const auto& ct : last_trks_) { if (ct.id == cur_sel.track_id) { sc_show = ct.score; sc_ok = true; break; } }
+      if (!sc_ok) {
+        auto geom_match = [&](const cv::Rect& a, const cv::Rect& b){
+          auto ca = cv::Point2f((float)a.x + a.width*0.5f, (float)a.y + a.height*0.5f);
+          auto cb = cv::Point2f((float)b.x + b.width*0.5f, (float)b.y + b.height*0.5f);
+          float dc = std::hypot(ca.x-cb.x, ca.y-cb.y);
+          float sa = (float)a.area(), sb = (float)b.area();
+          float srel = (sa>1 && sb>1) ? std::abs(sa-sb) / std::max(sa,sb) : 0.0f;
+          return (dc <= c.sel_geom_center_eps_px) && (srel <= c.sel_geom_area_rel_eps);
+        };
+        for (size_t i=0;i<ds.size();++i){ const auto& d=ds[i]; if (d.class_id!=cur_sel.cls) continue; if (geom_match(d.box, cur_sel.obs)){ sc_show = d.confidence; sc_ok = true; break; } }
+      }
+      std::string text = std::string("id=") + std::to_string(cur_sel.track_id) + " " + c.name_or_id(cur_sel.cls) + " " + fmt_conf(sc_show);
       std::wstring wtxt(text.begin(), text.end());
       float fsz = (float)std::max(1, c.ovl_font_px);
       float ty = MX(0.0f, y - fsz - 2.0f);
