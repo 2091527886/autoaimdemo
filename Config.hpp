@@ -108,7 +108,7 @@ public:
     double prop_dead_px = 0.6;
     bool   prop_use_dt = true;
 
-    bool   pred_enable = true;
+    bool   pred_enable = false;
     double pred_dt_max_ms = 7.0;
     double pred_v_tc_ms  = 12.0;
     double pred_v_lim_px = 220.0;
