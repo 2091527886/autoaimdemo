@@ -91,7 +91,7 @@ public:
 
     // ==================== [Model Input & Thresholds] ====================
     const int   crop_size_px = 640;
-    const float conf_thresh = 0.7f;
+    const float conf_thresh = 0.26f;
 
     const int aim_key = VK_RBUTTON;
     const double y_anchor_ratio = 0.6;
@@ -104,7 +104,7 @@ public:
     double prop_k_x = 0.4;
     double prop_k_y = 0.4;
     double prop_out_limit = 360.0;
-    double prop_tc_ms = 6.0;
+    double prop_tc_ms = 16.0;
     double prop_dead_px = 0;
     bool   prop_use_dt = true;
 
@@ -118,9 +118,9 @@ public:
     double dist_hys_h  = 24.0;
     bool   curve_interp = false;
 
-    double seg_near_kx=0.4, seg_near_ky=0.4, seg_near_tc_ms=6.0, seg_near_lim=360.0;
-    double seg_mid_kx =0.4, seg_mid_ky =0.4, seg_mid_tc_ms =6.0, seg_mid_lim =330.0;
-    double seg_far_kx =0.4, seg_far_ky =0.4, seg_far_tc_ms =6.0, seg_far_lim =300.0;
+    double seg_near_kx=0.4, seg_near_ky=0.4, seg_near_tc_ms=16.0, seg_near_lim=360.0;
+    double seg_mid_kx =0.4, seg_mid_ky =0.4, seg_mid_tc_ms =16.0, seg_mid_lim =330.0;
+    double seg_far_kx =0.4, seg_far_ky =0.4, seg_far_tc_ms =16.0, seg_far_lim =300.0;
 
     bool   aim_dyn_anchor = true;
     double y_anchor_head  = 0.58;
