@@ -128,7 +128,6 @@ public:
     double aim_hys_h      = 28.0;
     bool   aim_lock_on_seg = true;
 
-    bool   aim_single_use_pred = true;
     bool   aim_only_with_key = true;
 
     // ==================== [Wind (Mouse micro-movement)] ====================
