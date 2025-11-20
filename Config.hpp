@@ -101,8 +101,8 @@ public:
     // ==================== [Aim Control & Prediction] ====================
     // 运动学、预测、距离分段与锚点等行为控制
     bool   prop = true;
-    double prop_k_x = 0.8;
-    double prop_k_y = 0.8;
+    double prop_k_x = 0.4;
+    double prop_k_y = 0.4;
     double prop_out_limit = 360.0;
     double prop_tc_ms = 6.0;
     double prop_dead_px = 0.6;
@@ -118,9 +118,9 @@ public:
     double dist_hys_h  = 24.0;
     bool   curve_interp = false;
 
-    double seg_near_kx=0.32, seg_near_ky=0.34, seg_near_tc_ms=7.0, seg_near_lim=360.0;
-    double seg_mid_kx =0.24, seg_mid_ky =0.26, seg_mid_tc_ms =6.5, seg_mid_lim =330.0;
-    double seg_far_kx =0.18, seg_far_ky =0.20, seg_far_tc_ms =6.0, seg_far_lim =300.0;
+    double seg_near_kx=0.4, seg_near_ky=0.4, seg_near_tc_ms=6.0, seg_near_lim=360.0;
+    double seg_mid_kx =0.4, seg_mid_ky =0.4, seg_mid_tc_ms =6.0, seg_mid_lim =330.0;
+    double seg_far_kx =0.4, seg_far_ky =0.4, seg_far_tc_ms =6.0, seg_far_lim =300.0;
 
     bool   aim_dyn_anchor = true;
     double y_anchor_head  = 0.58;
