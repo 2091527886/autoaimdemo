@@ -105,7 +105,7 @@ public:
     double prop_k_y = 0.4;
     double prop_out_limit = 360.0;
     double prop_tc_ms = 6.0;
-    double prop_dead_px = 0.6;
+    double prop_dead_px = 0;
     bool   prop_use_dt = true;
 
     bool   pred_enable = false;
@@ -132,7 +132,7 @@ public:
 
     // ==================== [Wind (Mouse micro-movement)] ====================
     // 鼠标微扰控制（平滑/随机/风力）
-    bool   wind_enable = true;
+    bool   wind_enable = false;
     int    wind_rng_seed = 0;
     double wind_step_min_px = 0.6;
     double wind_step_max_px = 7.5;
