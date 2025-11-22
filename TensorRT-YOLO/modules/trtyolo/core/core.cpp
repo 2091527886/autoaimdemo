@@ -23,20 +23,24 @@ const std::map<nvinfer1::ILogger::Severity, std::string> TRTLogger::severity_map
 };
 
 // 构造函数
-TRTLogger::TRTLogger(nvinfer1::ILogger::Severity severity) : severity_(severity) {}
+TRTLogger::TRTLogger(nvinfer1::ILogger::Severity severity) : severity_(severity) {
+    // 确保标准错误为逐条自动刷新，避免任何环境下的延迟可见
+    std::cerr << std::unitbuf;
+}
 
 // 实现 log 方法
 void TRTLogger::log(nvinfer1::ILogger::Severity severity, const char* msg) noexcept {
     // 如果当前日志级别高于设置的日志级别，则忽略该日志
     if (severity > severity_) return;
 
-    // 根据日志级别选择输出流（INFO 及以上输出到标准输出，其他输出到标准错误）
-    std::ostream& stream = severity >= nvinfer1::ILogger::Severity::kINFO ? std::cout : std::cerr;
+    // 统一输出到标准错误，避免 stdout 在某些环境下的缓冲导致延迟可见
+    std::ostream& stream = std::cerr;
 
     // 查找日志级别的映射表，获取对应的前缀
     auto it = severity_map_.find(severity);
     if (it != severity_map_.end()) {
-        stream << it->second << msg << '\n';  // 输出日志
+        stream << it->second << msg << std::endl;  // 输出日志并刷新缓冲，确保即时可见
+        stream.flush();  // 追加显式 flush，确保逐条强制落地
     }
 }
 
@@ -45,7 +49,7 @@ TRTManager::TRTManager() : context_(nullptr), engine_(nullptr), runtime_(nullptr
 
 // 初始化方法
 void TRTManager::initialize(void const* blob, std::size_t size) {
-    logger_ = std::make_unique<TRTLogger>(nvinfer1::ILogger::Severity::kWARNING);
+    logger_ = std::make_unique<TRTLogger>(nvinfer1::ILogger::Severity::kINFO);
 
     initLibNvInferPlugins(logger_.get(), "");
 

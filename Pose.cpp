@@ -54,6 +54,7 @@ bool PoseInfer::run_on_view(unsigned char* data,
     std::vector<Img> batch; batch.emplace_back(img);
     auto do_predict = [&](const std::vector<Img>& imgs){ return model_->predict(imgs); };
     if (cfg.timing){ auto t0=tn(); auto res=do_predict(batch); auto t1=tn(); tm.infer_ms += msd(t1-t0).count();
+        if (cfg.perf_report) { auto pr = model_->performanceReport(); tm.trt_throughput = std::get<0>(pr); tm.trt_cpu_lat = std::get<1>(pr); tm.trt_gpu_lat = std::get<2>(pr); }
         if (res.empty()) return false; const auto& r = res[0];
         if (r.num<=0 || r.kpts.empty()) return false;
         out_kpts = r.kpts; // already in view coords
@@ -61,28 +62,17 @@ bool PoseInfer::run_on_view(unsigned char* data,
         for (const auto& b : r.boxes) out_boxes.emplace_back((int)b.left, (int)b.top, (int)(b.right - b.left), (int)(b.bottom - b.top));
         out_classes = r.classes;
         out_scores  = r.scores;
-        // fetch TRT perf strings for this frame (if enabled)
-        if (cfg.perf_report) {
-            auto pr = model_->performanceReport();
-            tm.trt_throughput = std::get<0>(pr);
-            tm.trt_cpu_lat    = std::get<1>(pr);
-            tm.trt_gpu_lat    = std::get<2>(pr);
-        }
         return true;
     } else {
-        auto res=do_predict(batch); if (res.empty()) return false; const auto& r = res[0];
+        auto res=do_predict(batch);
+        if (cfg.perf_report) { auto pr = model_->performanceReport(); tm.trt_throughput = std::get<0>(pr); tm.trt_cpu_lat = std::get<1>(pr); tm.trt_gpu_lat = std::get<2>(pr); }
+        if (res.empty()) return false; const auto& r = res[0];
         if (r.num<=0 || r.kpts.empty()) return false;
         out_kpts = r.kpts;
         out_boxes.clear(); out_boxes.reserve(r.boxes.size());
         for (const auto& b : r.boxes) out_boxes.emplace_back((int)b.left, (int)b.top, (int)(b.right - b.left), (int)(b.bottom - b.top));
         out_classes = r.classes;
         out_scores  = r.scores;
-        if (cfg.perf_report) {
-            auto pr = model_->performanceReport();
-            tm.trt_throughput = std::get<0>(pr);
-            tm.trt_cpu_lat    = std::get<1>(pr);
-            tm.trt_gpu_lat    = std::get<2>(pr);
-        }
         return true;
     }
 }

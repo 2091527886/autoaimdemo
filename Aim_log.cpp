@@ -12,9 +12,12 @@ void Aim::log_lat(FrameLat& fl) {
 
 void Aim::trt_log() {
     if (c.timing && !tm.trt_throughput.empty()) {
-        lg::ml(P_T, tm.trt_throughput, tm.trt_cpu_lat, tm.trt_gpu_lat);
-        tm.trt_throughput.clear();
-        tm.trt_cpu_lat.clear();
-        tm.trt_gpu_lat.clear();
+        int n = MX(1, c.log_latency_every_n);
+        if ((c.frame_idx % n) == 0) {
+            lg::ml(P_T, tm.trt_throughput, tm.trt_cpu_lat, tm.trt_gpu_lat);
+            tm.trt_throughput.clear();
+            tm.trt_cpu_lat.clear();
+            tm.trt_gpu_lat.clear();
+        }
     }
 }
