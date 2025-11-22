@@ -43,7 +43,7 @@ public:
     bool   adrc_use_dt = true;           // dt 源（ADRC内部）：true=用实测 dt；false=固定16ms（锁60更稳，抖动小）
     int    adrc_ctrl_low = 2;             // 近端抑制：0=不抑制（灵敏）/1=适中/2=强（更稳，接近目标更“刹车”）
     bool   adrc_inv_sign = true;         // 方向翻转：若“越纠越远”，置 true
-    double adrc_out_limit = 8.0;          // 输出限幅(px)：太慢→增大；过冲→减小（建议范围 6~14）
+    double adrc_out_limit = 500.0;          // 输出限幅(px)：太慢→增大；过冲→减小（建议范围 6~14）
     double adrc_r = 9.0;               // 小误差平滑区带宽：大→更稳更“软”，抖动小时可适当减小
     double adrc_b0 = 3;                // 模型增益估计：大→控制输出变小（估小易“猛”导致过冲）
     double adrc_delta = 0.05;            // fal 小量阈值（一般保持默认）
