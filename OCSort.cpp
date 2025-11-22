@@ -307,7 +307,7 @@ void OCSort::update_dev(const float* det_xyxy, const float* det_scores, const in
                               det_cls, reinterpret_cast<const int*>(db_.meta_cls),
                               db_.det_used, db_.trk_matched, db_.sel_det, stream);
             // 由选中的 det 构建 z/m；应用 ORU；更新 KF
-            float oru_alpha = oru_ ? oru_alpha_ : 0.0f;
+            oru_alpha = oru_ ? oru_alpha_ : 0.0f;
             ocs::build_z_from_sel(det_xyxy, D, db_.sel_det, actM, db_.obs_prev, oru_alpha, db_.kf_z, db_.kf_m, stream);
             ocs::kf_update(db_.kf_x, db_.kf_P, db_.kf_z, db_.kf_m, actM, r_pos_, r_size_, stream);
             // 命中统计：BYTE 二阶段新增匹配同样归零 tsu 并累计 hit

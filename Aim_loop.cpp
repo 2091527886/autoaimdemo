@@ -42,7 +42,7 @@ void Aim::loop() {
     double mou_cost_ms = 0.0;
     {
       // 0) 将 Timing 帧间隔传给 OCSort KF
-      ocs.set_dt((float)dt_frame);
+      ocs.set_dt(static_cast<float>(dt_frame));
       // 使用 Pose→Host→Device 桥接接入 OCSort（仅用于目标选择，不参与瞄准追踪）
       std::vector<OCSort::Trk> trks;
       if (c.ocs_enable) {
@@ -50,7 +50,7 @@ void Aim::loop() {
       } else {
         trks.reserve(ds.size());
         for (const auto& d : ds){
-          OCSort::Trk t{}; t.x1=d.box.x; t.y1=d.box.y; t.x2=d.box.x+d.box.width; t.y2=d.box.y+d.box.height;
+          OCSort::Trk t{}; t.x1 = static_cast<float>(d.box.x); t.y1 = static_cast<float>(d.box.y); t.x2 = static_cast<float>(d.box.x + d.box.width); t.y2 = static_cast<float>(d.box.y + d.box.height);
           t.ox1=t.x1; t.oy1=t.y1; t.ox2=t.x2; t.oy2=t.y2; t.score=d.confidence; t.cls=d.class_id; t.id=-1; t.valid=true; trks.push_back(t);
         }
       }

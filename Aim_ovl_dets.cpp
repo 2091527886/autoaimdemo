@@ -20,12 +20,12 @@ void Aim::draw_ovl(double &ms) {
     float fsz = (float)std::max(1, c.ovl_font_px);
     int ix = (int)std::lround(x); int iy = (int)std::lround(y);
     // 网格量化，减小轻微抖动带来的分裂
-    int grid = std::max(8, (int)std::lround(fsz * 0.8f));
+    int grid = std::max(8, static_cast<int>(std::lround(fsz * 0.8f)));
     auto q = [&](int v){ return (v>=0)? ((v + grid/2)/grid*grid) : ((v - grid/2)/grid*grid); };
     int qx = q(ix), qy = q(iy);
     // 非对称阈值：横向小、纵向大，更符合标签位移特性
-    int ex = std::max(8,  (int)std::lround(fsz * 0.5f));
-    int ey = std::max(10, (int)std::lround(fsz * 1.2f));
+    int ex = std::max(8,  static_cast<int>(std::lround(fsz * 0.5f)));
+    int ey = std::max(10, static_cast<int>(std::lround(fsz * 1.2f)));
     auto best_it = txtm.end(); int best_sc = 1e9;
     for (auto it = txtm.begin(); it != txtm.end(); ++it){
       const auto &e = it->second; int dx = std::abs(e.x - qx), dy = std::abs(e.y - qy);

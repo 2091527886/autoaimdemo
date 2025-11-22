@@ -19,11 +19,9 @@ function(enable_optimizations tgt)
   set(cfg "$<CONFIG:Release>")
     target_compile_options(${tgt} PRIVATE
       "$<${cfg}:/O2>"
-      "$<${cfg}:/GL>"       # 编译期 LTCG
     )
-    target_link_options(${tgt} PRIVATE
-      "$<${cfg}:/LTCG>"
-    )
+    # 使用 CMake 的 IPO/LTO，在 Release 配置自动启用跨模块优化
+    set_property(TARGET ${tgt} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 
     # 指令集：优先 AVX512，否则 AVX2
     check_flag(HAS_ARCH_AVX512 "/arch:AVX512")

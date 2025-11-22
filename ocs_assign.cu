@@ -20,10 +20,12 @@ static __device__ inline unsigned long long pack_bid_det(float bid, int det){
     return (static_cast<unsigned long long>(bid_bits) << 32) | static_cast<unsigned int>(det);
 }
 
+#if 0
 static __device__ inline float unpack_bid(unsigned long long p){
     unsigned int b = static_cast<unsigned int>(p >> 32);
     return __uint_as_float(b);
 }
+#endif
 static __device__ inline int unpack_det(unsigned long long p){
     return static_cast<int>(p & 0xFFFFFFFFu);
 }
