@@ -27,6 +27,34 @@ public:
     bool fps_lock = true;              // 是否锁帧
     int  fps = 60;                     // 目标帧率
 public:
+    // ==================== [ADRC Controller] ====================
+    // 使用提示（只改这些参数就能完成90%调参）：
+    // - 鼠标抖动：先增大 r(+20)、或把 adrc_ctrl_low=2，再小降 beta1(-30)/beta2(-3)
+    // - 太慢不跟手：先增大 adrc_out_limit(+2)，再小增 beta1(+30)/beta2(+3)
+    // - 过冲：先减小 adrc_out_limit(-2)，再小降 beta1/beta2，必要时 b0(+0.1)
+    // - 方向不对：adrc_inv_sign=true
+    // - 帧时不稳：adrc_use_dt=false（固定16ms），稳定后再考虑置 true 并配合 r+20 或 beta1/2 小降
+    // 策略说明：
+    // - dt 来源：Aim::get_dt() 始终返回“实测 dt”，不受任何控制器开关影响；fps_lock 仅影响渲染节拍，不影响 dt 计算。
+    // - ADRC 开关：默认启用 ADRC，P 控制器保留但默认不生效（可日后作为备选）。
+    // - adrc_use_dt：仅影响 ADRC 内部是否“使用传入 dt”；为 false 时强制使用 16ms（适配锁 60 的稳定节拍）。
+    // - prop_use_dt：仅影响 P 控制器内部（如启用 P 时），不影响 get_dt 的“实测 dt 来源”。
+    bool   adrc_enable = true;             // ADRC 总开关（true=使用 ADRC；false 时可选择 P 控制器）
+    bool   adrc_use_dt = true;           // dt 源（ADRC内部）：true=用实测 dt；false=固定16ms（锁60更稳，抖动小）
+    int    adrc_ctrl_low = 2;             // 近端抑制：0=不抑制（灵敏）/1=适中/2=强（更稳，接近目标更“刹车”）
+    bool   adrc_inv_sign = true;         // 方向翻转：若“越纠越远”，置 true
+    double adrc_out_limit = 8.0;          // 输出限幅(px)：太慢→增大；过冲→减小（建议范围 6~14）
+    double adrc_r = 9.0;               // 小误差平滑区带宽：大→更稳更“软”，抖动小时可适当减小
+    double adrc_b0 = 3;                // 模型增益估计：大→控制输出变小（估小易“猛”导致过冲）
+    double adrc_delta = 0.05;            // fal 小量阈值（一般保持默认）
+    double adrc_beta01 = 2.0;          // ESO 带宽1：大→更快更敏感；小→更稳。抖动时适度减小
+    double adrc_beta02 = 2.0;          // ESO 带宽2：同上，配合 beta01/03 调整
+    double adrc_beta03 = 2.0;          // ESO 带宽3：同上
+    double adrc_beta1 = 2.0;           // 跟踪环增益1（主速率）：大→更快/易过冲；小→更稳/易变钝（步长±30）
+    double adrc_beta2 = 2.0;            // 跟踪环增益2（次速率）：大→更快/易过冲；小→更稳（步长±3）
+    double adrc_alpha1 = 0.1;           // fal 近端指数：小→近端更“软”（抖动时可降到 0.4）
+    double adrc_alpha2 = 2.5;            // fal 远端指数：大→远端更“软”（1.6~2.2）
+
     // ==================== [OC-SORT Tracker] ====================
     bool  ocs_enable = true;
     int   ocs_max_age = 30;
@@ -91,7 +119,7 @@ public:
 
     // ==================== [Model Input & Thresholds] ====================
     const int   crop_size_px = 640;
-    const float conf_thresh = 0.26f;
+    const float conf_thresh = 0.5f;
 
     const int aim_key = VK_RBUTTON;
     const double y_anchor_ratio = 0.6;
@@ -100,13 +128,15 @@ public:
 
     // ==================== [Aim Control & Prediction] ====================
     // 运动学、预测、距离分段与锚点等行为控制
-    bool   prop = true;
+    // P 控制器开关（与 ADRC 互斥使用）
+    bool   prop_enable = false;          // 默认关闭 P 分支；不在 validate() 中强制覆盖 ADRC 开关
+    bool   prop = true;                  // P 控制器内部行为参数保留（备用），默认不开启使用
     double prop_k_x = 0.4;
     double prop_k_y = 0.4;
     double prop_out_limit = 360.0;
     double prop_tc_ms = 16.0;
     double prop_dead_px = 0;
-    bool   prop_use_dt = true;
+    bool   prop_use_dt = true;            // 仅影响 P 控制器内部；不影响 Aim::get_dt() 的“实测 dt 来源”
 
     bool   pred_enable = false;
     double pred_dt_max_ms = 7.0;
@@ -132,7 +162,7 @@ public:
 
     // ==================== [Wind (Mouse micro-movement)] ====================
     // 鼠标微扰控制（平滑/随机/风力）
-    bool   wind_enable = false;
+    bool   wind_enable = false;          // 默认关闭风鼠标（确保稳定与可控性）；开关在 Aim::on_smooth 内分流到 mv/mv_wind
     int    wind_rng_seed = 0;
     double wind_step_min_px = 0.6;
     double wind_step_max_px = 7.5;
@@ -242,6 +272,11 @@ public:
 
     void validate() {
         v_basic(); v_overlay(); v_dxgi();
+        // 强制忽略 P 分支：prop_enable=false 时，若用户误开 P 相关参数，仍以 ADRC 为准
+        if (false /* keep user config: do not force ADRC when P disabled */) {
+            /* keep user choice: do not force ADRC here */
+        }
+
         dist_near_h = MX(1.0, dist_near_h);
         dist_far_h  = MX(1.0, MN(dist_near_h-1.0, dist_far_h));
         dist_hys_h  = MX(0.0, dist_hys_h);
@@ -252,6 +287,10 @@ public:
         if (!(conf_thresh >= 0.0f && conf_thresh <= 1.0f)) { lg::e()<< P_E "conf_thresh out of [0,1]"<<lg::endl; }
         if (!(y_anchor_ratio >= 0.0 && y_anchor_ratio <= 1.0)) { lg::e()<< P_E "y_anchor_ratio out of [0,1]"<<lg::endl; }
         // 新增字段的 clamp
+        adrc_ctrl_low = std::max(0, std::min(2, adrc_ctrl_low));
+        adrc_out_limit = MX(0.0, adrc_out_limit);
+        adrc_alpha1 = CLP(adrc_alpha1, 1e-6, 0.999999);
+        adrc_alpha2 = MX(1.0 + 1e-6, adrc_alpha2);
         ocs_iou_th = (float)CLP((double)ocs_iou_th, 0.0, 1.0);
         sel_center_win_w = MX(1, sel_center_win_w);
         sel_center_win_h = MX(1, sel_center_win_h);
@@ -265,6 +304,8 @@ public:
     }
 private:
     void v_basic() {
+        // no-op for adrc defaults; only generic clamps above
+
         fps = MX(1, fps);
         capture_timeout_ms_dxgi = MX(0, capture_timeout_ms_dxgi);
         cap_retry = MX(0, cap_retry);

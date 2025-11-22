@@ -119,7 +119,12 @@ add_executable(aimassistant
   ovl_gpu.cpp
   ovl_util.cpp
   AimAlgo.hpp
+  AimADRC.hpp
+  ctrl_utils.hpp
+  ctrl_adrc.hpp
+  ctrl_adrc.cpp
 )
+
 
 # 启用 Release 高优化/LTO/AVX
 enable_optimizations(aimassistant)

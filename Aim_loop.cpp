@@ -84,7 +84,7 @@ void Aim::loop() {
       if (!sel.valid()) {
         on_no_target();
       } else {
-        if (!smooth_pressed) { algo.reset(); last_tp_valid_ = false; locked_track_id = -1; }
+        if (!smooth_pressed) { algo.reset(); adrc.reset(); last_tp_valid_ = false; locked_track_id = -1; }
         lock_ = smooth_pressed;
         if (lock_ && (locked_track_id<0 || locked_track_id==sel.track_id)) locked_track_id = sel.track_id;
         if (!lock_) locked_track_id = -1;

@@ -10,6 +10,7 @@ Aim::Aim()
   mfac = (c.hfov_deg / (double)cap.w()) * (c.px_per_360 / 360.0);
   LO << "Detect center " << c.crop_size_px << "x" << c.crop_size_px << END;
   algo.setConfig(c);
+  adrc.setConfig(c);
   if (c.wind_rng_seed > 0) {
     wind_.rng.seed(static_cast<uint32_t>(c.wind_rng_seed));
   }
