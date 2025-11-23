@@ -48,10 +48,10 @@ void Aim::loop() {
       if (c.ocs_enable) {
         (void)ocs_update_from_pose_host(ds, ocs, cap.w(), cap.h(), trks, 0);
       } else {
-        trks.reserve(ds.size());
+        trks.reserve(ds.size()); int fake_id = 0;
         for (const auto& d : ds){
           OCSort::Trk t{}; t.x1 = static_cast<float>(d.box.x); t.y1 = static_cast<float>(d.box.y); t.x2 = static_cast<float>(d.box.x + d.box.width); t.y2 = static_cast<float>(d.box.y + d.box.height);
-          t.ox1=t.x1; t.oy1=t.y1; t.ox2=t.x2; t.oy2=t.y2; t.score=d.confidence; t.cls=d.class_id; t.id=-1; t.valid=true; trks.push_back(t);
+          t.ox1=t.x1; t.oy1=t.y1; t.ox2=t.x2; t.oy2=t.y2; t.score=d.confidence; t.cls=d.class_id; t.id=fake_id++; t.valid=true; trks.push_back(t);
         }
       }
 
@@ -84,7 +84,7 @@ void Aim::loop() {
       if (!sel.valid()) {
         on_no_target();
       } else {
-        if (!smooth_pressed) { algo.reset(); adrc.reset(); last_tp_valid_ = false; locked_track_id = -1; }
+        if (!smooth_pressed) { algo.reset(); adrc.reset(); mv_residual_ = {0.0, 0.0}; last_tp_valid_ = false; locked_track_id = -1; }
         lock_ = smooth_pressed;
         if (lock_ && (locked_track_id<0 || locked_track_id==sel.track_id)) locked_track_id = sel.track_id;
         if (!lock_) locked_track_id = -1;
@@ -144,6 +144,10 @@ void Aim::loop() {
       double loop_e2e = std::max({tm.loop_ms, fl.cap_ms, fl.det_ms, fl.mou_ms, fl.ctl_ms, fl.ovl_ms});
       fl.loop_ms = loop_e2e;
     }
+
+    // 帧计数推进（用于日志/统计）
+    c.frame_idx++;
+    fl.idx = c.frame_idx;
 
     log_lat(fl);
     if (c.timing)

@@ -46,6 +46,7 @@ private:
     bool infer_view(ScreenCapturer::CapturedView& view);
     void mv(int mx, int my, double& ms);
     void mv_wind(int mx, int my, double& ms);
+    void mv_precise(double wx, double wy, double& ms);
     void draw_ovl(double& ms);
     void log_lat(FrameLat& fl);
     void trt_log();
@@ -101,6 +102,10 @@ private:
    std::vector<PendingText> pending_texts_;
 
    WindState wind_;
+   cv::Point2d mv_residual_{0.0, 0.0};
+   // 轻量调试统计：量化损失累计与事件次数（仅在 timing 打印）
+   double mvq_loss_sum_ = 0.0;
+   size_t mvq_events_ = 0;
 
     // grant access to helper free functions defined in separate units
     friend void aim_draw_cross(Aim* self);
@@ -112,7 +117,7 @@ private:
 };
 
 // inline impls (keep tiny to reduce .cpp size; no logic change)
-inline void Aim::on_no_target(){ algo.reset(); adrc.reset(); last_tp_valid_ = false; lock_ = false; aim_ok_ = false; }
+inline void Aim::on_no_target(){ algo.reset(); adrc.reset(); mv_residual_ = {0.0, 0.0}; last_tp_valid_ = false; lock_ = false; aim_ok_ = false; }
 inline void Aim::on_smooth(const Detection& target, double dt, double& mou_ms){
   // 选择控制器：默认使用 ADRC；P 控制器保留但默认不生效。
   // dt：由 Aim::get_dt() 提供的“实测 dt”。ADRC 内部可根据 adrc_use_measured_dt 决定是否改用 16ms。
@@ -121,12 +126,22 @@ inline void Aim::on_smooth(const Detection& target, double dt, double& mou_ms){
   // 控制器选择：优先 ADRC；否则仅在显式开启 prop_enable 时使用 P；否则不移动
   if (c.adrc_enable) {
     auto pr = adrc.step(ex, ey, dt);
-    int mx = (int)(pr.first * mfac), my = (int)(pr.second * mfac);
-    if (!c.wind_enable) mv(mx, my, mou_ms); else mv_wind(mx, my, mou_ms);
+    if (!c.wind_enable) {
+      double wx = pr.first * mfac, wy = pr.second * mfac;
+      mv_precise(wx, wy, mou_ms);
+    } else {
+      int mx = (int)(pr.first * mfac), my = (int)(pr.second * mfac);
+      mv_wind(mx, my, mou_ms);
+    }
   } else if (c.prop_enable) {
     auto pr = algo.step(ex, ey, dt);
-    int mx = (int)(pr.first * mfac), my = (int)(pr.second * mfac);
-    if (!c.wind_enable) mv(mx, my, mou_ms); else mv_wind(mx, my, mou_ms);
+    if (!c.wind_enable) {
+      double wx = pr.first * mfac, wy = pr.second * mfac;
+      mv_precise(wx, wy, mou_ms);
+    } else {
+      int mx = (int)(pr.first * mfac), my = (int)(pr.second * mfac);
+      mv_wind(mx, my, mou_ms);
+    }
   } else {
     // 两者都未启用则不移动
     return;

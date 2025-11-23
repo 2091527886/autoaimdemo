@@ -19,6 +19,7 @@ public:
         prm_r_ = c.adrc_td_bandwidth_r; prm_b0_ = c.adrc_model_gain_b0; prm_delta_ = c.adrc_fal_delta;
         prm_b01_ = c.adrc_eso_beta01; prm_b02_ = c.adrc_eso_beta02; prm_b03_ = c.adrc_eso_beta03;
         prm_b1_ = c.adrc_nlsef_beta1; prm_b2_ = c.adrc_nlsef_beta2; prm_a1_ = c.adrc_fal_alpha1; prm_a2_ = c.adrc_fal_alpha2;
+        fhan_c_ = c.adrc_fhan_c;
         build();
     }
     void reset(){ build(); }
@@ -40,6 +41,9 @@ private:
         auto lim = std::pair<double,double>{-out_lim_, out_lim_};
         ax_ = std::make_unique<ADRCController>(prm_r_, prm_b0_, prm_delta_, prm_b01_, prm_b02_, prm_b03_, prm_b1_, prm_b2_, prm_a1_, prm_a2_, lim);
         ay_ = std::make_unique<ADRCController>(prm_r_, prm_b0_, prm_delta_, prm_b01_, prm_b02_, prm_b03_, prm_b1_, prm_b2_, prm_a1_, prm_a2_, lim);
+        // 配置 fhan c（ctrl_low=1 有效），当前按同一系数写入两轴
+        if (ax_) ax_->set_fhan_c(fhan_c_);
+        if (ay_) ay_->set_fhan_c(fhan_c_);
     }
     std::unique_ptr<ADRCController> ax_;
     std::unique_ptr<ADRCController> ay_;
@@ -51,4 +55,5 @@ private:
     double prm_r_ = 80.0, prm_b0_ = 1.0, prm_delta_ = 0.05;
     double prm_b01_ = 100.0, prm_b02_ = 300.0, prm_b03_ = 100.0;
     double prm_b1_ = 0.6, prm_b2_ = 0.1, prm_a1_ = 0.9, prm_a2_ = 1.5;
+    double fhan_c_ = 1.5;
 };

@@ -66,6 +66,8 @@ bool LoadAdrcConfIfPresent(const std::string& path, Config& c){
         else if (key=="adrc_nlsef_beta2") upd_double(c.adrc_nlsef_beta2);
         else if (key=="adrc_fal_alpha1") upd_double(c.adrc_fal_alpha1);
         else if (key=="adrc_fal_alpha2") upd_double(c.adrc_fal_alpha2);
+        else if (key=="adrc_fhan_c") upd_double(c.adrc_fhan_c);
+        else if (key=="aim_residual_carry") upd_double(c.aim_residual_carry);
         else {
             // ignore unknown
         }

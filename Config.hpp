@@ -159,6 +159,7 @@ public:
     double adrc_nlsef_beta2 = 12.0;         // 线性反馈增益（速度 e2）：越大越快/易过冲；越小越稳。幅度不宜过大，常与 beta1 保持 10:1～30:1 的量级关系。
     double adrc_fal_alpha1 = 0.999;         // fal 近端指数（alpha1<1）：越小近端越“软”（抗抖）；越大近端越“硬”。常用 0.4~0.9；抖动→降；迟滞→升。
     double adrc_fal_alpha2 = 1.001;          // fal 远端指数（alpha2>1）：越大远端越“钝”（缓和）；越小远端越“猛”。常用 1.6~2.2；过冲→升；跟手慢→降。
+    double adrc_fhan_c = 1.5;               // ctrl_low=1（fhan 简化）耦合系数 c，默认 1.5（更稳）。可根据手感微调。
 
     // ==================== [OC-SORT Tracker] ====================
     bool  ocs_enable = true;
@@ -242,6 +243,8 @@ public:
     double prop_tc_ms = 16.0;
     double prop_dead_px = 0;
     bool   prop_use_dt = true;            // 仅影响 P 控制器内部；不影响 Aim::get_dt() 的“实测 dt 来源”
+    // 非风路径量化残差的保留系数（0~1），1.0=完全保留；<1.0=逐步衰减，避免极端情况下长期积累
+    double aim_residual_carry = 1.0;
 
     bool   pred_enable = false;
     double pred_dt_max_ms = 7.0;
@@ -394,8 +397,14 @@ public:
         // 新增字段的 clamp
         adrc_ctrl_low_level = std::max(0, std::min(2, adrc_ctrl_low_level));
         adrc_output_limit_px = MX(0.0, adrc_output_limit_px);
+        // ADRC 数值安全护栏（避免除 0 与 pow(0,·) 等数值问题）
+        adrc_td_bandwidth_r = MX(1e-6, adrc_td_bandwidth_r);
+        adrc_model_gain_b0  = MX(1e-6, adrc_model_gain_b0);
+        adrc_fal_delta      = MX(1e-6, adrc_fal_delta);
         adrc_fal_alpha1 = CLP(adrc_fal_alpha1, 1e-6, 0.999999);
         adrc_fal_alpha2 = MX(1.0 + 1e-6, adrc_fal_alpha2);
+        adrc_fhan_c = MX(1e-6, adrc_fhan_c);
+        aim_residual_carry = CLP(aim_residual_carry, 0.0, 1.0);
         ocs_iou_th = (float)CLP((double)ocs_iou_th, 0.0, 1.0);
         sel_center_win_w = MX(1, sel_center_win_w);
         sel_center_win_h = MX(1, sel_center_win_h);

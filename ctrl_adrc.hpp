@@ -20,6 +20,8 @@ private:
     std::vector<double> __alpha1;
     std::vector<double> __alpha2;
     std::vector<std::pair<double,double>> __control_limits;
+    // fhan 简化档位的耦合系数 c（每轴可独立，默认 1.5）
+    std::vector<double> __fhan_c;
     // 状态
     std::vector<double> __v1, __v2;
     std::vector<double> __z1, __z2, __z3;
@@ -52,4 +54,8 @@ public:
     double operator()(double setpoint, double feedback, double dt, int ctrl_low = 0);
     std::vector<double> call(const std::vector<double>& setpoint, const std::vector<double>& feedback, double dt, int ctrl_low = 0);
     std::vector<double> operator()(const std::vector<double>& setpoint, const std::vector<double>& feedback, double dt, int ctrl_low = 0);
+
+    // 配置 fhan 简化档位的 c 系数（统一设置所有轴）
+    void set_fhan_c(double c);
 };
+

@@ -14,6 +14,29 @@ void Aim::mv(int mx, int my, double &ms) {
   }
 }
 
+void Aim::mv_precise(double wx, double wy, double &ms) {
+  // 非风路径的亚像素残差累积，避免小输出被截断为0
+  auto t0 = (c.timing ? tn() : tp{});
+  double want_x = wx + mv_residual_.x;
+  double want_y = wy + mv_residual_.y;
+  int dx = (int)LR(want_x);
+  int dy = (int)LR(want_y);
+  if (dx || dy) {
+    mouse.Move(dx, dy);
+  }
+  // 调试：统计“被量化吞掉”的小输出（更精确：每帧统计残差长度）
+  {
+    double loss = std::hypot(want_x - dx, want_y - dy);
+    if (loss > 0) { mvq_loss_sum_ += loss; ++mvq_events_; }
+  }
+  // 残差按系数回填（0~1）
+  double carry = CLP(c.aim_residual_carry, 0.0, 1.0);
+  mv_residual_.x = (want_x - dx) * carry;
+  mv_residual_.y = (want_y - dy) * carry;
+  auto t1 = (c.timing ? tn() : t0);
+  ms = c.timing ? msd(t1 - t0).count() : 0.0;
+}
+
 void Aim::mv_wind(int mx, int my, double &ms) {
   auto t0 = (c.timing ? tn() : tp{});
   P2 want{(double)mx, (double)my};

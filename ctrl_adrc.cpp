@@ -45,7 +45,7 @@ double ADRCController::_fhan(double x1, double x2, double r, double h) {
     return -r * (a / d) * _fsg(y, d) - r * sign(a) * (1 - _fsg(a, d));
 }
 double ADRCController::_fal(double e, double alpha, double delta) {
-	return (abs(e) <= delta) ? e / pow(delta, alpha - 1) : sign(e) * pow(abs(e), alpha);
+	return (abs(e) <= delta) ? e / pow(delta, 1.0 - alpha) : sign(e) * pow(abs(e), alpha);
 }
 double ADRCController::_fsg(double x, double d) {
 	return (sign(x + d) - sign(x - d)) / 2;
@@ -79,7 +79,7 @@ vector<double> ADRCController::call(const vector<double>& setpoint, const vector
             u0 = _nlsef(e1, e2, __alpha1[i], __alpha2[i], __beta1[i], __beta2[i], __delta[i]);
         }
         else if (ctrl_low == 1) {
-            double c = 1.5; // 这个参数不外露
+            double c = (__fhan_c.empty() ? 1.5 : __fhan_c[i]);
             u0 = _nlsef(e1, e2, __r[i], dt, c);
         }
         else {
@@ -97,6 +97,9 @@ vector<double> ADRCController::call(const vector<double>& setpoint, const vector
 vector<double> ADRCController::operator()(const vector<double>& setpoint, const vector<double>& feedback, double dt, int ctrl_low) {
     return this->call(setpoint, feedback, dt, ctrl_low);
 }
+
+/* helper */
+void ADRCController::set_fhan_c(double c){ if (__fhan_c.size()!=__r.size()) __fhan_c.assign(__r.size(), 1.5); std::fill(__fhan_c.begin(), __fhan_c.end(), c); }
 
 /* init adrc */
 ADRCController::ADRCController(
@@ -130,6 +133,7 @@ ADRCController::ADRCController(
     __alpha2(1, nlsef_alpha2),
     __control_limits(1, control_limits)
 {
+    __fhan_c.assign(1, 1.5);
     if (nlsef_alpha1 >= 1 || nlsef_alpha1 <= 0) {
         throw std::invalid_argument("0 < alpha1 < 1");
     }
