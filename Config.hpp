@@ -145,18 +145,18 @@ public:
    */
 
     bool   adrc_enable = true;             // ADRC 总开关：true=使用 ADRC；false 时如 prop_enable=true 则改用 P（P 作为备选保留）。
-    bool   adrc_use_measured_dt = true;  // ADRC 内部 dt 源：true=使用 Aim::get_dt() 的“实测 dt”；false=强制 16ms（锁60稳节拍更抗抖）。实测 dt 更灵敏但易抖；16ms 更稳但略钝。
-    int    adrc_ctrl_low_level = 0;       // 控制律简化级别（近端抑制）：0=完整非线性；1=Fhan 简化；2=线性反馈（最稳）。建议从 2 起步，稳后再尝试 1/0。
+    bool   adrc_use_measured_dt = false;  // ADRC 内部 dt 源：true=使用 Aim::get_dt() 的“实测 dt”；false=强制 16ms（锁60稳节拍更抗抖）。实测 dt 更灵敏但易抖；16ms 更稳但略钝。
+    int    adrc_ctrl_low_level = 2;       // 控制律简化级别（近端抑制）：0=完整非线性；1=Fhan 简化；2=线性反馈（最稳）。建议从 2 起步，稳后再尝试 1/0。
     bool   adrc_invert_output_sign = true; // 输出方向翻转：若“越纠越远”则置 true；若“越纠越近但过度”则保持 false 并用 out_limit/beta1/2 限制速度。
-    double adrc_output_limit_px = 500.0;    // 输出限幅(px)：太慢→增大；过冲→减小（60FPS/3060 实用起步 120~240，>300 易冲，<80 易钝）
-    double adrc_td_bandwidth_r = 0.0001;      // TD 带宽（小误差平滑区）：大→更刚/抖动小；小→更灵/跟手快。常用 8~60；抖动大→增大；跟手慢→减小。
-    double adrc_model_gain_b0 = 1;         // 被控对象增益估计：越大→补偿项越小（更“软”）；越小→补偿项越大（更“猛”）。常用 1.5~4.0；过冲→略增；偏钝→略减。
-    double adrc_fal_delta = 0.0001;         // fal 小量阈值：误差很小时的“软区间”宽度。常用 0.03~0.08；抖动→略增；迟滞/钝→略减（保持默认 0.05 即可）。
-    double adrc_eso_beta01 = 0.4;         // ESO 带宽1：越大越敏感/快，越小越稳/慢。起步可与 beta02/03 等值（如 20/20/20），按抖动/速度整体微调。
-    double adrc_eso_beta02 = 0.4;          // ESO 带宽2：与 beta01/03 一起形成 ESO 的整体带宽。抖动大→整体减小；响应慢→整体增大（优先等比例调整）。
-    double adrc_eso_beta03 = 0.4;          // ESO 带宽3：与 beta01/02 协同，保持三者数量级一致更容易稳定；必要时按比例整体调整。
-    double adrc_nlsef_beta1 = 8.0;        // 线性反馈增益（位置 e1）：越大越快、易过冲；越小越稳、易变钝。建议与 beta2 维持 10:1～30:1 比例（如 60/6, 40/4），优先调 beta1。
-    double adrc_nlsef_beta2 = 8.0;         // 线性反馈增益（速度 e2）：越大越快/易过冲；越小越稳。幅度不宜过大，常与 beta1 保持 10:1～30:1 的量级关系。
+    double adrc_output_limit_px = 1500.0;    // 输出限幅(px)：太慢→增大；过冲→减小（60FPS/3060 实用起步 120~240，>300 易冲，<80 易钝）
+    double adrc_td_bandwidth_r = 0.5;      // TD 带宽（小误差平滑区）：大→更刚/抖动小；小→更灵/跟手快。常用 8~60；抖动大→增大；跟手慢→减小。
+    double adrc_model_gain_b0 = 8;         // 被控对象增益估计：越大→补偿项越小（更“软”）；越小→补偿项越大（更“猛”）。常用 1.5~4.0；过冲→略增；偏钝→略减。
+    double adrc_fal_delta = 0.02;         // fal 小量阈值：误差很小时的“软区间”宽度。常用 0.03~0.08；抖动→略增；迟滞/钝→略减（保持默认 0.05 即可）。
+    double adrc_eso_beta01 = 1;         // ESO 带宽1：越大越敏感/快，越小越稳/慢。起步可与 beta02/03 等值（如 20/20/20），按抖动/速度整体微调。
+    double adrc_eso_beta02 = 1;          // ESO 带宽2：与 beta01/03 一起形成 ESO 的整体带宽。抖动大→整体减小；响应慢→整体增大（优先等比例调整）。
+    double adrc_eso_beta03 = 150.4;          // ESO 带宽3：与 beta01/02 协同，保持三者数量级一致更容易稳定；必要时按比例整体调整。
+    double adrc_nlsef_beta1 = 20.0;        // 线性反馈增益（位置 e1）：越大越快、易过冲；越小越稳、易变钝。建议与 beta2 维持 10:1～30:1 比例（如 60/6, 40/4），优先调 beta1。
+    double adrc_nlsef_beta2 = 12.0;         // 线性反馈增益（速度 e2）：越大越快/易过冲；越小越稳。幅度不宜过大，常与 beta1 保持 10:1～30:1 的量级关系。
     double adrc_fal_alpha1 = 0.999;         // fal 近端指数（alpha1<1）：越小近端越“软”（抗抖）；越大近端越“硬”。常用 0.4~0.9；抖动→降；迟滞→升。
     double adrc_fal_alpha2 = 1.001;          // fal 远端指数（alpha2>1）：越大远端越“钝”（缓和）；越小远端越“猛”。常用 1.6~2.2；过冲→升；跟手慢→降。
 
@@ -235,7 +235,7 @@ public:
     // 运动学、预测、距离分段与锚点等行为控制
     // P 控制器开关（与 ADRC 互斥使用）
     bool   prop_enable = false;          // 默认关闭 P 分支；不在 validate() 中强制覆盖 ADRC 开关
-    bool   prop = true;                  // P 控制器内部行为参数保留（备用），默认不开启使用
+    bool   prop = false;                  // P 控制器内部行为参数保留（备用），默认不开启使用
     double prop_k_x = 0.4;
     double prop_k_y = 0.4;
     double prop_out_limit = 360.0;
