@@ -115,7 +115,7 @@ private:
 inline void Aim::on_no_target(){ algo.reset(); adrc.reset(); last_tp_valid_ = false; lock_ = false; aim_ok_ = false; }
 inline void Aim::on_smooth(const Detection& target, double dt, double& mou_ms){
   // 选择控制器：默认使用 ADRC；P 控制器保留但默认不生效。
-  // dt：由 Aim::get_dt() 提供的“实测 dt”。ADRC 内部可根据 adrc_use_dt 决定是否改用 16ms。
+  // dt：由 Aim::get_dt() 提供的“实测 dt”。ADRC 内部可根据 adrc_use_measured_dt 决定是否改用 16ms。
   double h = (double)target.box.height; set_seg(h);
   auto [ex, ey] = pred_err(target, dt, true);
   // 控制器选择：优先 ADRC；否则仅在显式开启 prop_enable 时使用 P；否则不移动

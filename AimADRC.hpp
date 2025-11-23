@@ -11,14 +11,14 @@ public:
     // - use_dt_：为 true 时使用调用方传入的“实测 dt”；为 false 时在内部将 dt 视为 16ms（锁60节拍兼容）。
     // - ctrl_low_：控制律降阶/简化级别（0=完整，1/2=简化），便于快速稳定性切换。
     void setConfig(const Config& c){
-        inv_sign_ = c.adrc_inv_sign;
-        use_dt_ = c.adrc_use_dt;
-        out_lim_ = (c.adrc_out_limit>0? c.adrc_out_limit : 360.0);
-        ctrl_low_ = c.adrc_ctrl_low;
+        inv_sign_ = c.adrc_invert_output_sign;
+        use_dt_ = c.adrc_use_measured_dt;
+        out_lim_ = (c.adrc_output_limit_px>0? c.adrc_output_limit_px : 360.0);
+        ctrl_low_ = c.adrc_ctrl_low_level;
         // 记住参数用于 reset 重建
-        prm_r_ = c.adrc_r; prm_b0_ = c.adrc_b0; prm_delta_ = c.adrc_delta;
-        prm_b01_ = c.adrc_beta01; prm_b02_ = c.adrc_beta02; prm_b03_ = c.adrc_beta03;
-        prm_b1_ = c.adrc_beta1; prm_b2_ = c.adrc_beta2; prm_a1_ = c.adrc_alpha1; prm_a2_ = c.adrc_alpha2;
+        prm_r_ = c.adrc_td_bandwidth_r; prm_b0_ = c.adrc_model_gain_b0; prm_delta_ = c.adrc_fal_delta;
+        prm_b01_ = c.adrc_eso_beta01; prm_b02_ = c.adrc_eso_beta02; prm_b03_ = c.adrc_eso_beta03;
+        prm_b1_ = c.adrc_nlsef_beta1; prm_b2_ = c.adrc_nlsef_beta2; prm_a1_ = c.adrc_fal_alpha1; prm_a2_ = c.adrc_fal_alpha2;
         build();
     }
     void reset(){ build(); }
