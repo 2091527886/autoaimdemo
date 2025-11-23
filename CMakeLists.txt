@@ -123,6 +123,7 @@ add_executable(aimassistant
   ctrl_utils.hpp
   ctrl_adrc.hpp
   ctrl_adrc.cpp
+  AdrcConfIO.cpp
 )
 
 

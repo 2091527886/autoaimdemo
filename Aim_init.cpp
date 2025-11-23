@@ -1,4 +1,5 @@
 #include "Aim.hpp"
+#include "AdrcConfIO.hpp"
 Aim::Aim()
     : c(), cap(c, c.crop_size_px, c.crop_size_px), pose(c), hk(c),
       crop((cap.w() - c.crop_size_px) / 2, (cap.h() - c.crop_size_px) / 2, c.crop_size_px, c.crop_size_px),
@@ -9,6 +10,9 @@ Aim::Aim()
   }
   mfac = (c.hfov_deg / (double)cap.w()) * (c.px_per_360 / 360.0);
   LO << "Detect center " << c.crop_size_px << "x" << c.crop_size_px << END;
+  // 在控制器初始化前尝试加载外部 ADRC 配置
+  (void)LoadAdrcConfIfPresent("adrc.conf", c);
+  c.validate();
   algo.setConfig(c);
   adrc.setConfig(c);
   if (c.wind_rng_seed > 0) {
