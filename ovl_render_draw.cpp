@@ -10,6 +10,19 @@ void Game_overlay::Impl::RenderOne(){
   d2dCtx->BeginDraw();
   d2dCtx->Clear(D2D1::ColorF(0.f,0.f,0.f,0.f));
   D2D1_MATRIX_3X2_F __oldM; if(small_window){ d2dCtx->GetTransform(&__oldM); d2dCtx->SetTransform(D2D1::Matrix3x2F::Translation((float)-winX,(float)-winY)); }
+
+  // draw center crosshair at screen center before other cmds (as bottom layer)
+  if(ctr_show){
+    int vx=0,vy=0,vw=0,vh=0; GetVirtualScreen(vx,vy,vw,vh);
+    float px = vx + vw * 0.5f;
+    float py = vy + vh * 0.5f;
+    float s  = (float)ctr_size;
+    float th = (float)ctr_th;
+    brush->SetColor(C(ctr_col));
+    d2dCtx->FillRectangle(RF(px - s,        py - th*0.5f, 2*s, th), brush.Get());
+    d2dCtx->FillRectangle(RF(px - th*0.5f,  py - s,       th, 2*s), brush.Get());
+  }
+
   if(dl){ for(const auto& c : dl->cmds){ switch(c.type){
     case DrawCmd::Rect: brush->SetColor(C(c.color)); d2dCtx->DrawRectangle(RF(c.rect.x, c.rect.y, c.rect.w, c.rect.h), brush.Get(), c.thickness); break;
     case DrawCmd::RectFilled: brush->SetColor(C(c.color)); d2dCtx->FillRectangle(RF(c.rect.x, c.rect.y, c.rect.w, c.rect.h), brush.Get()); break;

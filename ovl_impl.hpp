@@ -34,6 +34,10 @@ struct Game_overlay::Impl{
     std::atomic<bool> running{false}, visible{true}; std::mutex pendingMutex; DrawList pending; std::shared_ptr<DrawList> current;
     std::wstring gpu_name, gpu_luid; int gpu_idx=-1; bool gpu_enum=false; bool vsync=false; int max_latency=1;
     bool skip_empty=true; bool small_window=true; int cfg_win_x=0,cfg_win_y=0,cfg_win_w=640,cfg_win_h=640;
+
+    // center crosshair settings (from Config)
+    bool ctr_show = true; int ctr_size = 10; float ctr_th = 2.0f; OverlayColor ctr_col = ARGB(255,255,255,255);
+
     void UseVirtualScreen(){ useVirtual=true; } void SetBounds(int x,int y,int w,int h){ useVirtual=false; winX=x; winY=y; winW=w; winH=h; }
     bool Start(); void Stop();
     void BeginFrame(); void EndFrame(); void AddCmd(const DrawCmd&);
@@ -42,3 +46,4 @@ struct Game_overlay::Impl{
     HRESULT CreateTextFormat(const std::wstring& font,float size,IDWriteTextFormat** out);
     HRESULT CreateTargets(); void ReleaseTargets();
 };
+

@@ -22,6 +22,12 @@ void Game_overlay::SetConfig(const Config &cfg) {
   impl_->cfg_win_y = cfg.ovl_win_y;
   impl_->cfg_win_w = cfg.ovl_win_w;
   impl_->cfg_win_h = cfg.ovl_win_h;
+
+  // center crosshair config
+  impl_->ctr_show = cfg.cross_ctr_show;
+  impl_->ctr_size = cfg.cross_ctr_size;
+  impl_->ctr_th   = cfg.cross_ctr_th;
+  impl_->ctr_col  = ARGB((uint8_t)cfg.cross_ctr_a, (uint8_t)cfg.cross_ctr_r, (uint8_t)cfg.cross_ctr_g, (uint8_t)cfg.cross_ctr_b);
 }
 
 void Game_overlay::BeginFrame() { impl_->BeginFrame(); }
