@@ -50,7 +50,7 @@ public:
 public:
     // ==================== [Deadzone] ====================
     bool   dz = true;       // 误差死区开关
-    double dz_px = 4.0;     // 半径 px
+    double dz_px = 3.0;     // 半径 px
     double dz_hys = 2;    // 滞回 px（无状态实现下仅用于阈值带）
 
 public:
@@ -96,7 +96,7 @@ public:
     float ocs_kf_q_size = 0.0f;
     float ocs_kf_r_pos = 1e-6f;
     float ocs_kf_r_size = 1e-6f;
-    bool  ocs_use_byte = false;
+    bool  ocs_use_byte = true;
     float ocs_byte_iou_th = 0.05f; // BYTE 二阶段匹配 IOU 阈值（官方常用较低阈值）
     std::string ocs_asso = "ciou"; // iou|giou|ciou|diou|ct_dist
     bool  ocs_oru = true;   // Observation-centric Re-Update
