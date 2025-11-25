@@ -17,6 +17,16 @@ void kfx_to_boxes(const float* kfx, int T, Box* out_boxes, cudaStream_t stream){
     k_kfx_to_boxes<<<gb,tb,0,stream>>>(kfx, T, out_boxes);
 }
 
+__global__ void k_obs_to_boxes(const float4* meta_obs, int T, Box* out_boxes){
+    int j = blockIdx.x*blockDim.x + threadIdx.x; if (j>=T) return;
+    float4 ob = meta_obs[j];
+    Box b; b.x1=ob.x; b.y1=ob.y; b.x2=ob.z; b.y2=ob.w; out_boxes[j]=b;
+}
+void obs_to_boxes(const float4* meta_obs, int T, Box* out_boxes, cudaStream_t stream){
+    int tb=256, gb=(T+tb-1)/tb;
+    k_obs_to_boxes<<<gb,tb,0,stream>>>(meta_obs, T, out_boxes);
+}
+
 __global__ void k_age_tsu_begin(int T, int* meta_tsu){ int j=blockIdx.x*blockDim.x+threadIdx.x; if (j<T) meta_tsu[j]+=1; }
 void age_tsu_begin(int T, int* meta_tsu, cudaStream_t stream){ int tb=256, gb=(T+tb-1)/tb; k_age_tsu_begin<<<gb,tb,0,stream>>>(T, meta_tsu); }
 

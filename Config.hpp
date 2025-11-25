@@ -88,9 +88,9 @@ public:
 
     // ==================== [OC-SORT Tracker] ====================
     bool  ocs_enable = true;
-    int   ocs_max_age = 20;
+    int   ocs_max_age = 130;
     int   ocs_min_hits = 2;
-    float ocs_iou_th = 0.30f;
+    float ocs_iou_th = 0.05f;
     float ocs_inertia = 0.0f; // VDC weight
     float ocs_kf_q_pos = 0.0f;
     float ocs_kf_q_size = 0.0f;
@@ -98,13 +98,14 @@ public:
     float ocs_kf_r_size = 1e-6f;
     bool  ocs_use_byte = false;
     float ocs_byte_iou_th = 0.05f; // BYTE 二阶段匹配 IOU 阈值（官方常用较低阈值）
-    std::string ocs_asso = "iou"; // iou|giou|ciou|diou|ct_dist
+    std::string ocs_asso = "ciou"; // iou|giou|ciou|diou|ct_dist
     bool  ocs_oru = true;   // Observation-centric Re-Update
     bool  ocs_ocm = true;   // Observation-Centric Momentum
     bool  ocs_ocr = true;   // Observation-Centric Recovery
     float ocs_recover_relax = 0.1f; // 1.0=no relax; <1.0 relax iou_th for recovery
     int   ocs_auction_rounds = 128;   // CUDA Auction 迭代回合上限
     float ocs_ocr_slope = 0.05f;     // OCR 动态阈值斜率
+    bool  ocs_disable_kf = true;     // 关闭KF预测/更新，使用观测直通（默认开启）
     float ocs_oru_alpha = 1.0f;     // ORU 融合系数（0=不用ORU，>0与obs融合）
 
     // ==================== [Selector] ====================
@@ -216,6 +217,9 @@ public:
     int       ovl_layer_text     = 200;
     int       ovl_layer_cross    = 240;
     int       ovl_layer_lock     = 250;
+    // 调试中心点绘制层（默认略低于 cross）
+    int       ovl_layer_dbg      = 238;
+    bool      dbg_centers        = true;
 
     bool         ovl_gpu_enum = false;
     int          ovl_gpu_idx  = 1;
@@ -356,6 +360,8 @@ private:
         dz_segments = MX(3, dz_segments);
 
         clampL(ovl_layer_lock);
+        clampL(ovl_layer_dbg);
+
 
         if (ovl_cls) { size_t n = classes.size(); pad(ovl_cr,n,ovl_r); pad(ovl_cg,n,ovl_g); pad(ovl_cb,n,ovl_b); }
         cross_size = MX(1, cross_size);

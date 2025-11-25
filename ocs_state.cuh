@@ -14,6 +14,9 @@ struct Box { float x1, y1, x2, y2; };
 // Convert KF state (cx,cy,s,r,...) to xyxy boxes for T tracks
 void kfx_to_boxes(const float* kfx, int T, Box* out_boxes, cudaStream_t stream);
 
+// Convert meta_obs (float4 xyxy) to Box for T tracks
+void obs_to_boxes(const float4* meta_obs, int T, Box* out_boxes, cudaStream_t stream);
+
 // Age tsu by +1 for all tracks
 void age_tsu_begin(int T, int* meta_tsu, cudaStream_t stream);
 

@@ -78,6 +78,10 @@ private:
 
 
     // overlay state
+    // dbg centers
+    bool dbg_has_pts_ = false;
+    cv::Point2f dbg_trk_pt_{0.f,0.f};
+    cv::Point2f dbg_ctrl_pt_{0.f,0.f};
     bool lock_ = false;
     OverlayRect lock_rect_{0,0,0,0};
     cv::Point2f aim_pt_{0.f, 0.f};
@@ -99,6 +103,7 @@ private:
     friend void aim_draw_cross(Aim* self);
     friend void aim_draw_lock(Aim* self);
     friend void aim_draw_dz(Aim* self);
+    friend void aim_draw_dbg(Aim* self);
 
     // small control helpers to shrink .cpp
     void on_no_target();
@@ -106,7 +111,7 @@ private:
 };
 
 // inline impls (keep tiny to reduce .cpp size; no logic change)
-inline void Aim::on_no_target(){ adrc.reset(); mv_residual_ = {0.0, 0.0}; human.reset(); lock_ = false; aim_ok_ = false; }
+inline void Aim::on_no_target(){ adrc.reset(); mv_residual_ = {0.0, 0.0}; human.reset(); lock_ = false; aim_ok_ = false; dbg_has_pts_ = false; }
 inline void Aim::on_smooth(const Detection& target, double dt, double& mou_ms){
   auto [ex, ey] = pred_err(target);
   // deadzone on error to suppress endpoint jitter

@@ -47,8 +47,10 @@ void OCSort::update_dev(const float* det_xyxy, const float* det_scores, const in
     // KF predict on device with persistent state
     if (T>0){
         ensure_capacity(D, T, stream);
-        // 直接对当前 T 个轨迹做 KF 预测（状态常驻于设备）
-        ocs::kf_predict(db_.kf_x, db_.kf_P, T, kf_dt_, q_pos_, q_size_, stream);
+        // 关闭KF时跳过预测；否则执行预测
+        if (!disable_kf_) {
+            ocs::kf_predict(db_.kf_x, db_.kf_P, T, kf_dt_, q_pos_, q_size_, stream);
+        }
         CHECK(cudaPeekAtLastError());
         // tsu aging：无论是否有检测，本帧轨迹均老化一次
         ocs::age_tsu_begin(T, db_.meta_tsu, stream);
@@ -61,10 +63,14 @@ void OCSort::update_dev(const float* det_xyxy, const float* det_scores, const in
         // 基于上一帧中心计算 OCM 动量与有效性（设备）
         // 确保 trk_valid 在本帧之前被清零（当 OCM 关闭或首帧），随后再计算 OCM 动量与有效性
         if (T>0) ocs::memset_float(db_.trk_valid, 0.0f, T, stream);
-        if (ocm_) ocs::ocm_compute_momentum(db_.obs_prev, db_.obs_curr, T, 1e-3f, db_.trk_vdc, db_.trk_valid, stream);
+        if (ocm_ && !disable_kf_) ocs::ocm_compute_momentum(db_.obs_prev, db_.obs_curr, T, 1e-3f, db_.trk_vdc, db_.trk_valid, stream);
        CHECK(cudaPeekAtLastError());
-        // 从 KF 状态生成预测框用于匹配
-        ocs::kfx_to_boxes(db_.kf_x, T, reinterpret_cast<ocs::Box*>(db_.trk_boxes), stream);
+        // 从 KF 状态或上一帧观测生成用于匹配的轨迹框
+        if (!disable_kf_) {
+            ocs::kfx_to_boxes(db_.kf_x, T, reinterpret_cast<ocs::Box*>(db_.trk_boxes), stream);
+        } else {
+            ocs::obs_to_boxes(db_.meta_obs, T, reinterpret_cast<ocs::Box*>(db_.trk_boxes), stream);
+        }
         CHECK(cudaPeekAtLastError());
 
         // 计算代价
@@ -88,7 +94,7 @@ void OCSort::update_dev(const float* det_xyxy, const float* det_scores, const in
         ocs::memset_int(db_.sel_det, -1, T, stream);
          CHECK(cudaPeekAtLastError());
         // 主匹配选择（tsu aging 已在预测后完成）
-        ocs::primary_select_from_pairs(db_.iou, D, T, db_.pairs, db_.k, det_cls, reinterpret_cast<const int*>(db_.meta_cls), db_.meta_tsu, iou_th_, recover_relax_, ocr_?1:0, ocr_slope_, db_.det_used, db_.sel_det, stream);
+        ocs::primary_select_from_pairs(db_.iou, D, T, db_.pairs, db_.k, det_cls, reinterpret_cast<const int*>(db_.meta_cls), db_.meta_tsu, iou_th_, recover_relax_, (ocr_ && !disable_kf_)?1:0, ocr_slope_, db_.det_used, db_.sel_det, stream);
          CHECK(cudaPeekAtLastError());
         // 在设备端直接根据 sel_det 构建 KF z/m 并更新 meta（obs/score/cls）；不在此处回读 sel_det
         // 若保留 trk_cls: 在应用 meta 后将 trk_cls 同步为 meta_cls，避免类别漂移
@@ -103,8 +109,10 @@ void OCSort::update_dev(const float* det_xyxy, const float* det_scores, const in
         cudaMemcpyAsync(db_.trk_cls, db_.meta_cls, T*sizeof(int), cudaMemcpyDeviceToDevice, stream);
         // KF update on device + OCM centers更新
         if (T>0){
-            ocs::kf_update(db_.kf_x, db_.kf_P, db_.kf_z, db_.kf_m, actM, r_pos_, r_size_, stream);
-            CHECK(cudaPeekAtLastError());
+            if (!disable_kf_) {
+                if (!disable_kf_) ocs::kf_update(db_.kf_x, db_.kf_P, db_.kf_z, db_.kf_m, actM, r_pos_, r_size_, stream);
+                CHECK(cudaPeekAtLastError());
+            }
             // 命中统计：匹配上的轨迹 tsu=0，hit+=1
             ocs::update_hit_tsu_after_match(db_.sel_det, T, db_.meta_hit, db_.meta_tsu, stream);
             CHECK(cudaPeekAtLastError());
@@ -131,7 +139,7 @@ void OCSort::update_dev(const float* det_xyxy, const float* det_scores, const in
             oru_alpha = oru_ ? oru_alpha_ : 0.0f;
             ocs::build_z_from_sel(det_xyxy, D, db_.sel_det, actM, db_.obs_prev, oru_alpha, db_.kf_z, db_.kf_m, stream);
              CHECK(cudaPeekAtLastError());
-            ocs::kf_update(db_.kf_x, db_.kf_P, db_.kf_z, db_.kf_m, actM, r_pos_, r_size_, stream);
+            if (!disable_kf_) ocs::kf_update(db_.kf_x, db_.kf_P, db_.kf_z, db_.kf_m, actM, r_pos_, r_size_, stream);
             // 命中统计：BYTE 二阶段新增匹配同样归零 tsu 并累计 hit
             ocs::update_hit_tsu_after_match(db_.sel_det, T, db_.meta_hit, db_.meta_tsu, stream);
             // 将二阶段匹配写入 meta，并更新 OCM 中心/动量（同步 trk_cls <- meta_cls 防止类别漂移）
@@ -162,6 +170,7 @@ void OCSort::update_dev(const float* det_xyxy, const float* det_scores, const in
     out.clear(); out.reserve(T);
     // 设备端构建输出（直接使用设备常驻 meta），一次性回读
     if (T>0){
+        // 输出构建仍使用统一API；当 disable_kf_ 时内核仍从 meta_obs 构建 obs，trk 字段可保持为 KF 投影或与 obs 同步（现保持 KF 投影以减少修改）
         ocs::build_outputs_packed(db_.kf_x,
                                   reinterpret_cast<ocs::OcsPackedTrk*>(db_.out_packed),
                                   db_.meta_id,
@@ -176,7 +185,7 @@ void OCSort::update_dev(const float* det_xyxy, const float* det_scores, const in
         std::vector<ocs::OcsPackedTrk> h(T);
         cudaMemcpyAsync(h.data(), db_.out_packed, T*sizeof(ocs::OcsPackedTrk), cudaMemcpyDeviceToHost, stream);
         cudaStreamSynchronize(stream);
-        for (int j=0;j<T;++j){ const auto& p=h[j]; if (!p.valid) continue; Trk r; auto tb=p.trk; auto ob=p.obs; r.x1=tb.x; r.y1=tb.y; r.x2=tb.z; r.y2=tb.w; r.ox1=ob.x; r.oy1=ob.y; r.ox2=ob.z; r.oy2=ob.w; r.score=p.score; r.cls=p.cls; r.id=p.id; r.valid=true; out.push_back(r);} 
+        for (int j=0;j<T;++j){ const auto& p=h[j]; if (!p.valid) continue; Trk r; auto tb = disable_kf_ ? p.obs : p.trk; auto ob=p.obs; r.x1=tb.x; r.y1=tb.y; r.x2=tb.z; r.y2=tb.w; r.ox1=ob.x; r.oy1=ob.y; r.ox2=ob.z; r.oy2=ob.w; r.score=p.score; r.cls=p.cls; r.id=p.id; r.valid=true; out.push_back(r);} 
     }
     // 设备端紧凑搬移：移除超龄轨迹并写回计数
     ocs::compact_tracks(T, max_age_,

@@ -31,7 +31,7 @@ void build_outputs(const float* kfx,
                    cudaStream_t stream);
 
 // AoS packed builder to reduce D2H copies to a single memcpy
-void build_outputs_packed(const float* kfx,
+void build_outputs_packed(const float* kfx, // kfx ignored when KF disabled (still required for API)
                           OcsPackedTrk* out_packed,
                           const int*    meta_id,
                           const int*    meta_cls,

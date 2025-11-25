@@ -9,7 +9,11 @@ void OCSort::configure(const Config& c){
     vdc_weight_ = c.ocs_inertia;
     q_pos_ = c.ocs_kf_q_pos; q_size_ = c.ocs_kf_q_size; r_pos_ = c.ocs_kf_r_pos; r_size_ = c.ocs_kf_r_size;
     if (c.ocs_asso == "iou") afn_ = 0; else if (c.ocs_asso=="giou") afn_ = 1; else if (c.ocs_asso=="ciou") afn_ = 2; else if (c.ocs_asso=="diou") afn_ = 3; else if (c.ocs_asso=="ct_dist") afn_ = 4; else afn_ = 0;
-    oru_ = c.ocs_oru; ocm_ = c.ocs_ocm; ocr_ = c.ocs_ocr;
+    disable_kf_ = c.ocs_disable_kf;
+    // 在关闭KF时，强制退化 ORU/OCM/OCR
+    oru_ = c.ocs_oru && !disable_kf_;
+    ocm_ = c.ocs_ocm && !disable_kf_;
+    ocr_ = c.ocs_ocr && !disable_kf_;
     use_byte_ = c.ocs_use_byte; byte_iou_th_ = c.ocs_byte_iou_th;
     recover_relax_ = c.ocs_recover_relax;
     auction_rounds_ = c.ocs_auction_rounds;

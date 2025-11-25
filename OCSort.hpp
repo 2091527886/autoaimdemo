@@ -129,4 +129,5 @@ private:
     int   auction_rounds_ = 64;
     float ocr_slope_ = 0.05f;
     float oru_alpha_ = 0.85f; // ORU 融合系数，来自 Config
+    bool  disable_kf_ = false;
 };

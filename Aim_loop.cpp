@@ -120,6 +120,14 @@ void Aim::loop() {
         aim_pt_.x = ap.x; 
         aim_pt_.y = ap.y; 
         aim_ok_ = true;
+        // dbg centers
+        dbg_has_pts_ = true;
+        // track center（叠加层绘制使用 trk 框）
+        dbg_trk_pt_.x = (float)(sel.trk.x + sel.trk.width*0.5f);
+        dbg_trk_pt_.y = (float)(sel.trk.y + sel.trk.height*0.5f);
+        // control center（用于 pred_err/ADRC 的 obs 中心）
+        dbg_ctrl_pt_.x = (float)(det_for_aim.box.x + det_for_aim.box.width*0.5f);
+        dbg_ctrl_pt_.y = (float)(det_for_aim.box.y + det_for_aim.box.height*0.5f);
 
         if (smooth_pressed) { on_smooth(det_for_aim, dt_frame, mou_cost_ms); }
       }
