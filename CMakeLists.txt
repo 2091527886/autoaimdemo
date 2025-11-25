@@ -126,6 +126,13 @@ add_executable(aimassistant
   ctrl_adrc.hpp
   ctrl_adrc.cpp
   AdrcConfIO.cpp
+  HC_Tween.hpp
+  HC_Bezier.hpp
+  HC_Curve.hpp
+  HC_Random.hpp
+  HC_Buffer.hpp
+  Clicker.hpp
+  HumanCursor.hpp
 )
 
 

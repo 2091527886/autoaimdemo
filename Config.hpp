@@ -7,8 +7,44 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
+#include "HC_Random.hpp"
 
 class Config {
+public:
+    hc::CurveRandConfig to_hc_curve_rand_config() const { return human_rand_cfg; }
+
+public:
+    // HumanCursor 新配置（紧随类开始定义，便于查找）
+    bool  human_enable = true;     // 默认开启 HumanCursor
+    bool  human_steady = false;    // 稳定曲线（更小边界/更强扰动）
+    int   human_queue_cap = 2048;  // 曲线步长队列上限
+    int   human_mode = 0;          // 0=OffsetCurve(配合ADRC), 1=AbsoluteCurve(直达目标)
+    int   human_queue_clear_policy = 0; // 0=KeepExisting(保持旧队列), 1=AbsNewClear(AbsoluteCurve 生成新曲线前清空)
+    // 曲线参数配置（将 Python 随机范围/权重暴露出来）
+    // AbsoluteCurve 模式的默认时长（毫秒），用于将时长映射为 target_points（不 sleep，不改计时）
+    int human_abs_dur_ms_min = 200;
+    int human_abs_dur_ms_max = 300;
+    // 近目标极小步长抑制阈值（像素 L1），默认开启，用于抑制末端微抖；仅在 OffsetCurve 路径使用
+    double human_min_step_eps = 0.3; // px
+    bool   human_min_step_eps_enable = true;
+    hc::CurveRandConfig human_rand_cfg = []{
+        hc::CurveRandConfig r;
+        // 强力止抖：目标附近尽量直线，几乎无扰动
+        r.off_r0_min = 0; r.off_r0_max = 10;
+        r.off_r1_min = 10; r.off_r1_max = 15;
+        r.off_r2_min = 15; r.off_r2_max = 20;
+        r.off_w0 = 100; r.off_w1 = 0; r.off_w2 = 0; // 全力压小半径
+        // 完全关闭扰动
+        r.mean_min = 0; r.mean_max = 0;
+        r.std_min  = 0; r.std_max  = 0;
+        r.freq_min = 0; r.freq_max = 0;
+        // 每帧一步或极少步
+        r.target_points_cap = 2;
+        r.viewport_min_ratio = 0.15; r.viewport_max_ratio = 0.85;
+        r.use_default_tween_pool = true;
+        return r;
+    }();
+
 public:
     bool timing = true;
 public:
@@ -224,6 +260,30 @@ public:
         if (!(conf_thresh >= 0.0f && conf_thresh <= 1.0f)) { lg::e()<< P_E "conf_thresh out of [0,1]"<<lg::endl; }
         if (!(y_anchor_ratio >= 0.0 && y_anchor_ratio <= 1.0)) { lg::e()<< P_E "y_anchor_ratio out of [0,1]"<<lg::endl; }
         // 新增字段的 clamp
+        human_queue_cap = MX(1, human_queue_cap);
+        human_mode = (human_mode==1)?1:0;
+        human_queue_clear_policy = (human_queue_clear_policy==1)?1:0;
+        // clamp human_rand_cfg 部分字段
+        human_rand_cfg.off_r0_min = MX(0, human_rand_cfg.off_r0_min);
+        human_rand_cfg.off_r0_max = MX(human_rand_cfg.off_r0_min, human_rand_cfg.off_r0_max);
+        human_rand_cfg.off_r1_min = MX(0, human_rand_cfg.off_r1_min);
+        human_rand_cfg.off_r1_max = MX(human_rand_cfg.off_r1_min, human_rand_cfg.off_r1_max);
+        human_rand_cfg.off_r2_min = MX(0, human_rand_cfg.off_r2_min);
+        human_rand_cfg.off_r2_max = MX(human_rand_cfg.off_r2_min, human_rand_cfg.off_r2_max);
+        human_rand_cfg.off_w0 = MX(0, human_rand_cfg.off_w0);
+        human_rand_cfg.off_w1 = MX(0, human_rand_cfg.off_w1);
+        human_rand_cfg.off_w2 = MX(0, human_rand_cfg.off_w2);
+        human_rand_cfg.mean_min = MX(0, human_rand_cfg.mean_min);
+        human_rand_cfg.mean_max = MX(human_rand_cfg.mean_min, human_rand_cfg.mean_max);
+        human_rand_cfg.std_min = MX(0, human_rand_cfg.std_min);
+        human_rand_cfg.std_max = MX(human_rand_cfg.std_min, human_rand_cfg.std_max);
+        human_rand_cfg.freq_min = MX(0, human_rand_cfg.freq_min);
+        human_rand_cfg.freq_max = MX(human_rand_cfg.freq_min, human_rand_cfg.freq_max);
+        human_rand_cfg.viewport_min_ratio = CLP(human_rand_cfg.viewport_min_ratio, 0.0, 1.0);
+        human_rand_cfg.viewport_max_ratio = CLP(human_rand_cfg.viewport_max_ratio, 0.0, 1.0);
+        if (human_rand_cfg.viewport_max_ratio < human_rand_cfg.viewport_min_ratio) std::swap(human_rand_cfg.viewport_min_ratio, human_rand_cfg.viewport_max_ratio);
+        human_rand_cfg.target_points_cap = MX(2, human_rand_cfg.target_points_cap);
+
         adrc_ctrl_low_level = std::max(0, std::min(2, adrc_ctrl_low_level));
         adrc_output_limit_px = MX(0.0, adrc_output_limit_px);
         // ADRC 数值安全护栏（避免除 0 与 pow(0,·) 等数值问题）
