@@ -19,7 +19,7 @@ bool Aim::capture(FrameLat &fl, ScreenCapturer::CapturedView &view) {
     }
     return false;
   }
-  c.frame_idx++;
+  
   fl.idx = c.frame_idx;
   fl.cap_ms = cap_ms;
   return true;
