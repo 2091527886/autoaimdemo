@@ -37,7 +37,7 @@ __global__ void k_append_new_tracks(
     int u = blockIdx.x*blockDim.x + threadIdx.x; if (u>=K) return;
     int di = unused_idx[u];
     int idx = atomicAdd(trk_count, 1);
-    if (idx >= cap_M) return; // overflow guard
+    if (idx >= cap_M) { atomicSub(trk_count, 1); return; } // overflow guard with rollback
     int id = atomicAdd(next_id, 1);
     // det box
     float x1=det_xyxy[di*4+0], y1=det_xyxy[di*4+1], x2=det_xyxy[di*4+2], y2=det_xyxy[di*4+3];

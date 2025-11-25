@@ -3,10 +3,10 @@
 namespace ocs {
 
 __global__ void k_zero_int(int* p, int v, int n){ int i=blockIdx.x*blockDim.x+threadIdx.x; if(i<n) p[i]=v; }
-void memset_int(int* ptr, int value, int count, cudaStream_t stream){ int tb=256, gb=(count+tb-1)/tb; k_zero_int<<<gb,tb,0,stream>>>(ptr,value,count); }
+void memset_int(int* ptr, int value, int count, cudaStream_t stream){ if (count<=0) return; int tb=256, gb=(count+tb-1)/tb; k_zero_int<<<gb,tb,0,stream>>>(ptr,value,count); }
 
 __global__ void k_zero_float(float* p, float v, int n){ int i=blockIdx.x*blockDim.x+threadIdx.x; if(i<n) p[i]=v; }
-void memset_float(float* ptr, float value, int count, cudaStream_t stream){ int tb=256, gb=(count+tb-1)/tb; k_zero_float<<<gb,tb,0,stream>>>(ptr,value,count); }
+void memset_float(float* ptr, float value, int count, cudaStream_t stream){ if (count<=0) return; int tb=256, gb=(count+tb-1)/tb; k_zero_float<<<gb,tb,0,stream>>>(ptr,value,count); }
 
 __global__ void k_byte_select(const float* iou, int N, int M, float th,
                               const int* det_cls, const int* trk_cls,
