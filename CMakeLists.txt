@@ -93,7 +93,10 @@ add_executable(aimassistant
   Aim_ovl_dets.cpp
   Aim_ovl_cross.cpp
   Aim_ovl_lock.cpp
-  OCSort.cpp
+  OCSort_init.cpp
+  OCSort_cap.cpp
+  OCSort_conf.cpp
+  OCSort_update.cpp
   PoseOCSBridge.cpp
   Aim_log.cpp
   FpsCtl.cpp
