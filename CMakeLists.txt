@@ -121,7 +121,6 @@ add_executable(aimassistant
   ovl_render_draw.cpp
   ovl_gpu.cpp
   ovl_util.cpp
-  AimAlgo.hpp
   AimADRC.hpp
   ctrl_utils.hpp
   ctrl_adrc.hpp

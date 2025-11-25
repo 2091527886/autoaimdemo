@@ -27,7 +27,7 @@ public:
     bool fps_lock = true;              // 是否锁帧
     int  fps = 60;                     // 目标帧率
 public:
-    bool   adrc_enable = true;             // ADRC 总开关：true=使用 ADRC；false 时如 prop_enable=true 则改用 P（P 作为备选保留）。
+    bool   adrc_enable = true;             // ADRC 总开关：true=使用 ADRC；false=不输出移动
     bool   adrc_use_measured_dt = false;  // ADRC 内部 dt 源：true=使用 Aim::get_dt() 的“实测 dt”；false=强制 16ms（锁60稳节拍更抗抖）。实测 dt 更灵敏但易抖；16ms 更稳但略钝。
     int    adrc_ctrl_low_level = 2;       // 控制律简化级别（近端抑制）：0=完整非线性；1=Fhan 简化；2=线性反馈（最稳）。建议从 2 起步，稳后再尝试 1/0。
     bool   adrc_invert_output_sign = true; // 输出方向翻转：若“越纠越远”则置 true；若“越纠越近但过度”则保持 false 并用 out_limit/beta1/2 限制速度。
@@ -115,65 +115,12 @@ public:
     const double px_per_360     = 3600;
     const double hfov_deg       = 85.461056;
 
-    // ==================== [Aim Control & Prediction] ====================
-    // 运动学、预测、距离分段与锚点等行为控制
-    // P 控制器开关（与 ADRC 互斥使用）
-    bool   prop_enable = false;          // 默认关闭 P 分支；不在 validate() 中强制覆盖 ADRC 开关
-    bool   prop = false;                  // P 控制器内部行为参数保留（备用），默认不开启使用
-    double prop_k_x = 0.4;
-    double prop_k_y = 0.4;
-    double prop_out_limit = 360.0;
-    double prop_tc_ms = 16.0;
-    double prop_dead_px = 0;
-    bool   prop_use_dt = true;            // 仅影响 P 控制器内部；不影响 Aim::get_dt() 的“实测 dt 来源”
-    // 非风路径量化残差的保留系数（0~1），1.0=完全保留；<1.0=逐步衰减，避免极端情况下长期积累
+    // ==================== [Aim Control] ====================
+    // 仅保留 ADRC 与非风路径残差累积
+    // 非风路径量化残差的保留系数（0~1），1.0=完全保留；<1.0=逐步衰减
     double aim_residual_carry = 1.0;
 
-    bool   pred_enable = false;
-    double pred_dt_max_ms = 7.0;
-    double pred_v_tc_ms  = 12.0;
-    double pred_v_lim_px = 220.0;
-
-    double dist_near_h = 220.0;
-    double dist_far_h  = 120.0;
-    double dist_hys_h  = 24.0;
-    bool   curve_interp = false;
-
-    double seg_near_kx=0.4, seg_near_ky=0.4, seg_near_tc_ms=16.0, seg_near_lim=360.0;
-    double seg_mid_kx =0.4, seg_mid_ky =0.4, seg_mid_tc_ms =16.0, seg_mid_lim =330.0;
-    double seg_far_kx =0.4, seg_far_ky =0.4, seg_far_tc_ms =16.0, seg_far_lim =300.0;
-
-    bool   aim_dyn_anchor = true;
-    double y_anchor_head  = 0.58;
-    double y_anchor_body  = 0.80;
-    double aim_hys_h      = 28.0;
-    bool   aim_lock_on_seg = true;
-
     bool   aim_only_with_key = true;
-
-    // ==================== [Wind (Mouse micro-movement)] ====================
-    // 鼠标微扰控制（平滑/随机/风力）
-    bool   wind_enable = false;          // 默认关闭风鼠标（确保稳定与可控性）；开关在 Aim::on_smooth 内分流到 mv/mv_wind
-    int    wind_rng_seed = 0;
-    double wind_step_min_px = 0.6;
-    double wind_step_max_px = 7.5;
-    double wind_speed_curve = 0.65;
-    double wind_end_slow_px = 10.0;
-    double wind_wind_k = 0.24;
-    double wind_gravity_k = 0.86;
-    double wind_jitter_std_px = 0.22;
-    double wind_backtrack_k = 0.12;
-    double wind_near_scale = 0.90;
-    double wind_mid_scale  = 1.0;
-    double wind_far_scale  = 1.15;
-    int    wind_max_steps_per_frame = 4;
-    double wind_time_budget_ms = 0.6;
-    double wind_residual_carry = 0.9;
-    double wind_dead_px = 0.5;
-    bool   wind_target_noise_enable = true;
-    double wind_target_noise_px = 0.6;
-    bool   wind_use_seg_scale = true;
-    double wind_out_limit_px = 340.0;
 
     // ==================== [Classes & Targets] ====================
     // pose 模型类别：0=enemy, 1=teammate
@@ -269,18 +216,11 @@ public:
 
     void validate() {
         v_basic(); v_overlay(); v_dxgi();
-        // 强制忽略 P 分支：prop_enable=false 时，若用户误开 P 相关参数，仍以 ADRC 为准
+        // removed legacy P-branch notes
         if (false /* keep user config: do not force ADRC when P disabled */) {
             /* keep user choice: do not force ADRC here */
         }
 
-        dist_near_h = MX(1.0, dist_near_h);
-        dist_far_h  = MX(1.0, MN(dist_near_h-1.0, dist_far_h));
-        dist_hys_h  = MX(0.0, dist_hys_h);
-        aim_hys_h   = MX(0.0, aim_hys_h);
-        pred_dt_max_ms = MX(0.0, pred_dt_max_ms);
-        pred_v_tc_ms  = MX(0.0, pred_v_tc_ms);
-        pred_v_lim_px = MX(0.0, pred_v_lim_px);
         if (!(conf_thresh >= 0.0f && conf_thresh <= 1.0f)) { lg::e()<< P_E "conf_thresh out of [0,1]"<<lg::endl; }
         if (!(y_anchor_ratio >= 0.0 && y_anchor_ratio <= 1.0)) { lg::e()<< P_E "y_anchor_ratio out of [0,1]"<<lg::endl; }
         // 新增字段的 clamp

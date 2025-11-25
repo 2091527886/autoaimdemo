@@ -13,11 +13,7 @@ Aim::Aim()
   // 在控制器初始化前尝试加载外部 ADRC 配置
   (void)LoadAdrcConfIfPresent("adrc.conf", c);
   c.validate();
-  algo.setConfig(c);
   adrc.setConfig(c);
-  if (c.wind_rng_seed > 0) {
-    wind_.rng.seed(static_cast<uint32_t>(c.wind_rng_seed));
-  }
   if (c.ovl){ gover.UseVirtualScreen(); gover.SetConfig(c); bool ok = gover.Start(); lg::ok_or_werr(P_B, "Overlay.Start", ok); }
   ocs.configure(c);
 }

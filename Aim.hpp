@@ -8,7 +8,6 @@
 #include "Timing.hpp"
 #include "Detection.hpp"
 #include "Mouse.hpp"
-#include "AimAlgo.hpp"
 #include "HotkeyManager.hpp"
 #include "ScreenCapturer.hpp"
 #include "Pose.hpp"
@@ -20,13 +19,7 @@
 
 class Aim {
 private:
-    struct WindState {
-        cv::Point2d residual{0.0, 0.0};
-        cv::Point2d v{0.0, 0.0};
-        std::mt19937 rng{std::random_device{}()};
-        std::normal_distribution<double> n01{0.0, 1.0};
-    };
-
+    // wind removed
 public:
     // FpsCtl 独立为全局结构，保持名称不变
     
@@ -40,12 +33,9 @@ private:
     double get_dt();
     double anch(double h);
     double anch_read(double h) const; // read-only anchor, no state write
-    void set_seg(double h);
-    std::pair<double,double> pred_err(const Detection& d, double dt, bool enable_pred);
+    std::pair<double,double> pred_err(const Detection& d);
     bool capture(FrameLat& fl, ScreenCapturer::CapturedView& view);
     bool infer_view(ScreenCapturer::CapturedView& view);
-    void mv(int mx, int my, double& ms);
-    void mv_wind(int mx, int my, double& ms);
     void mv_precise(double wx, double wy, double& ms);
     void draw_ovl(double& ms);
     void log_lat(FrameLat& fl);
@@ -60,7 +50,6 @@ private:
     ScreenCapturer cap;
     PoseInfer pose;
     Mouse mouse;
-    AimAlgo algo;
     AimADRC adrc;
     HotkeyManager hk;
     const cv::Rect crop;
@@ -83,10 +72,6 @@ private:
 
     Game_overlay gover;
 
-    cv::Point2d v_lp_ {0.0, 0.0};
-    cv::Point2d last_tp_ {0.0, 0.0};
-    bool last_tp_valid_ = false;
-    int  last_seg_ = 1; // 0:far,1:mid,2:near
 
     // overlay state
     bool lock_ = false;
@@ -101,7 +86,6 @@ private:
    struct PendingText { float x; float y; std::wstring text; OverlayColor col; uint16_t layer; int pri; int ord; };
    std::vector<PendingText> pending_texts_;
 
-   WindState wind_;
    cv::Point2d mv_residual_{0.0, 0.0};
    // 轻量调试统计：量化损失累计与事件次数（仅在 timing 打印）
    double mvq_loss_sum_ = 0.0;
@@ -117,33 +101,11 @@ private:
 };
 
 // inline impls (keep tiny to reduce .cpp size; no logic change)
-inline void Aim::on_no_target(){ algo.reset(); adrc.reset(); mv_residual_ = {0.0, 0.0}; last_tp_valid_ = false; lock_ = false; aim_ok_ = false; }
+inline void Aim::on_no_target(){ adrc.reset(); mv_residual_ = {0.0, 0.0}; lock_ = false; aim_ok_ = false; }
 inline void Aim::on_smooth(const Detection& target, double dt, double& mou_ms){
-  // 选择控制器：默认使用 ADRC；P 控制器保留但默认不生效。
-  // dt：由 Aim::get_dt() 提供的“实测 dt”。ADRC 内部可根据 adrc_use_measured_dt 决定是否改用 16ms。
-  double h = (double)target.box.height; set_seg(h);
-  auto [ex, ey] = pred_err(target, dt, true);
-  // 控制器选择：优先 ADRC；否则仅在显式开启 prop_enable 时使用 P；否则不移动
-  if (c.adrc_enable) {
-    auto pr = adrc.step(ex, ey, dt);
-    if (!c.wind_enable) {
-      double wx = pr.first * mfac, wy = pr.second * mfac;
-      mv_precise(wx, wy, mou_ms);
-    } else {
-      int mx = (int)(pr.first * mfac), my = (int)(pr.second * mfac);
-      mv_wind(mx, my, mou_ms);
-    }
-  } else if (c.prop_enable) {
-    auto pr = algo.step(ex, ey, dt);
-    if (!c.wind_enable) {
-      double wx = pr.first * mfac, wy = pr.second * mfac;
-      mv_precise(wx, wy, mou_ms);
-    } else {
-      int mx = (int)(pr.first * mfac), my = (int)(pr.second * mfac);
-      mv_wind(mx, my, mou_ms);
-    }
-  } else {
-    // 两者都未启用则不移动
-    return;
-  }
+  auto [ex, ey] = pred_err(target);
+  if (!c.adrc_enable) return;
+  auto pr = adrc.step(ex, ey, dt);
+  double wx = pr.first * mfac, wy = pr.second * mfac;
+  mv_precise(wx, wy, mou_ms);
 }
