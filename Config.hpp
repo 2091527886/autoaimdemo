@@ -88,24 +88,24 @@ public:
 
     // ==================== [OC-SORT Tracker] ====================
     bool  ocs_enable = true;
-    int   ocs_max_age = 130;
-    int   ocs_min_hits = 1;
-    float ocs_iou_th = 0.03f;
-    float ocs_inertia = 0.10f; // VDC weight
-    float ocs_kf_q_pos = 0.01f;
-    float ocs_kf_q_size = 0.01f;
-    float ocs_kf_r_pos = 1.0f;
-    float ocs_kf_r_size = 1.0f;
-    bool  ocs_use_byte = true;
+    int   ocs_max_age = 20;
+    int   ocs_min_hits = 2;
+    float ocs_iou_th = 0.30f;
+    float ocs_inertia = 0.0f; // VDC weight
+    float ocs_kf_q_pos = 0.0f;
+    float ocs_kf_q_size = 0.0f;
+    float ocs_kf_r_pos = 1e-6f;
+    float ocs_kf_r_size = 1e-6f;
+    bool  ocs_use_byte = false;
     float ocs_byte_iou_th = 0.05f; // BYTE 二阶段匹配 IOU 阈值（官方常用较低阈值）
-    std::string ocs_asso = "ciou"; // iou|giou|ciou|diou|ct_dist
+    std::string ocs_asso = "iou"; // iou|giou|ciou|diou|ct_dist
     bool  ocs_oru = true;   // Observation-centric Re-Update
     bool  ocs_ocm = true;   // Observation-Centric Momentum
     bool  ocs_ocr = true;   // Observation-Centric Recovery
     float ocs_recover_relax = 0.1f; // 1.0=no relax; <1.0 relax iou_th for recovery
     int   ocs_auction_rounds = 128;   // CUDA Auction 迭代回合上限
     float ocs_ocr_slope = 0.05f;     // OCR 动态阈值斜率
-    float ocs_oru_alpha = 0.85f;     // ORU 融合系数（0=不用ORU，>0与obs融合）
+    float ocs_oru_alpha = 1.0f;     // ORU 融合系数（0=不用ORU，>0与obs融合）
 
     // ==================== [Selector] ====================
     // 默认 center_win，按键按下=锁定/维持
