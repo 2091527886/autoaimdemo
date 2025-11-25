@@ -14,6 +14,7 @@ Aim::Aim()
   (void)LoadAdrcConfIfPresent("adrc.conf", c);
   c.validate();
   adrc.setConfig(c);
+  dz.cfg(c.dz_px, c.dz_hys);
   // 初始化 HumanCursor（默认开启，读取配置）
   {
     HumanCursorConfig hcfg; hcfg.enable = c.human_enable; hcfg.steady = c.human_steady; hcfg.queue_cap = (size_t)c.human_queue_cap; hcfg.fps_for_duration = c.fps;

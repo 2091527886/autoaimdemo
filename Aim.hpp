@@ -17,6 +17,7 @@
 #include "FpsCtl.hpp"
 #include "AimADRC.hpp"
 #include "HumanCursor.hpp"
+#include "AimDZ.hpp"
 
 class Aim {
 private:
@@ -53,6 +54,7 @@ private:
     Mouse mouse;
     AimADRC adrc;
     HumanCursor human;
+    AimDZ dz;
     HotkeyManager hk;
     const cv::Rect crop;
     const cv::Point ctr;
@@ -96,6 +98,7 @@ private:
     // grant access to helper free functions defined in separate units
     friend void aim_draw_cross(Aim* self);
     friend void aim_draw_lock(Aim* self);
+    friend void aim_draw_dz(Aim* self);
 
     // small control helpers to shrink .cpp
     void on_no_target();
@@ -106,6 +109,8 @@ private:
 inline void Aim::on_no_target(){ adrc.reset(); mv_residual_ = {0.0, 0.0}; human.reset(); lock_ = false; aim_ok_ = false; }
 inline void Aim::on_smooth(const Detection& target, double dt, double& mou_ms){
   auto [ex, ey] = pred_err(target);
+  // deadzone on error to suppress endpoint jitter
+  if (c.dz){ auto __dz = dz.apply(ex, ey, true); ex = __dz.first; ey = __dz.second; }
   if (!c.adrc_enable && c.human_mode==0) return; // OffsetCurve 模式依赖 ADRC；AbsoluteCurve 可不依赖
 
   if (c.human_enable && c.human_mode==1){

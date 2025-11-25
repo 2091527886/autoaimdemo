@@ -93,6 +93,7 @@ add_executable(aimassistant
   Aim_ovl_dets.cpp
   Aim_ovl_cross.cpp
   Aim_ovl_lock.cpp
+  Aim_ovl_dz.cpp
   OCSort_init.cpp
   OCSort_cap.cpp
   OCSort_conf.cpp
@@ -133,6 +134,8 @@ add_executable(aimassistant
   HC_Buffer.hpp
   Clicker.hpp
   HumanCursor.hpp
+  AimDZ.hpp
+  AimDZ.cpp
 )
 
 

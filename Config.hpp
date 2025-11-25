@@ -25,7 +25,7 @@ public:
     int human_abs_dur_ms_min = 200;
     int human_abs_dur_ms_max = 300;
     // 近目标极小步长抑制阈值（像素 L1），默认开启，用于抑制末端微抖；仅在 OffsetCurve 路径使用
-    double human_min_step_eps = 0.3; // px
+    double human_min_step_eps = 1; // px
     bool   human_min_step_eps_enable = true;
     hc::CurveRandConfig human_rand_cfg = []{
         hc::CurveRandConfig r;
@@ -47,6 +47,12 @@ public:
 
 public:
     bool timing = true;
+public:
+    // ==================== [Deadzone] ====================
+    bool   dz = true;       // 误差死区开关
+    double dz_px = 4.0;     // 半径 px
+    double dz_hys = 2;    // 滞回 px（无状态实现下仅用于阈值带）
+
 public:
     // ==================== [Basic & Capture] ====================
     unsigned long long frame_idx = 0;  // 全局帧计数
@@ -82,22 +88,22 @@ public:
 
     // ==================== [OC-SORT Tracker] ====================
     bool  ocs_enable = true;
-    int   ocs_max_age = 30;
-    int   ocs_min_hits = 3;
-    float ocs_iou_th = 0.3f;
-    float ocs_inertia = 0.2f; // VDC weight
+    int   ocs_max_age = 130;
+    int   ocs_min_hits = 1;
+    float ocs_iou_th = 0.03f;
+    float ocs_inertia = 0.10f; // VDC weight
     float ocs_kf_q_pos = 0.01f;
     float ocs_kf_q_size = 0.01f;
     float ocs_kf_r_pos = 1.0f;
     float ocs_kf_r_size = 1.0f;
-    bool  ocs_use_byte = false;
-    float ocs_byte_iou_th = 0.15f; // BYTE 二阶段匹配 IOU 阈值（官方常用较低阈值）
-    std::string ocs_asso = "iou"; // iou|giou|ciou|diou|ct_dist
+    bool  ocs_use_byte = true;
+    float ocs_byte_iou_th = 0.05f; // BYTE 二阶段匹配 IOU 阈值（官方常用较低阈值）
+    std::string ocs_asso = "ciou"; // iou|giou|ciou|diou|ct_dist
     bool  ocs_oru = true;   // Observation-centric Re-Update
     bool  ocs_ocm = true;   // Observation-Centric Momentum
     bool  ocs_ocr = true;   // Observation-Centric Recovery
-    float ocs_recover_relax = 1.0f; // 1.0=no relax; <1.0 relax iou_th for recovery
-    int   ocs_auction_rounds = 64;   // CUDA Auction 迭代回合上限
+    float ocs_recover_relax = 0.1f; // 1.0=no relax; <1.0 relax iou_th for recovery
+    int   ocs_auction_rounds = 128;   // CUDA Auction 迭代回合上限
     float ocs_ocr_slope = 0.05f;     // OCR 动态阈值斜率
     float ocs_oru_alpha = 0.85f;     // ORU 融合系数（0=不用ORU，>0与obs融合）
 
@@ -188,6 +194,15 @@ public:
     int  opt_report_every_n = 30;
 
     // ==================== [Overlay] ====================
+    // 死区绘制（可视化）。仅影响显示，不参与控制逻辑。
+    bool  dz_show = true;
+    float dz_th = 1.5f;
+    int   dz_a = 160, dz_r = 255, dz_g = 255, dz_b = 255;
+    int   dz_layer = 235; // 略低于 cross(240)
+    int   dz_shape = 0;   // 0=box, 1=circle, 2=diamond
+    int   dz_segments = 16; // circle segments
+
+
     // 叠加层绘制（颜色/线宽/窗口参数/字体）
     bool      ovl = true;
     int       ovl_a = 160;
@@ -285,6 +300,10 @@ public:
         human_rand_cfg.target_points_cap = MX(2, human_rand_cfg.target_points_cap);
 
         adrc_ctrl_low_level = std::max(0, std::min(2, adrc_ctrl_low_level));
+        // DZ clamp
+        dz_px = MX(0.0, dz_px);
+        dz_hys = CLP(dz_hys, 0.0, dz_px);
+
         adrc_output_limit_px = MX(0.0, adrc_output_limit_px);
         // ADRC 数值安全护栏（避免除 0 与 pow(0,·) 等数值问题）
         adrc_td_bandwidth_r = MX(1e-6, adrc_td_bandwidth_r);
@@ -328,13 +347,21 @@ private:
         clampL(ovl_layer_trk_sel);
         clampL(ovl_layer_text);
         clampL(ovl_layer_cross);
+        // dz layer clamp
+        clampL(dz_layer);
+        dz_th = MX(0.5f, dz_th);
+        auto clampc = [](int& v){ v = std::max(0, std::min(255, v)); };
+        clampc(dz_a); clampc(dz_r); clampc(dz_g); clampc(dz_b);
+        dz_shape = std::max(0, std::min(2, dz_shape));
+        dz_segments = MX(3, dz_segments);
+
         clampL(ovl_layer_lock);
 
         if (ovl_cls) { size_t n = classes.size(); pad(ovl_cr,n,ovl_r); pad(ovl_cg,n,ovl_g); pad(ovl_cb,n,ovl_b); }
         cross_size = MX(1, cross_size);
         cross_th   = MX(0.5f, cross_th);
         lock_th    = MX(1.0f, lock_th);
-        auto clampc = [](int& v){ v = std::max(0, std::min(255, v)); };
+        /* reuse clampc defined above for dz */
         clampc(cross_a); clampc(cross_r); clampc(cross_g); clampc(cross_b);
         clampc(lock_a);  clampc(lock_r);  clampc(lock_g);  clampc(lock_b);
 

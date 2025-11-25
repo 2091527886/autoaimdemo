@@ -3,3 +3,4 @@
 class Aim;
 void aim_draw_cross(Aim* self);
 void aim_draw_lock(Aim* self);
+void aim_draw_dz(Aim* self);

@@ -194,6 +194,7 @@ void Aim::draw_ovl(double &ms) {
 
   aim_draw_cross(this);
   aim_draw_lock(this);
+  aim_draw_dz(this);
   gover.EndFrame();
   gover.Tick();
   auto t1 = (c.timing ? tn() : tp{});
