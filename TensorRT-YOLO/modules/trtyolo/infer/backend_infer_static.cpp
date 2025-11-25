@@ -67,6 +67,8 @@ void TrtBackend::staticInfer(const std::vector<Image>& inputs) {
 
     // launch graph
     cuda_graph_.launch(stream);
+    // For safety in static graph path, ensure outputs copied back before CPU post-process
+    CHECK(cudaStreamSynchronize(stream));
 }
 
 } // namespace trtyolo

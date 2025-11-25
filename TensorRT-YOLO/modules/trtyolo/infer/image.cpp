@@ -5,7 +5,7 @@
 namespace trtyolo {
 
 Image::Image(void* data, int width, int height)
-    : ptr(data), width(width), height(height), pitch(width * sizeof(uint8_t) * 3) {
+    : ptr(data), width(width), height(height), pitch(static_cast<size_t>(width) * 4) { // Expect BGRA input by default
     if (width <= 0 || height <= 0) {
         throw std::invalid_argument(MAKE_ERROR_MESSAGE("Image: width and height must be positive"));
     }

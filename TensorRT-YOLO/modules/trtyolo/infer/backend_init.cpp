@@ -78,7 +78,7 @@ void TrtBackend::initialize() {
     if (infer_config.input_shape.has_value()) {
         int in_w = infer_config.input_shape->y;
         int in_h = infer_config.input_shape->x;
-        input_row_bytes_   = static_cast<size_t>(in_w) * 4;  // BGRA
+        input_row_bytes_   = static_cast<size_t>(in_w) * 4;  // Expect BGRA input
         input_image_bytes_ = static_cast<size_t>(in_h) * input_row_bytes_;
         input_size_        = static_cast<int>(input_image_bytes_);
 
