@@ -4,6 +4,16 @@
 
 namespace ocs {
 
+__device__ int g_append_overflow_count = 0;
+__device__ int g_append_max_index = -1;
+
+__global__ void k_reset_append_debug(){ g_append_overflow_count = 0; g_append_max_index = -1; }
+void reset_append_debug(cudaStream_t stream){ k_reset_append_debug<<<1,1,0,stream>>>(); }
+void read_append_debug(int* overflow_count, int* max_index){
+    if (overflow_count) cudaMemcpyFromSymbol(overflow_count, g_append_overflow_count, sizeof(int));
+    if (max_index) cudaMemcpyFromSymbol(max_index, g_append_max_index, sizeof(int));
+}
+
 __global__ void k_kfx_to_boxes(const float* kfx, int T, Box* out_boxes){
     int j = blockIdx.x*blockDim.x + threadIdx.x; if (j>=T) return;
     float cx=kfx[j*7+0], cy=kfx[j*7+1], s=kfx[j*7+2], r=kfx[j*7+3];
@@ -36,6 +46,7 @@ void update_hit_tsu_after_match(const int* sel_det, int T, int* meta_hit, int* m
 __global__ void k_append_new_tracks(
     const float* det_xyxy, const float* det_scores, const int* det_cls,
     const int* unused_idx, int K,
+    int D,
     int cap_M,
     int* trk_count, int* next_id,
     float* kf_x, float* kf_P,
@@ -46,8 +57,10 @@ __global__ void k_append_new_tracks(
 ){
     int u = blockIdx.x*blockDim.x + threadIdx.x; if (u>=K) return;
     int di = unused_idx[u];
+    if (di < 0 || di >= D) return;
     int idx = atomicAdd(trk_count, 1);
-    if (idx >= cap_M) { atomicSub(trk_count, 1); return; } // overflow guard with rollback
+    if (idx >= cap_M) { atomicAdd(&g_append_overflow_count, 1); atomicSub(trk_count, 1); return; } // overflow guard with rollback
+    atomicMax(&g_append_max_index, idx);
     int id = atomicAdd(next_id, 1);
     // det box
     float x1=det_xyxy[di*4+0], y1=det_xyxy[di*4+1], x2=det_xyxy[di*4+2], y2=det_xyxy[di*4+3];
@@ -67,6 +80,7 @@ __global__ void k_append_new_tracks(
 
 void append_new_tracks(const float* det_xyxy, const float* det_scores, const int* det_cls,
                        const int* unused_idx, int K,
+                       int D,
                        int cap_M,
                        int* trk_count, int* next_id,
                        float* kf_x, float* kf_P,
@@ -75,9 +89,81 @@ void append_new_tracks(const float* det_xyxy, const float* det_scores, const int
                        float2* obs_prev, float2* obs_curr,
                        int* trk_cls,
                        cudaStream_t stream){
-    int tb=256, gb=(K+tb-1)/tb; if (K>0) k_append_new_tracks<<<gb,tb,0,stream>>>(det_xyxy, det_scores, det_cls, unused_idx, K, cap_M, trk_count, next_id, kf_x, kf_P, meta_id, meta_cls, meta_score, meta_tsu, meta_hit, meta_obs, obs_prev, obs_curr, trk_cls);
+    int tb=256, gb=(K+tb-1)/tb; if (K>0) k_append_new_tracks<<<gb,tb,0,stream>>>(det_xyxy, det_scores, det_cls, unused_idx, K, D, cap_M, trk_count, next_id, kf_x, kf_P, meta_id, meta_cls, meta_score, meta_tsu, meta_hit, meta_obs, obs_prev, obs_curr, trk_cls);
 }
 
+__global__ void k_validate_append(const float* det_xyxy, const float* det_scores, const int* det_cls,
+                                  const int* unused_idx, int K, int D,
+                                  int cap_M,
+                                  const float* kf_x, const float* kf_P,
+                                  const int* meta_id, const int* meta_cls, const float* meta_score, const int* meta_tsu, const int* meta_hit,
+                                  const float4* meta_obs,
+                                  const float2* obs_prev, const float2* obs_curr,
+                                  const int* trk_cls){
+    int u = blockIdx.x*blockDim.x + threadIdx.x;
+    if (u < K){
+        int di = unused_idx ? unused_idx[u] : -1;
+        if (di >= 0 && di < D){
+            volatile float s = 0.f;
+            if (det_xyxy){ s += det_xyxy[di*4+0]; }
+            if (det_scores){ s += det_scores[di]; }
+            if (det_cls){ s += (float)det_cls[di]; }
+        }
+    }
+    if (u == 0){
+        int last = cap_M > 0 ? cap_M-1 : 0;
+        volatile float s = 0.f;
+        if (kf_x){ s += kf_x[0]; if (cap_M>0) s += kf_x[last*7]; }
+        if (kf_P){ s += kf_P[0]; if (cap_M>0) s += kf_P[last*49]; }
+        if (meta_id){ s += (float)meta_id[0]; if (cap_M>0) s += (float)meta_id[last]; }
+        if (meta_cls){ s += (float)meta_cls[0]; if (cap_M>0) s += (float)meta_cls[last]; }
+        if (meta_score){ s += meta_score[0]; if (cap_M>0) s += meta_score[last]; }
+        if (meta_tsu){ s += (float)meta_tsu[0]; if (cap_M>0) s += (float)meta_tsu[last]; }
+        if (meta_hit){ s += (float)meta_hit[0]; if (cap_M>0) s += (float)meta_hit[last]; }
+        if (meta_obs){ float4 a = meta_obs[0]; s += a.x; if (cap_M>0){ float4 b = meta_obs[last]; s += b.x; } }
+        if (obs_prev){ float2 a = obs_prev[0]; s += a.x; if (cap_M>0){ float2 b = obs_prev[last]; s += b.x; } }
+        if (obs_curr){ float2 a = obs_curr[0]; s += a.x; if (cap_M>0){ float2 b = obs_curr[last]; s += b.x; } }
+        if (trk_cls){ s += (float)trk_cls[0]; if (cap_M>0) s += (float)trk_cls[last]; }
+    }
+}
+
+void validate_append_args(const float* det_xyxy, const float* det_scores, const int* det_cls,
+                          const int* unused_idx, int K, int D,
+                          int cap_M,
+                          const float* kf_x, const float* kf_P,
+                          const int* meta_id, const int* meta_cls, const float* meta_score, const int* meta_tsu, const int* meta_hit,
+                          const float4* meta_obs,
+                          const float2* obs_prev, const float2* obs_curr,
+                          const int* trk_cls,
+                          cudaStream_t stream){
+    int tb=256, gb=(max(K,1)+tb-1)/tb; k_validate_append<<<gb,tb,0,stream>>>(det_xyxy, det_scores, det_cls, unused_idx, K, D, cap_M, kf_x, kf_P, meta_id, meta_cls, meta_score, meta_tsu, meta_hit, meta_obs, obs_prev, obs_curr, trk_cls);
+}
+
+__global__ void k_validate_unused_idx(const int* unused_idx, int K, int D,
+                                      int* bad_count, int* first_bad_u, int* first_bad_val){
+    int u = blockIdx.x*blockDim.x + threadIdx.x; if (u>=K) return;
+    int di = unused_idx[u];
+    if (di < 0 || di >= D){
+        atomicAdd(bad_count, 1);
+        if (atomicCAS(first_bad_u, -1, u) == -2) {
+            // no-op
+        }
+        // store first bad val if first_bad_u was -1 before
+        int old = atomicCAS(first_bad_u, -1, u);
+        if (old == -1 && first_bad_val){ *first_bad_val = di; }
+    }
+}
+
+void validate_unused_idx(const int* unused_idx, int K, int D,
+                         int* bad_count, int* first_bad_u, int* first_bad_val,
+                         cudaStream_t stream){
+    if (!unused_idx || K<=0){ if (bad_count) cudaMemsetAsync(bad_count, 0, sizeof(int), stream); if (first_bad_u) cudaMemsetAsync(first_bad_u, 0xFF, sizeof(int), stream); if (first_bad_val) cudaMemsetAsync(first_bad_val, 0xFF, sizeof(int), stream); return; }
+    // init: bad_count=0, first_bad_u=-1, first_bad_val=-1
+    if (bad_count) cudaMemsetAsync(bad_count, 0, sizeof(int), stream);
+    if (first_bad_u) cudaMemsetAsync(first_bad_u, 0xFF, sizeof(int), stream);
+    if (first_bad_val) cudaMemsetAsync(first_bad_val, 0xFF, sizeof(int), stream);
+    int tb=256, gb=(K+tb-1)/tb; k_validate_unused_idx<<<gb,tb,0,stream>>>(unused_idx, K, D, bad_count, first_bad_u, first_bad_val);
+}
 __global__ void k_compact_tracks(int T, int max_age,
                     const float* kf_x, const float* kf_P,
                     const int* meta_id, const int* meta_cls, const float* meta_score, const int* meta_tsu, const int* meta_hit,

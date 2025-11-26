@@ -29,6 +29,7 @@ void update_hit_tsu_after_match(const int* sel_det, int T, int* meta_hit, int* m
 // trk_count: device scalar current track count, next_id: device scalar next id
 void append_new_tracks(const float* det_xyxy, const float* det_scores, const int* det_cls,
                        const int* unused_idx, int K,
+                       int D,
                        int cap_M,
                        int* trk_count, int* next_id,
                        // outputs / states
@@ -38,6 +39,26 @@ void append_new_tracks(const float* det_xyxy, const float* det_scores, const int
                        float2* obs_prev, float2* obs_curr,
                        int* trk_cls,
                        cudaStream_t stream);
+
+// Debug helpers for append (no behavior change)
+void reset_append_debug(cudaStream_t stream);
+void read_append_debug(int* overflow_count, int* max_index);
+
+// Validation kernel (append) to preflight-read inputs/outputs; no side effects
+void validate_append_args(const float* det_xyxy, const float* det_scores, const int* det_cls,
+                          const int* unused_idx, int K, int D,
+                          int cap_M,
+                          const float* kf_x, const float* kf_P,
+                          const int* meta_id, const int* meta_cls, const float* meta_score, const int* meta_tsu, const int* meta_hit,
+                          const float4* meta_obs,
+                          const float2* obs_prev, const float2* obs_curr,
+                          const int* trk_cls,
+                          cudaStream_t stream);
+
+// Validate unused_idx is within [0, D). Writes bad_count, first_bad_u, first_bad_val (device scalars)
+void validate_unused_idx(const int* unused_idx, int K, int D,
+                        int* bad_count, int* first_bad_u, int* first_bad_val,
+                        cudaStream_t stream);
 
 // Compact tracks by removing those with meta_tsu > max_age
 // Writes compacted arrays into tmp buffers; newT (device scalar) is written with result

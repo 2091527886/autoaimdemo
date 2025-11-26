@@ -39,7 +39,11 @@ __global__ void k_cost(const Box* dets,int N,const Box* trks,int M,
     int di = blockIdx.y*blockDim.y + threadIdx.y;
     int ti = blockIdx.x*blockDim.x + threadIdx.x;
     if (di>=N || ti>=M) return;
-    const Box d = dets[di]; const Box t = trks[ti];
+    // Safe scalar loads to avoid potential 16-byte alignment issues when dets/trks may alias SOA buffers
+    const float* detsf = reinterpret_cast<const float*>(dets);
+    const float* trksf = reinterpret_cast<const float*>(trks);
+    Box d; d.x1 = detsf[di*4+0]; d.y1 = detsf[di*4+1]; d.x2 = detsf[di*4+2]; d.y2 = detsf[di*4+3];
+    Box t; t.x1 = trksf[ti*4+0]; t.y1 = trksf[ti*4+1]; t.x2 = trksf[ti*4+2]; t.y2 = trksf[ti*4+3];
     // class mask
     if (class_mask_enable && det_cls && trk_cls){
         int dc = det_cls[di]; int tc = trk_cls[ti];

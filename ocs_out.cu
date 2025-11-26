@@ -94,4 +94,37 @@ void build_outputs_packed(const float* kfx,
     k_build_outputs_packed<<<gb,tb,0,stream>>>(kfx, out_packed, meta_id, meta_cls, meta_score, meta_tsu, meta_hit, meta_obs, min_hits, T);
 }
 
+
+__global__ void k_validate_outputs(const float* kfx,
+                                   const int*    meta_id,
+                                   const int*    meta_cls,
+                                   const float*  meta_score,
+                                   const int*    meta_tsu,
+                                   const int*    meta_hit,
+                                   const float4* meta_obs,
+                                   int T){
+    int j = blockIdx.x*blockDim.x + threadIdx.x; if (j>=T) return;
+    // read a few elements to force memory access; no write
+    volatile float a = 0.f;
+    a += kfx ? kfx[j*7+0] : 0.f;
+    a += meta_id ? (float)meta_id[j] : 0.f;
+    a += meta_cls ? (float)meta_cls[j] : 0.f;
+    a += meta_score ? meta_score[j] : 0.f;
+    a += meta_tsu ? (float)meta_tsu[j] : 0.f;
+    a += meta_hit ? (float)meta_hit[j] : 0.f;
+    if (meta_obs){ float4 b = meta_obs[j]; a += b.x + b.y + b.z + b.w; }
+}
+
+void validate_outputs_args(const float* kfx,
+                           const int*    meta_id,
+                           const int*    meta_cls,
+                           const float*  meta_score,
+                           const int*    meta_tsu,
+                           const int*    meta_hit,
+                           const float4* meta_obs,
+                           int T,
+                           cudaStream_t stream){
+    if (T<=0) return; int tb=256, gb=(T+tb-1)/tb; k_validate_outputs<<<gb,tb,0,stream>>>(kfx,meta_id,meta_cls,meta_score,meta_tsu,meta_hit,meta_obs,T);
+}
+
 } // namespace ocs

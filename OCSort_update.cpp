@@ -1,6 +1,8 @@
 #include "OCSort.hpp"
 #include <algorithm>
 #include <cuda_runtime.h>
+#include <cstdint>
+#include "Log.hpp"
 #include "TensorRT-YOLO/modules/trtyolo/utils/common.hpp"
 using trtyolo::checkCudaError;
 #include "ocs_iou.cuh"
@@ -10,6 +12,7 @@ using trtyolo::checkCudaError;
 #include "ocs_byte.cuh"
 #include "ocs_out.cuh"
 #include "ocs_state.cuh"
+
 
 void OCSort::update_dev(const float* det_xyxy, const float* det_scores, const int* det_cls, int det_num,
                         std::vector<Trk>& out,
@@ -37,10 +40,12 @@ void OCSort::update_dev(const float* det_xyxy, const float* det_scores, const in
         ensure_capacity(D, D, stream);
         std::vector<int> h_idx(D); for (int i=0;i<D;++i) h_idx[i]=i;
         cudaMemcpyAsync(db_.unused_det_idx, h_idx.data(), D*sizeof(int), cudaMemcpyHostToDevice, stream);
-        ocs::append_new_tracks(det_xyxy, det_scores, det_cls, db_.unused_det_idx, D, cap_M_, db_.dev_trk_count, db_.dev_next_id,
+        ocs::reset_append_debug(stream);
+        ocs::append_new_tracks(det_xyxy, det_scores, det_cls, db_.unused_det_idx, D, D, cap_M_, db_.dev_trk_count, db_.dev_next_id,
                           db_.kf_x, db_.kf_P, db_.meta_id, db_.meta_cls, db_.meta_score, db_.meta_tsu, db_.meta_hit, db_.meta_obs,
                           db_.obs_prev, db_.obs_curr, db_.trk_cls, stream);
         cudaMemcpyAsync(&T, db_.dev_trk_count, sizeof(int), cudaMemcpyDeviceToHost, stream); cudaStreamSynchronize(stream);
+        int ovf=0, maxidx=-1; ocs::read_append_debug(&ovf,&maxidx);
         last_T_ = T; kf_inited_ = (T>0);
     }
 
@@ -75,10 +80,47 @@ void OCSort::update_dev(const float* det_xyxy, const float* det_scores, const in
 
         // 计算代价
         ocs::Assoc afn = (ocs::Assoc)afn_;
+        // 仅在首次或扩容后输出一次轻量日志，便于定位潜在 SOA/AoS 对齐问题（不影响时序）
+        {
+            static int last_capN_logged = -1, last_capM_logged = -1;
+            if (last_capN_logged != cap_N_ || last_capM_logged != cap_M_) {
+                last_capN_logged = cap_N_; last_capM_logged = cap_M_;
+                auto ptr = reinterpret_cast<uintptr_t>(det_xyxy);
+            }
+        }
+        // 设备指针校验与按需对齐/镜像复制（仅在不满足条件时触发，一般不走）
+        const float* det_xyxy_dev = det_xyxy;
+        const float* det_scores_dev = det_scores;
+        const int*   det_cls_dev = det_cls;
+        bool did_h2d_xy=false, did_d2d_xy=false, did_h2d_sc=false, did_h2d_cl=false;
+        // 检测 det_xyxy 是否为设备指针；若不是则 H2D 到对齐缓冲
+        cudaPointerAttributes attr_xy{}; auto st_xy = cudaPointerGetAttributes(&attr_xy, det_xyxy);
+        bool det_xy_is_dev = (st_xy==cudaSuccess) && (attr_xy.type == cudaMemoryTypeDevice);
+        if (!det_xy_is_dev) {
+            cudaMemcpyAsync(db_.det_xyxy_aligned, det_xyxy, D*4*sizeof(float), cudaMemcpyHostToDevice, stream);
+            det_xyxy_dev = db_.det_xyxy_aligned; did_h2d_xy=true;
+        } else if ((reinterpret_cast<uintptr_t>(det_xyxy) & 0xF) != 0) {
+            cudaMemcpyAsync(db_.det_xyxy_aligned, det_xyxy, D*4*sizeof(float), cudaMemcpyDeviceToDevice, stream);
+            det_xyxy_dev = db_.det_xyxy_aligned; did_d2d_xy=true;
+        }
+        // 检测 det_scores/cls 是否为设备指针；若不是则 H2D 到已有池化缓冲（new_scores/new_cls 临时复用）
+        if (det_scores){
+            cudaPointerAttributes attr_sc{}; auto st_sc = cudaPointerGetAttributes(&attr_sc, det_scores);
+            bool is_dev = (st_sc==cudaSuccess) && (attr_sc.type==cudaMemoryTypeDevice);
+            if (!is_dev){ cudaMemcpyAsync(db_.new_scores, det_scores, D*sizeof(float), cudaMemcpyHostToDevice, stream); det_scores_dev = db_.new_scores; did_h2d_sc=true; }
+        }
+        if (det_cls){
+            cudaPointerAttributes attr_cl{}; auto st_cl = cudaPointerGetAttributes(&attr_cl, det_cls);
+            bool is_dev = (st_cl==cudaSuccess) && (attr_cl.type==cudaMemoryTypeDevice);
+            if (!is_dev){ cudaMemcpyAsync(db_.new_cls, det_cls, D*sizeof(int), cudaMemcpyHostToDevice, stream); det_cls_dev = db_.new_cls; did_h2d_cl=true; }
+        }
+        // 仅在发生镜像时打印一次（避免刷屏）
+        if (did_h2d_xy || did_d2d_xy || did_h2d_sc || did_h2d_cl || !det_scores || !det_cls){
+        }
         // 类别掩码：直接使用设备常驻 meta_cls
-        iou_cost_matrix(reinterpret_cast<const ocs::Box*>(det_xyxy), D, reinterpret_cast<const ocs::Box*>(db_.trk_boxes), T,
-                        det_scores, db_.trk_valid, db_.trk_vdc, vdc_weight_, afn,
-                        det_cls, reinterpret_cast<const int*>(db_.meta_cls), 1,
+        iou_cost_matrix(reinterpret_cast<const ocs::Box*>(det_xyxy_dev), D, reinterpret_cast<const ocs::Box*>(db_.trk_boxes), T,
+                        det_scores_dev, db_.trk_valid, db_.trk_vdc, vdc_weight_, afn,
+                        det_cls_dev, reinterpret_cast<const int*>(db_.meta_cls), 1,
                         db_.iou, db_.ang, db_.cost, stream);
          CHECK(cudaPeekAtLastError());
 
@@ -152,21 +194,51 @@ void OCSort::update_dev(const float* det_xyxy, const float* det_scores, const in
         }
 
         // 新增 tracks（仅对未使用的 det），设备端 gather 后一次性回读紧凑数组，减少散拷
-        ocs::build_unused_det_list(db_.det_used, D, db_.unused_det_idx, db_.unused_det_cnt, stream);
+       ocs::build_unused_det_list(db_.det_used, D, db_.unused_det_idx, db_.unused_det_cnt, stream);
         int h_unused_cnt=0; cudaMemcpyAsync(&h_unused_cnt, db_.unused_det_cnt, sizeof(int), cudaMemcpyDeviceToHost, stream); cudaStreamSynchronize(stream);
+        // 校验 unused_idx 是否越界（只定位）
+        if (h_unused_cnt>0){
+            int *d_bad=nullptr, *d_fu=nullptr, *d_fv=nullptr; cudaMalloc(&d_bad,sizeof(int)); cudaMalloc(&d_fu,sizeof(int)); cudaMalloc(&d_fv,sizeof(int));
+            ocs::validate_unused_idx(db_.unused_det_idx, h_unused_cnt, D, d_bad, d_fu, d_fv, stream);
+            int h_bad=0, h_fu=-1, h_fv=-1; cudaMemcpyAsync(&h_bad, d_bad, sizeof(int), cudaMemcpyDeviceToHost, stream); cudaMemcpyAsync(&h_fu, d_fu, sizeof(int), cudaMemcpyDeviceToHost, stream); cudaMemcpyAsync(&h_fv, d_fv, sizeof(int), cudaMemcpyDeviceToHost, stream); cudaStreamSynchronize(stream);
+            // 调试校验仅在开发阶段启用，默认不打印
+            // 可按需启用以下二行：
+            // LO << P_D "OCS: unused_idx.validate K=" << h_unused_cnt << ", D=" << D << ", bad_count=" << h_bad << ", first_bad_u=" << h_fu << ", bad_di=" << h_fv << END;
+            // int sample = std::min(h_unused_cnt, 16);
+            // if (sample>0){ std::vector<int> tmp(sample); cudaMemcpyAsync(tmp.data(), db_.unused_det_idx, sample*sizeof(int), cudaMemcpyDeviceToHost, stream); cudaStreamSynchronize(stream);
+            //     LO << P_D "OCS: unused_idx.sample[0.." << (sample-1) << "]="; for (int i=0;i<sample;++i) LO << tmp[i] << (i+1<sample?",":""); LO << END; }
+            cudaFree(d_bad); cudaFree(d_fu); cudaFree(d_fv);
+        }
         if (h_unused_cnt>0){
             // ensure capacity for existing tracks + new tracks
             ensure_capacity(D, T + h_unused_cnt, stream);
-            ocs::append_new_tracks(det_xyxy, det_scores, det_cls, db_.unused_det_idx, h_unused_cnt, cap_M_, db_.dev_trk_count, db_.dev_next_id,
+            // 追加前参数快照 + 只读校验（不改变行为）
+            ocs::validate_append_args(det_xyxy, det_scores, det_cls,
+                                      db_.unused_det_idx, h_unused_cnt, D,
+                                      cap_M_,
+                                      db_.kf_x, db_.kf_P,
+                                      db_.meta_id, db_.meta_cls, db_.meta_score, db_.meta_tsu, db_.meta_hit,
+                                      db_.meta_obs,
+                                      db_.obs_prev, db_.obs_curr,
+                                      db_.trk_cls,
+                                      stream);
+            CHECK(cudaPeekAtLastError());
+            cudaStreamSynchronize(stream);
+            int T_before = T;
+            ocs::reset_append_debug(stream);
+            ocs::append_new_tracks(det_xyxy, det_scores, det_cls, db_.unused_det_idx, h_unused_cnt, D, cap_M_, db_.dev_trk_count, db_.dev_next_id,
                               db_.kf_x, db_.kf_P, db_.meta_id, db_.meta_cls, db_.meta_score, db_.meta_tsu, db_.meta_hit, db_.meta_obs,
                               db_.obs_prev, db_.obs_curr, db_.trk_cls, stream);
+            CHECK(cudaPeekAtLastError());
             cudaMemcpyAsync(&T, db_.dev_trk_count, sizeof(int), cudaMemcpyDeviceToHost, stream);
             cudaStreamSynchronize(stream);
+            int ovf=0, maxidx=-1; ocs::read_append_debug(&ovf,&maxidx);
             // sync done
         }
 
     }
     // 输出：设备端构建紧凑输出并一次性回读（全GPU meta）
+    // 调试：在紧凑前打印主/临时缓冲指针快照（定位潜在空指针/迁移不一致）
     out.clear(); out.reserve(T);
     // 设备端构建输出（直接使用设备常驻 meta），一次性回读
     if (T>0){
@@ -182,6 +254,7 @@ void OCSort::update_dev(const float* det_xyxy, const float* det_scores, const in
                                   min_hits_,
                                   T,
                                   stream);
+        CHECK(cudaPeekAtLastError());
         std::vector<ocs::OcsPackedTrk> h(T);
         cudaMemcpyAsync(h.data(), db_.out_packed, T*sizeof(ocs::OcsPackedTrk), cudaMemcpyDeviceToHost, stream);
         cudaStreamSynchronize(stream);
@@ -201,6 +274,7 @@ void OCSort::update_dev(const float* det_xyxy, const float* det_scores, const in
                         db_.tmp_trk_cls,
                         db_.comp_newT,
                         stream);
+     CHECK(cudaPeekAtLastError());
     int newT=0; cudaMemcpyAsync(&newT, db_.comp_newT, sizeof(int), cudaMemcpyDeviceToHost, stream); cudaStreamSynchronize(stream);
     ocs::swap_compacted_back(db_.kf_x, db_.kf_P,
                              db_.meta_id, db_.meta_cls, db_.meta_score, db_.meta_tsu, db_.meta_hit,
@@ -212,6 +286,8 @@ void OCSort::update_dev(const float* det_xyxy, const float* det_scores, const in
                              db_.tmp_meta_obs,
                              db_.tmp_obs_prev, db_.tmp_obs_curr,
                              db_.tmp_trk_cls);
-    last_T_ = newT; kf_inited_ = (newT>0);
+    CHECK(cudaPeekAtLastError());
+   last_T_ = newT; kf_inited_ = (newT>0);
     cudaMemcpyAsync(db_.dev_trk_count, &newT, sizeof(int), cudaMemcpyHostToDevice, stream);
+    CHECK(cudaPeekAtLastError());
 }

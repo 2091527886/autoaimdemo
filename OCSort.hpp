@@ -78,6 +78,8 @@ private:
         int    *out_valid=nullptr; // M (1/0)
         // packed AoS buffer to reduce D2H copies
         void   *out_packed=nullptr; // ocs::OcsPackedTrk* size M
+        // optional aligned det buffer (N x 4 floats) used only if input det_xyxy is not 16B aligned
+        float *det_xyxy_aligned=nullptr;
         // buffers for new tracks (gathered unused detections)
         float *new_xyxy=nullptr;   // N x 4
         float *new_scores=nullptr; // N

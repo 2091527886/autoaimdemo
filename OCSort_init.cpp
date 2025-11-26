@@ -17,6 +17,7 @@ OCSort::~OCSort(){
     f((void**)&db_.det_used); f((void**)&db_.trk_matched); f((void**)&db_.sel_det);
     // outputs
     f((void**)&db_.out_trk); f((void**)&db_.out_obs); f((void**)&db_.out_score); f((void**)&db_.out_cls); f((void**)&db_.out_id); f((void**)&db_.out_valid); f((void**)&db_.out_packed);
+    f((void**)&db_.det_xyxy_aligned);
     // meta
     f((void**)&db_.meta_id); f((void**)&db_.meta_cls); f((void**)&db_.meta_score); f((void**)&db_.meta_tsu); f((void**)&db_.meta_hit); f((void**)&db_.meta_obs);
     f((void**)&db_.unused_det_idx); f((void**)&db_.unused_det_cnt);
