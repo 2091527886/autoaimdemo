@@ -116,10 +116,20 @@ void Aim::loop() {
         }
         Detection det_fallback; det_fallback.box = sel.obs; det_fallback.confidence = sel.score; det_fallback.class_id = sel.cls;
         const Detection& det_for_aim = pDet ? *pDet : det_fallback;
-        auto ap = aim_no_pred(det_for_aim); 
-        aim_pt_.x = ap.x; 
-        aim_pt_.y = ap.y; 
-        aim_ok_ = true;
+        auto ap = aim_no_pred(det_for_aim);
+        // FOV gate: circle centered at virtual screen center; outside => treat as no target (no smooth)
+        bool in_fov = true;
+        if (c.fov && c.fov_px > 0) {
+          in_fov = fov_ok(ap.x, ap.y);
+        }
+        if (in_fov) {
+          aim_pt_.x = ap.x;
+          aim_pt_.y = ap.y;
+          aim_ok_ = true;
+        } else {
+          aim_ok_ = false;
+          lock_ = false;
+        }
         // dbg centers
         dbg_has_pts_ = true;
         // track center（叠加层绘制使用 trk 框）
@@ -129,7 +139,7 @@ void Aim::loop() {
         dbg_ctrl_pt_.x = (float)(det_for_aim.box.x + det_for_aim.box.width*0.5f);
         dbg_ctrl_pt_.y = (float)(det_for_aim.box.y + det_for_aim.box.height*0.5f);
 
-        if (smooth_pressed) { on_smooth(det_for_aim, dt_frame, mou_cost_ms); }
+        if (in_fov && smooth_pressed) { on_smooth(det_for_aim, dt_frame, mou_cost_ms); }
       }
     }
     auto tctl1 = (c.timing ? tn() : tctl0);

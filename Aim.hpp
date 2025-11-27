@@ -46,6 +46,8 @@ private:
     cv::Point2f aim_no_pred(const Detection& d) const;
     // map detection reference to index in ds (linear scan; ds small)
     int det_index(const Detection& d) const;
+    // FOV check (virtual screen center)
+    bool fov_ok(float x, float y) const;
 
     // state
     Config c;
@@ -104,6 +106,7 @@ private:
     friend void aim_draw_lock(Aim* self);
     friend void aim_draw_dz(Aim* self);
     friend void aim_draw_dbg(Aim* self);
+    friend void aim_draw_fov(Aim* self);
 
     // small control helpers to shrink .cpp
     void on_no_target();

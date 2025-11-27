@@ -8,6 +8,7 @@ void aim_draw_cross(Aim* self) {
   float py = (float)self->ctr.y;
   if (self->aim_ok_) { px = self->aim_pt_.x; py = self->aim_pt_.y; }
   int vx, vy, vw, vh; GetVirtualScreen(vx, vy, vw, vh);
+  // 若启用FOV且aim点在FOV外，依然允许画十字但裁剪到屏幕边界（保持原行为）：不做附加处理
   px = MX((float)vx, MN((float)(vx + vw - 1), px));
   py = MX((float)vy, MN((float)(vy + vh - 1), py));
   const float s = (float)c.cross_size;

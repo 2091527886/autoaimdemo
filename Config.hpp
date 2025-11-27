@@ -126,6 +126,15 @@ public:
     bool  ovl_show_trk_all = true; // 显示全部 track 框与 id
     bool  ovl_show_pose = true; // 独立的骨架开关（默认开启）
 
+    // FOV 限制与可视化
+    bool  fov = true;         // 逻辑开关：限制仅在 FOV 圆内才打
+    bool  fov_show = true;    // 仅显示开关：是否绘制 FOV 圆
+    int   fov_px = 150;       // 半径(px)
+    int   fov_th = 2;         // 线宽
+    int   fov_a = 200, fov_r = 0, fov_g = 200, fov_b = 255; // 颜色 ARGB
+    int   fov_layer = 236;    // 图层（略低于 cross 240，高于 dbg 238/dz 235）
+    int   fov_segments = 64;  // 圆分段数
+
 public:
     // ==================== [Pose (TRT YOLO PoseModel)] ====================
     // 统一以 pose 作为检测来源：bbox+关键点
@@ -361,6 +370,12 @@ private:
 
         clampL(ovl_layer_lock);
         clampL(ovl_layer_dbg);
+        // FOV layer clamp and params
+        clampL(fov_layer);
+        fov_th = (int)MX(0.5f, (float)fov_th);
+        clampc(fov_a); clampc(fov_r); clampc(fov_g); clampc(fov_b);
+        fov_px = MX(0, fov_px);
+        fov_segments = MX(3, fov_segments);
 
 
         if (ovl_cls) { size_t n = classes.size(); pad(ovl_cr,n,ovl_r); pad(ovl_cg,n,ovl_g); pad(ovl_cb,n,ovl_b); }

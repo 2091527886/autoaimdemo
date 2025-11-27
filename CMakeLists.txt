@@ -95,6 +95,7 @@ add_executable(aimassistant
   Aim_ovl_lock.cpp
   Aim_ovl_dz.cpp
   Aim_ovl_dbg.cpp
+  aim_ovl_fov.cpp
   OCSort_init.cpp
   OCSort_cap.cpp
   OCSort_conf.cpp

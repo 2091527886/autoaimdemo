@@ -1,8 +1,20 @@
 #include "Aim.hpp"
 #include "pch.hpp"
 #include "sh.hpp"
+#include "ovl_util.hpp"
 using P2 = cv::Point2d;
 using P2f = cv::Point2f;
+
+bool Aim::fov_ok(float x, float y) const {
+  int vx,vy,vw,vh; GetVirtualScreen(vx,vy,vw,vh);
+  float cx = vx + vw * 0.5f;
+  float cy = vy + vh * 0.5f;
+  float dx = x - cx;
+  float dy = y - cy;
+  float r = (float)c.fov_px;
+  return (r <= 0.0f) ? true : (dx*dx + dy*dy <= r*r);
+}
+
 std::pair<double, double> Aim::pred_err(const Detection &d) {
   cv::Point2f ap = aim_no_pred(d);
   P2 tp(ap.x - crop.x, ap.y - crop.y);
