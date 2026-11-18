@@ -34,7 +34,7 @@ void TrtBackend::dynamicInfer(const std::vector<Image>& inputs) {
             const void* src_ptr = infer_config.cuda_mem ? inputs[idx].ptr : static_cast<uint8_t*>(inputs_buffer_->device()) + idx * input_image_bytes_;
             launch_letterbox_idx(src_ptr, inputs[idx].width, inputs[idx].height,
                                  infer_config.cuda_mem ? inputs[idx].pitch : input_row_bytes_,
-                                 tensor_infos.front().buffer->device(),
+                                 preprocessBuffer(),
                                  max_shape.w, max_shape.z,
                                  infer_size_, idx,
                                  affine_transforms.front(), infer_config.config, stream);
@@ -57,7 +57,7 @@ void TrtBackend::dynamicInfer(const std::vector<Image>& inputs) {
             for (int idx = 0; idx < num; ++idx) {
                 launch_letterbox_idx(input_device,
                                      inputs[idx].width, inputs[idx].height, inputs[idx].pitch,
-                                     tensor_infos.front().buffer->device(),
+                                     preprocessBuffer(),
                                      max_shape.w, max_shape.z,
                                      infer_size_, idx,
                                      affine_transforms[idx], infer_config.config, stream);
@@ -67,12 +67,17 @@ void TrtBackend::dynamicInfer(const std::vector<Image>& inputs) {
             for (int idx = 0; idx < num; ++idx) {
                 launch_letterbox_idx(inputs[idx].ptr,
                                      inputs[idx].width, inputs[idx].height, inputs[idx].pitch,
-                                     tensor_infos.front().buffer->device(),
+                                     preprocessBuffer(),
                                      max_shape.w, max_shape.z,
                                      infer_size_, idx,
                                      affine_transforms[idx], infer_config.config, stream);
             }
         }
+    }
+
+    if (preprocess_buffer_) {
+        cudaHalfToFloat(preprocessBuffer(), tensor_infos.front().buffer->device(),
+                        static_cast<size_t>(num) * infer_size_, stream);
     }
 
     // enqueue

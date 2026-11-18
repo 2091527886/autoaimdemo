@@ -1,0 +1,260 @@
+[
+  {
+    "name": "enemy",
+    "id": 8767930,
+    "color": "#ef0966",
+    "type": "skeleton",
+    "sublabels": [
+      {
+        "name": "nose",
+        "attributes": [],
+        "type": "points",
+        "color": "#d12345",
+        "id": 8767931
+      },
+      {
+        "name": "left_eye",
+        "attributes": [],
+        "type": "points",
+        "color": "#350dea",
+        "id": 8767932
+      },
+      {
+        "name": "right_eye",
+        "attributes": [],
+        "type": "points",
+        "color": "#479ffe",
+        "id": 8767933
+      },
+      {
+        "name": "left_ear",
+        "attributes": [],
+        "type": "points",
+        "color": "#4a649f",
+        "id": 8767934
+      },
+      {
+        "name": "right_ear",
+        "attributes": [],
+        "type": "points",
+        "color": "#478144",
+        "id": 8767935
+      },
+      {
+        "name": "left_shoulder",
+        "attributes": [],
+        "type": "points",
+        "color": "#57236b",
+        "id": 8767936
+      },
+      {
+        "name": "right_shoulder",
+        "attributes": [],
+        "type": "points",
+        "color": "#1cdda5",
+        "id": 8767937
+      },
+      {
+        "name": "left_elbow",
+        "attributes": [],
+        "type": "points",
+        "color": "#e2bc6e",
+        "id": 8767938
+      },
+      {
+        "name": "right_elbow",
+        "attributes": [],
+        "type": "points",
+        "color": "#f067db",
+        "id": 8767939
+      },
+      {
+        "name": "left_wrist",
+        "attributes": [],
+        "type": "points",
+        "color": "#63bbfa",
+        "id": 8767940
+      },
+      {
+        "name": "right_wrist",
+        "attributes": [],
+        "type": "points",
+        "color": "#22b16f",
+        "id": 8767941
+      },
+      {
+        "name": "left_hip",
+        "attributes": [],
+        "type": "points",
+        "color": "#daddec",
+        "id": 8767942
+      },
+      {
+        "name": "right_hip",
+        "attributes": [],
+        "type": "points",
+        "color": "#2ac791",
+        "id": 8767943
+      },
+      {
+        "name": "left_knee",
+        "attributes": [],
+        "type": "points",
+        "color": "#de22a0",
+        "id": 8767944
+      },
+      {
+        "name": "right_knee",
+        "attributes": [],
+        "type": "points",
+        "color": "#a7a570",
+        "id": 8767945
+      },
+      {
+        "name": "left_ankle",
+        "attributes": [],
+        "type": "points",
+        "color": "#74db1b",
+        "id": 8767946
+      },
+      {
+        "name": "right_ankle",
+        "attributes": [],
+        "type": "points",
+        "color": "#aaa246",
+        "id": 8767947
+      }
+    ],
+    "svg": "<line x1=\"18.06020164489746\" y1=\"25.08918571472168\" x2=\"13.043478965759277\" y2=\"20.07246208190918\" data-type=\"edge\" data-node-from=\"1\" data-node-to=\"2\"></line>\n<line x1=\"18.06020164489746\" y1=\"25.08918571472168\" x2=\"24.24749183654785\" y2=\"21.911928176879883\" data-type=\"edge\" data-node-from=\"1\" data-node-to=\"3\"></line>\n<line x1=\"13.043478965759277\" y1=\"20.07246208190918\" x2=\"11.705686569213867\" y2=\"16.56075668334961\" data-type=\"edge\" data-node-from=\"2\" data-node-to=\"4\"></line>\n<line x1=\"24.24749183654785\" y1=\"21.911928176879883\" x2=\"23.745820999145508\" y2=\"15.390189170837402\" data-type=\"edge\" data-node-from=\"3\" data-node-to=\"5\"></line>\n<line x1=\"10.033445358276367\" y1=\"30.105907440185547\" x2=\"27.090301513671875\" y2=\"29.43701171875\" data-type=\"edge\" data-node-from=\"6\" data-node-to=\"7\"></line>\n<line x1=\"10.033445358276367\" y1=\"30.105907440185547\" x2=\"11.036789894104004\" y2=\"43.98550796508789\" data-type=\"edge\" data-node-from=\"6\" data-node-to=\"8\"></line>\n<line x1=\"11.036789894104004\" y1=\"43.98550796508789\" x2=\"3.511706590652466\" y2=\"38.96878433227539\" data-type=\"edge\" data-node-from=\"8\" data-node-to=\"10\"></line>\n<line x1=\"27.090301513671875\" y1=\"29.43701171875\" x2=\"27.759197235107422\" y2=\"43.14938735961914\" data-type=\"edge\" data-node-from=\"7\" data-node-to=\"9\"></line>\n<line x1=\"27.759197235107422\" y1=\"43.14938735961914\" x2=\"31.77257537841797\" y2=\"36.79487228393555\" data-type=\"edge\" data-node-from=\"9\" data-node-to=\"11\"></line>\n<line x1=\"10.033445358276367\" y1=\"30.105907440185547\" x2=\"10.869565963745117\" y2=\"52.68115997314453\" data-type=\"edge\" data-node-from=\"6\" data-node-to=\"12\"></line>\n<line x1=\"27.090301513671875\" y1=\"29.43701171875\" x2=\"29.09699058532715\" y2=\"52.68115997314453\" data-type=\"edge\" data-node-from=\"7\" data-node-to=\"13\"></line>\n<line x1=\"10.869565963745117\" y1=\"52.68115997314453\" x2=\"29.09699058532715\" y2=\"52.68115997314453\" data-type=\"edge\" data-node-from=\"12\" data-node-to=\"13\"></line>\n<line x1=\"10.869565963745117\" y1=\"52.68115997314453\" x2=\"11.036789894104004\" y2=\"59.20289611816406\" data-type=\"edge\" data-node-from=\"12\" data-node-to=\"14\"></line>\n<line x1=\"11.036789894104004\" y1=\"59.20289611816406\" x2=\"11.371238708496094\" y2=\"63.21627426147461\" data-type=\"edge\" data-node-from=\"14\" data-node-to=\"16\"></line>\n<line x1=\"29.09699058532715\" y1=\"52.68115997314453\" x2=\"29.431438446044922\" y2=\"57.363433837890625\" data-type=\"edge\" data-node-from=\"13\" data-node-to=\"15\"></line>\n<line x1=\"29.431438446044922\" y1=\"57.363433837890625\" x2=\"29.598663330078125\" y2=\"61.37681198120117\" data-type=\"edge\" data-node-from=\"15\" data-node-to=\"17\"></line>\n<circle r=\"0.75\" cx=\"18.06020164489746\" cy=\"25.08918571472168\" data-type=\"element node\" data-element-id=\"1\" data-node-id=\"1\" data-label-id=\"8767931\"></circle>\n<circle r=\"0.75\" cx=\"13.043478965759277\" cy=\"20.07246208190918\" data-type=\"element node\" data-element-id=\"2\" data-node-id=\"2\" data-label-id=\"8767932\"></circle>\n<circle r=\"0.75\" cx=\"24.24749183654785\" cy=\"21.911928176879883\" data-type=\"element node\" data-element-id=\"3\" data-node-id=\"3\" data-label-id=\"8767933\"></circle>\n<circle r=\"0.75\" cx=\"11.705686569213867\" cy=\"16.56075668334961\" data-type=\"element node\" data-element-id=\"4\" data-node-id=\"4\" data-label-id=\"8767934\"></circle>\n<circle r=\"0.75\" cx=\"23.745820999145508\" cy=\"15.390189170837402\" data-type=\"element node\" data-element-id=\"5\" data-node-id=\"5\" data-label-id=\"8767935\"></circle>\n<circle r=\"0.75\" cx=\"10.033445358276367\" cy=\"30.105907440185547\" data-type=\"element node\" data-element-id=\"6\" data-node-id=\"6\" data-label-id=\"8767936\"></circle>\n<circle r=\"0.75\" cx=\"27.090301513671875\" cy=\"29.43701171875\" data-type=\"element node\" data-element-id=\"7\" data-node-id=\"7\" data-label-id=\"8767937\"></circle>\n<circle r=\"0.75\" cx=\"11.036789894104004\" cy=\"43.98550796508789\" data-type=\"element node\" data-element-id=\"8\" data-node-id=\"8\" data-label-id=\"8767938\"></circle>\n<circle r=\"0.75\" cx=\"27.759197235107422\" cy=\"43.14938735961914\" data-type=\"element node\" data-element-id=\"9\" data-node-id=\"9\" data-label-id=\"8767939\"></circle>\n<circle r=\"0.75\" cx=\"3.511706590652466\" cy=\"38.96878433227539\" data-type=\"element node\" data-element-id=\"10\" data-node-id=\"10\" data-label-id=\"8767940\"></circle>\n<circle r=\"0.75\" cx=\"31.77257537841797\" cy=\"36.79487228393555\" data-type=\"element node\" data-element-id=\"11\" data-node-id=\"11\" data-label-id=\"8767941\"></circle>\n<circle r=\"0.75\" cx=\"10.869565963745117\" cy=\"52.68115997314453\" data-type=\"element node\" data-element-id=\"12\" data-node-id=\"12\" data-label-id=\"8767942\"></circle>\n<circle r=\"0.75\" cx=\"29.09699058532715\" cy=\"52.68115997314453\" data-type=\"element node\" data-element-id=\"13\" data-node-id=\"13\" data-label-id=\"8767943\"></circle>\n<circle r=\"0.75\" cx=\"11.036789894104004\" cy=\"59.20289611816406\" data-type=\"element node\" data-element-id=\"14\" data-node-id=\"14\" data-label-id=\"8767944\"></circle>\n<circle r=\"0.75\" cx=\"29.431438446044922\" cy=\"57.363433837890625\" data-type=\"element node\" data-element-id=\"15\" data-node-id=\"15\" data-label-id=\"8767945\"></circle>\n<circle r=\"0.75\" cx=\"11.371238708496094\" cy=\"63.21627426147461\" data-type=\"element node\" data-element-id=\"16\" data-node-id=\"16\" data-label-id=\"8767946\"></circle>\n<circle r=\"0.75\" cx=\"29.598663330078125\" cy=\"61.37681198120117\" data-type=\"element node\" data-element-id=\"17\" data-node-id=\"17\" data-label-id=\"8767947\"></circle>",
+    "attributes": []
+  },
+  {
+    "name": "teammate",
+    "id": 8767948,
+    "color": "#412445",
+    "type": "skeleton",
+    "sublabels": [
+      {
+        "name": "nose",
+        "attributes": [],
+        "type": "points",
+        "color": "#d12345",
+        "id": 8767949
+      },
+      {
+        "name": "left_eye",
+        "attributes": [],
+        "type": "points",
+        "color": "#350dea",
+        "id": 8767950
+      },
+      {
+        "name": "right_eye",
+        "attributes": [],
+        "type": "points",
+        "color": "#479ffe",
+        "id": 8767951
+      },
+      {
+        "name": "left_ear",
+        "attributes": [],
+        "type": "points",
+        "color": "#4a649f",
+        "id": 8767952
+      },
+      {
+        "name": "right_ear",
+        "attributes": [],
+        "type": "points",
+        "color": "#478144",
+        "id": 8767953
+      },
+      {
+        "name": "left_shoulder",
+        "attributes": [],
+        "type": "points",
+        "color": "#57236b",
+        "id": 8767954
+      },
+      {
+        "name": "right_shoulder",
+        "attributes": [],
+        "type": "points",
+        "color": "#1cdda5",
+        "id": 8767955
+      },
+      {
+        "name": "left_elbow",
+        "attributes": [],
+        "type": "points",
+        "color": "#e2bc6e",
+        "id": 8767956
+      },
+      {
+        "name": "right_elbow",
+        "attributes": [],
+        "type": "points",
+        "color": "#f067db",
+        "id": 8767957
+      },
+      {
+        "name": "left_wrist",
+        "attributes": [],
+        "type": "points",
+        "color": "#63bbfa",
+        "id": 8767958
+      },
+      {
+        "name": "right_wrist",
+        "attributes": [],
+        "type": "points",
+        "color": "#22b16f",
+        "id": 8767959
+      },
+      {
+        "name": "left_hip",
+        "attributes": [],
+        "type": "points",
+        "color": "#daddec",
+        "id": 8767960
+      },
+      {
+        "name": "right_hip",
+        "attributes": [],
+        "type": "points",
+        "color": "#2ac791",
+        "id": 8767961
+      },
+      {
+        "name": "left_knee",
+        "attributes": [],
+        "type": "points",
+        "color": "#de22a0",
+        "id": 8767962
+      },
+      {
+        "name": "right_knee",
+        "attributes": [],
+        "type": "points",
+        "color": "#a7a570",
+        "id": 8767963
+      },
+      {
+        "name": "left_ankle",
+        "attributes": [],
+        "type": "points",
+        "color": "#74db1b",
+        "id": 8767964
+      },
+      {
+        "name": "right_ankle",
+        "attributes": [],
+        "type": "points",
+        "color": "#aaa246",
+        "id": 8767965
+      }
+    ],
+    "svg": "<line x1=\"14.548495292663574\" y1=\"22.982162475585938\" x2=\"9.03010082244873\" y2=\"18.801559448242188\" data-type=\"edge\" data-node-from=\"1\" data-node-to=\"2\"></line>\n<line x1=\"14.548495292663574\" y1=\"22.982162475585938\" x2=\"20.73578643798828\" y2=\"18.96878433227539\" data-type=\"edge\" data-node-from=\"1\" data-node-to=\"3\"></line>\n<line x1=\"9.03010082244873\" y1=\"18.801559448242188\" x2=\"6.0200676918029785\" y2=\"12.94871711730957\" data-type=\"edge\" data-node-from=\"2\" data-node-to=\"4\"></line>\n<line x1=\"20.73578643798828\" y1=\"18.96878433227539\" x2=\"25.0836124420166\" y2=\"11.945372581481934\" data-type=\"edge\" data-node-from=\"3\" data-node-to=\"5\"></line>\n<line x1=\"6.187291622161865\" y1=\"30.17279815673828\" x2=\"26.421405792236328\" y2=\"29.169452667236328\" data-type=\"edge\" data-node-from=\"6\" data-node-to=\"7\"></line>\n<line x1=\"6.187291622161865\" y1=\"30.17279815673828\" x2=\"5.016723155975342\" y2=\"47.06242752075195\" data-type=\"edge\" data-node-from=\"6\" data-node-to=\"8\"></line>\n<line x1=\"5.016723155975342\" y1=\"47.06242752075195\" x2=\"2.3411378860473633\" y2=\"37.86510467529297\" data-type=\"edge\" data-node-from=\"8\" data-node-to=\"10\"></line>\n<line x1=\"26.421405792236328\" y1=\"29.169452667236328\" x2=\"27.090301513671875\" y2=\"47.39687728881836\" data-type=\"edge\" data-node-from=\"7\" data-node-to=\"9\"></line>\n<line x1=\"27.090301513671875\" y1=\"47.39687728881836\" x2=\"34.615386962890625\" y2=\"38.86845016479492\" data-type=\"edge\" data-node-from=\"9\" data-node-to=\"11\"></line>\n<line x1=\"6.187291622161865\" y1=\"30.17279815673828\" x2=\"4.68227481842041\" y2=\"53.24972152709961\" data-type=\"edge\" data-node-from=\"6\" data-node-to=\"12\"></line>\n<line x1=\"26.421405792236328\" y1=\"29.169452667236328\" x2=\"24.749164581298828\" y2=\"53.082496643066406\" data-type=\"edge\" data-node-from=\"7\" data-node-to=\"13\"></line>\n<line x1=\"4.68227481842041\" y1=\"53.24972152709961\" x2=\"24.749164581298828\" y2=\"53.082496643066406\" data-type=\"edge\" data-node-from=\"12\" data-node-to=\"13\"></line>\n<line x1=\"4.68227481842041\" y1=\"53.24972152709961\" x2=\"8.193981170654297\" y2=\"59.2697868347168\" data-type=\"edge\" data-node-from=\"12\" data-node-to=\"14\"></line>\n<line x1=\"8.193981170654297\" y1=\"59.2697868347168\" x2=\"13.210702896118164\" y2=\"64.28650665283203\" data-type=\"edge\" data-node-from=\"14\" data-node-to=\"16\"></line>\n<line x1=\"24.749164581298828\" y1=\"53.082496643066406\" x2=\"22.909700393676758\" y2=\"58.935340881347656\" data-type=\"edge\" data-node-from=\"13\" data-node-to=\"15\"></line>\n<line x1=\"22.909700393676758\" y1=\"58.935340881347656\" x2=\"22.40802764892578\" y2=\"64.4537353515625\" data-type=\"edge\" data-node-from=\"15\" data-node-to=\"17\"></line>\n<circle r=\"0.75\" cx=\"14.548495292663574\" cy=\"22.982162475585938\" data-type=\"element node\" data-element-id=\"1\" data-node-id=\"1\" data-label-id=\"8767949\"></circle>\n<circle r=\"0.75\" cx=\"9.03010082244873\" cy=\"18.801559448242188\" data-type=\"element node\" data-element-id=\"2\" data-node-id=\"2\" data-label-id=\"8767950\"></circle>\n<circle r=\"0.75\" cx=\"20.73578643798828\" cy=\"18.96878433227539\" data-type=\"element node\" data-element-id=\"3\" data-node-id=\"3\" data-label-id=\"8767951\"></circle>\n<circle r=\"0.75\" cx=\"6.0200676918029785\" cy=\"12.94871711730957\" data-type=\"element node\" data-element-id=\"4\" data-node-id=\"4\" data-label-id=\"8767952\"></circle>\n<circle r=\"0.75\" cx=\"25.0836124420166\" cy=\"11.945372581481934\" data-type=\"element node\" data-element-id=\"5\" data-node-id=\"5\" data-label-id=\"8767953\"></circle>\n<circle r=\"0.75\" cx=\"6.187291622161865\" cy=\"30.17279815673828\" data-type=\"element node\" data-element-id=\"6\" data-node-id=\"6\" data-label-id=\"8767954\"></circle>\n<circle r=\"0.75\" cx=\"26.421405792236328\" cy=\"29.169452667236328\" data-type=\"element node\" data-element-id=\"7\" data-node-id=\"7\" data-label-id=\"8767955\"></circle>\n<circle r=\"0.75\" cx=\"5.016723155975342\" cy=\"47.06242752075195\" data-type=\"element node\" data-element-id=\"8\" data-node-id=\"8\" data-label-id=\"8767956\"></circle>\n<circle r=\"0.75\" cx=\"27.090301513671875\" cy=\"47.39687728881836\" data-type=\"element node\" data-element-id=\"9\" data-node-id=\"9\" data-label-id=\"8767957\"></circle>\n<circle r=\"0.75\" cx=\"2.3411378860473633\" cy=\"37.86510467529297\" data-type=\"element node\" data-element-id=\"10\" data-node-id=\"10\" data-label-id=\"8767958\"></circle>\n<circle r=\"0.75\" cx=\"34.615386962890625\" cy=\"38.86845016479492\" data-type=\"element node\" data-element-id=\"11\" data-node-id=\"11\" data-label-id=\"8767959\"></circle>\n<circle r=\"0.75\" cx=\"4.68227481842041\" cy=\"53.24972152709961\" data-type=\"element node\" data-element-id=\"12\" data-node-id=\"12\" data-label-id=\"8767960\"></circle>\n<circle r=\"0.75\" cx=\"24.749164581298828\" cy=\"53.082496643066406\" data-type=\"element node\" data-element-id=\"13\" data-node-id=\"13\" data-label-id=\"8767961\"></circle>\n<circle r=\"0.75\" cx=\"8.193981170654297\" cy=\"59.2697868347168\" data-type=\"element node\" data-element-id=\"14\" data-node-id=\"14\" data-label-id=\"8767962\"></circle>\n<circle r=\"0.75\" cx=\"22.909700393676758\" cy=\"58.935340881347656\" data-type=\"element node\" data-element-id=\"15\" data-node-id=\"15\" data-label-id=\"8767963\"></circle>\n<circle r=\"0.75\" cx=\"13.210702896118164\" cy=\"64.28650665283203\" data-type=\"element node\" data-element-id=\"16\" data-node-id=\"16\" data-label-id=\"8767964\"></circle>\n<circle r=\"0.75\" cx=\"22.40802764892578\" cy=\"64.4537353515625\" data-type=\"element node\" data-element-id=\"17\" data-node-id=\"17\" data-label-id=\"8767965\"></circle>",
+    "attributes": []
+  }
+]

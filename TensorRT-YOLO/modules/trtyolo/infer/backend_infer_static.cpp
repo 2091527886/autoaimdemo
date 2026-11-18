@@ -17,7 +17,7 @@ void TrtBackend::staticInfer(const std::vector<Image>& inputs) {
     if (infer_config.input_shape.has_value()) {
         if (infer_config.cuda_mem) {
             for (int idx = 0; idx < num; ++idx) {
-                void* infer_device_ptr = static_cast<void*>(static_cast<uint16_t*>(tensor_infos.front().buffer->device()) + idx * infer_size_);
+                void* infer_device_ptr = static_cast<void*>(static_cast<uint16_t*>(preprocessBuffer()) + idx * infer_size_);
                 void* kernelParams[] = {
                     (void*)&inputs[idx].ptr,
                     (void*)&inputs[idx].width,
@@ -50,7 +50,7 @@ void TrtBackend::staticInfer(const std::vector<Image>& inputs) {
         uint8_t* input_ptr = !infer_config.cuda_mem ? static_cast<uint8_t*>(inputs_buffer_->device()) : nullptr;
         for (int idx = 0; idx < num; ++idx) {
             affine_transforms[idx].updateParams(inputs[idx].width, inputs[idx].height, max_shape.w, max_shape.z);
-            void* infer_device_ptr = static_cast<void*>(static_cast<uint16_t*>(tensor_infos.front().buffer->device()) + idx * infer_size_);
+            void* infer_device_ptr = static_cast<void*>(static_cast<uint16_t*>(preprocessBuffer()) + idx * infer_size_);
             int node_idx = (infer_config.cuda_mem || buffer_type_ != BufferType::Discrete) ? idx : idx + 1;
             const void* src_ptr = infer_config.cuda_mem ? inputs[idx].ptr : input_ptr;
             update_kernel_params_single(cuda_graph_, node_idx,

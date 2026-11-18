@@ -25,12 +25,15 @@ void Aim::loop() {
 
     ScreenCapturer::CapturedView view;
     if (!capture(fl, view)) {
+      log_detections(false);
       continue;
     }
 
     if (!infer_view(view)) {
+      log_detections(false);
       continue;
     }
+    log_detections(true);
     double ovl_ms = 0.0;
     fl.det_ms = c.timing ? (tm.infer_ms + tm.post_ms) : 0.0;
 

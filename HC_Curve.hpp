@@ -3,6 +3,8 @@
 #include <random>
 #include <stdexcept>
 #include <algorithm>
+#include <cmath>
+#include <optional>
 #include "HC_Bezier.hpp"
 #include "HC_Tween.hpp"
 
@@ -66,13 +68,16 @@ private:
 
     std::vector<hc::Point> distort_points(const std::vector<hc::Point>& pts, double mean, double stdv, double freq){
         if (!(freq>=0.0 && freq<=1.0)) throw std::invalid_argument("freq range");
+        if (!std::isfinite(mean) || !std::isfinite(stdv) || stdv < 0.0) throw std::invalid_argument("invalid distortion parameters");
+        if (freq == 0.0) return pts;
         std::random_device rd; std::mt19937 gen(rd());
-        std::normal_distribution<double> norm(mean, stdv);
+        std::optional<std::normal_distribution<double>> norm;
+        if (stdv > 0.0) norm.emplace(mean, stdv);
         std::uniform_real_distribution<double> uni(0.0, 1.0);
         std::vector<hc::Point> out; out.reserve(pts.size());
         for (size_t i=0;i<pts.size(); ++i){
             if (i==0 || i+1==pts.size()){ out.push_back(pts[i]); continue; }
-            double delta = (uni(gen) < freq) ? norm(gen) : 0.0;
+            double delta = (uni(gen) < freq) ? (norm ? (*norm)(gen) : mean) : 0.0;
             out.push_back(hc::Point{ pts[i].x, pts[i].y + delta });
         }
         if (!pts.empty()){

@@ -49,6 +49,9 @@ set(CMAKE_CUDA_ARCHITECTURES 86)
 # Provide TensorRT install path (Windows example default)
 set(TRT_PATH "C:/cuda/TensorRT-10.9.0.34" CACHE PATH "Path to TensorRT installation (e.g., C:/cuda/TensorRT-10.9.0.34)")
 # Build embedded TensorRT-YOLO library and plugins
+if(MSVC)
+  string(APPEND CMAKE_CUDA_FLAGS " -Xcompiler=/Zc:preprocessor")
+endif()
 add_subdirectory(${CMAKE_SOURCE_DIR}/TensorRT-YOLO)
 
 # Ensure MSVC compiles trtyolo with UTF-8 and NOMINMAX to avoid header parsing issues
@@ -65,6 +68,8 @@ if(MSVC)
     $<$<COMPILE_LANGUAGE:CXX>:/W4>
     $<$<COMPILE_LANGUAGE:CXX>:/permissive->
     $<$<COMPILE_LANGUAGE:CXX>:/utf-8>
+    $<$<COMPILE_LANGUAGE:CXX>:/Zc:preprocessor>
+    $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:preprocessor>
   )
 endif()
 
@@ -163,6 +168,12 @@ if(WIN32)
   )
 endif()
 
+if(MSVC)
+  target_compile_definitions(aimassistant PRIVATE
+    _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS
+  )
+endif()
+
 # 4) 平台/系统库链接（Windows + DirectX）
 if(WIN32)
   target_link_libraries(aimassistant PRIVATE d3d11 dxgi d2d1 dwrite windowscodecs dcomp dwmapi avrt windowsapp)
@@ -184,7 +195,7 @@ add_library(ocsort_cuda STATIC
  ocs_out.cu
  ocs_state.cu
 )
-set_target_properties(ocsort_cuda PROPERTIES CUDA_SEPARABLE_COMPILATION ON POSITION_INDEPENDENT_CODE ON)
+set_target_properties(ocsort_cuda PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON POSITION_INDEPENDENT_CODE ON)
 
 # MSVC: 让 NVCC 调用 MSVC 时使用 /utf-8，避免中文注释/不可见字符触发 C4819
 if(MSVC)
@@ -217,6 +228,14 @@ if(WIN32)
       COMMAND ${CMAKE_COMMAND} -E copy_if_different "${TRT_BIN_DIR}/${dll}" "$<TARGET_FILE_DIR:aimassistant>"
     )
   endforeach()
+  if(OpenCV_LIB_PATH)
+    file(GLOB OpenCV_RUNTIME_DLLS "${OpenCV_LIB_PATH}/../bin/*.dll")
+    if(OpenCV_RUNTIME_DLLS)
+      add_custom_command(TARGET aimassistant POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${OpenCV_RUNTIME_DLLS} "$<TARGET_FILE_DIR:aimassistant>"
+      )
+    endif()
+  endif()
   # Also copy built trtyolo.dll beside the executable
   add_custom_command(TARGET aimassistant POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E echo "Post-build: copy trtyolo.dll if present"

@@ -4,24 +4,22 @@
   "configurePresets": [
     {
       "name": "win-vs-debug",
-      "displayName": "Windows-MSVC Debug (VS/Ninja可选)",
-      "generator": "Ninja",
+      "displayName": "Windows-MSVC Debug (Visual Studio 2026)",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_C_COMPILER": "cl",
-        "CMAKE_CXX_COMPILER": "cl"
+        "OpenCV_DIR": "${sourceDir}/opencv/build"
       }
     },
     {
       "name": "win-vs-release",
-      "displayName": "Windows-MSVC Release (VS/Ninja可选)",
-      "generator": "Ninja",
+      "displayName": "Windows-MSVC Release (Visual Studio 2026)",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_C_COMPILER": "cl",
-        "CMAKE_CXX_COMPILER": "cl"
+        "OpenCV_DIR": "${sourceDir}/opencv/build"
       }
     }
   ],

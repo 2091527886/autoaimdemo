@@ -2,6 +2,31 @@
 #include "Log.hpp"
 #include "sh.hpp"
 
+void Aim::log_detections(bool frame_available) {
+    detection_frame_since_log_ = detection_frame_since_log_ || frame_available;
+    const auto now = std::chrono::steady_clock::now();
+    if (now - last_detection_log_ < std::chrono::seconds(1)) return;
+    last_detection_log_ = now;
+
+    if (!detection_frame_since_log_) {
+        LO << "[DETECT] frame unavailable" << END;
+    } else if (!c.pose_enable) {
+        LO << "[DETECT] pose disabled" << END;
+    } else if (!pose.ready()) {
+        LO << "[DETECT] pose model unavailable" << END;
+    } else if (!pose.has_result()) {
+        LO << "[DETECT] inference result unavailable" << END;
+    } else {
+        size_t enemy = 0, teammate = 0;
+        for (int class_id : pose.result_classes()) {
+            if (class_id == 0) ++enemy;
+            else if (class_id == 1) ++teammate;
+        }
+        LO << "[DETECT] enemy=" << enemy << " | teammate=" << teammate << END;
+    }
+    detection_frame_since_log_ = false;
+}
+
 void Aim::log_lat(FrameLat& fl) {
     if (!(c.timing && c.log_latency)) return;
     lat.push(fl);

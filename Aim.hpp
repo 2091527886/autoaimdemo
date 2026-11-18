@@ -42,6 +42,7 @@ private:
     void draw_ovl(double& ms);
     void log_lat(FrameLat& fl);
     void trt_log();
+    void log_detections(bool frame_available);
     // pure aim point for overlay, no state change
     cv::Point2f aim_no_pred(const Detection& d) const;
     // map detection reference to index in ds (linear scan; ds small)
@@ -62,6 +63,8 @@ private:
     const cv::Point ctr;
     double mfac = 1.0;
     std::vector<Detection> ds;
+    std::chrono::steady_clock::time_point last_detection_log_ = std::chrono::steady_clock::now();
+    bool detection_frame_since_log_ = false;
     OCSort ocs;
     int    locked_track_id = -1; // 当前锁定的 track（按键按下维持）
     SelectedTarget cur_sel;      // 当前选择结果（obs+trk）

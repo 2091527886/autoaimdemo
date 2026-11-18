@@ -82,10 +82,12 @@ private:
     void captureCudaGraph();
     void dynamicInfer(const std::vector<Image>& inputs);
     void staticInfer(const std::vector<Image>& inputs);
+    void* preprocessBuffer();
 
     std::unique_ptr<TRTManager> manager_;        // < TensorRT 管理器对象的智能指针
     CudaGraph                   cuda_graph_;     // < CUDA 图
     std::unique_ptr<BaseBuffer> inputs_buffer_;  // < 输入缓冲区智能指针
+    std::unique_ptr<BaseBuffer> preprocess_buffer_;
     BufferType                  buffer_type_;    // < 缓冲区类型
 
     bool zero_copy_;                             // < 是否为零拷贝

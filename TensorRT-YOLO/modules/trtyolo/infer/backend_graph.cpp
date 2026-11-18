@@ -40,7 +40,7 @@ void TrtBackend::captureCudaGraph() {
                 input_width,
                 input_height,
                 src_pitch,
-                tensor_infos.front().buffer->device(),
+                preprocessBuffer(),
                 max_shape.w,
                 max_shape.z,
                 affine_transforms.front(),
@@ -51,7 +51,7 @@ void TrtBackend::captureCudaGraph() {
             for (int idx = 0; idx < max_shape.x; ++idx) {
                 void* input_device = calc_src_offset(idx, input_width, input_height);
                 launch_letterbox_idx(input_device, input_width, input_height, src_pitch,
-                                     tensor_infos.front().buffer->device(),
+                                     preprocessBuffer(),
                                      max_shape.w, max_shape.z,
                                      infer_size_, idx,
                                      affine_transforms[idx], infer_config.config, stream);
@@ -72,6 +72,11 @@ void TrtBackend::captureCudaGraph() {
         int input_width  = infer_config.input_shape ? infer_config.input_shape->y : max_shape.w;
         int input_height = infer_config.input_shape ? infer_config.input_shape->x : max_shape.z;
         run_letterbox(infer_config.input_shape.has_value(), input_width, input_height);
+    }
+
+    if (preprocess_buffer_) {
+        cudaHalfToFloat(preprocessBuffer(), tensor_infos.front().buffer->device(),
+                        static_cast<size_t>(max_shape.x) * infer_size_, stream);
     }
 
     // Step 4: Enqueue inference

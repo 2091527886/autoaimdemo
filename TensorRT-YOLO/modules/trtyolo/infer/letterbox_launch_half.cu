@@ -7,6 +7,17 @@
 
 namespace trtyolo {
 
+__global__ void halfToFloatKernel(const __half* src, float* dst, size_t count) {
+    size_t i = static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (i < count) dst[i] = __half2float(src[i]);
+}
+
+void cudaHalfToFloat(const void* src, void* dst, size_t count, cudaStream_t stream) {
+    constexpr unsigned int threads = 256;
+    halfToFloatKernel<<<static_cast<unsigned int>((count + threads - 1) / threads), threads, 0, stream>>>(
+        static_cast<const __half*>(src), static_cast<float*>(dst), count);
+}
+
 void cudaLetterboxHalf(const void* src, int src_cols, int src_rows, size_t src_pitch,
                        void* dst, int dst_cols, int dst_rows,
                        const LetterboxTransform& params, const ProcessConfig config, cudaStream_t stream) {

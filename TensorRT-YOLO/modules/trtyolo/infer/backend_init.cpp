@@ -3,6 +3,7 @@
 #include "core/core.hpp"
 #include "letterbox.hpp"
 #include "infer/pch_infer.hpp"
+#include <cstdint>
 
 namespace trtyolo {
 
@@ -75,6 +76,17 @@ void TrtBackend::initialize() {
 
     infer_size_ = max_shape.y * max_shape.w * max_shape.z;
 
+    if (tensor_infos.empty() || !tensor_infos.front().input) {
+        throw std::runtime_error("Expected the first engine tensor to be the input");
+    }
+    const auto dtype = tensor_infos.front().dtype();
+    if (dtype == nvinfer1::DataType::kFLOAT) {
+        preprocess_buffer_ = BufferFactory::createBuffer(BufferType::Device);
+        preprocess_buffer_->allocate(static_cast<size_t>(max_shape.x) * infer_size_ * sizeof(uint16_t));
+    } else if (dtype != nvinfer1::DataType::kHALF) {
+        throw std::runtime_error("Only FP32 and FP16 engine inputs are supported");
+    }
+
     if (infer_config.input_shape.has_value()) {
         int in_w = infer_config.input_shape->y;
         int in_h = infer_config.input_shape->x;
@@ -89,6 +101,10 @@ void TrtBackend::initialize() {
         affine_transforms.resize(max_shape.x, LetterboxTransform());
         if (!dynamic) inputs_buffer_->allocate(max_shape.x * infer_size_);
     }
+}
+
+void* TrtBackend::preprocessBuffer() {
+    return preprocess_buffer_ ? preprocess_buffer_->device() : tensor_infos.front().buffer->device();
 }
 
 } // namespace trtyolo

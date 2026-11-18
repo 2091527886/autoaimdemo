@@ -151,7 +151,7 @@ public:
     int  pose_trt_input_w = 640;
     int  pose_trt_input_h = 640;
     // 已移除 det/pose IoU 匹配；不再需要 pose_match_iou_thresh
-    float pose_kpt_conf_thresh = 0.05f; // kpt conf threshold
+    float pose_kpt_conf_thresh = 0.0f; // kpt conf threshold
     bool  pose_aim_pref_nose = false;   // true: aim nose first, then chest; false: chest first
 
     // ==================== [Detection Runtime (TRT通用)] ====================
@@ -160,7 +160,7 @@ public:
 
     // ==================== [Model Input & Thresholds] ====================
     const int   crop_size_px = 640;
-    const float conf_thresh = 0.5f;
+    const float conf_thresh = 0.0f;
 
     const int aim_key = VK_RBUTTON;
     const double y_anchor_ratio = 0.6;
@@ -184,23 +184,23 @@ public:
     // 捕获/延迟/性能日志开关与频率
     bool capture_debug = false;
     int  capture_debug_every_n = 30;
-    bool log_latency = true;
+    bool log_latency = false;
     int  log_latency_every_n = 30;
-    bool latency_on_capture_only = true;
-    bool capture_timing = true;
+    bool latency_on_capture_only = false;
+    bool capture_timing = false;
     int  capture_timing_every_n = 30;
     bool capture_timing_each_frame = false;
-    bool capture_timing_on_success = true;
+    bool capture_timing_on_success = false;
 
     bool capture_flush_after_copy = false;
 
-    bool perf_report = true;
+    bool perf_report = false;
     int  perf_report_every_n = 30;
     bool perf_each_frame = false;
 
-    bool opt_report = true;
-    bool opt_report_capture = true;
-    bool opt_report_system = true;
+    bool opt_report = false;
+    bool opt_report_capture = false;
+    bool opt_report_system = false;
     int  opt_report_every_n = 30;
 
     // ==================== [Overlay] ====================

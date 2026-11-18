@@ -49,4 +49,6 @@ void cudaMultiLetterboxHalf(const void* src, int src_cols, int src_rows, size_t 
                             const LetterboxTransform& params, const ProcessConfig config,
                             int num_images, cudaStream_t stream);
 
+void cudaHalfToFloat(const void* src, void* dst, size_t count, cudaStream_t stream);
+
 } // namespace trtyolo

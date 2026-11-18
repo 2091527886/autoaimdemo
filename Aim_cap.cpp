@@ -38,18 +38,15 @@ bool Aim::infer_view(ScreenCapturer::CapturedView &view) {
       // build ds 1:1 from pose results
       ds.clear();
       ds.reserve(all_boxes.size());
+      pose_kpts.reserve(all_boxes.size());
+      pose_ok.reserve(all_boxes.size());
       for (size_t i=0;i<all_boxes.size();++i){
         if (i < all_scores.size() && all_scores[i] < c.conf_thresh) continue;
         Detection d; d.box = all_boxes[i]; d.class_id = (i<(size_t)all_classes.size()? all_classes[i] : 0); d.confidence = (i<(size_t)all_scores.size()? all_scores[i] : 0.f);
-        if (d.box.width>0 && d.box.height>0) ds.emplace_back(d);
-      }
-      // pose keypoints align with ds; as we filtered by conf, rebuild kpts accordingly
-      pose_kpts.assign(ds.size(), {});
-      pose_ok.assign(ds.size(), false);
-      size_t k=0;
-      for (size_t i=0;i<all_boxes.size();++i){
-        if (i < all_scores.size() && all_scores[i] < c.conf_thresh) continue;
-        if (k < ds.size()) { pose_kpts[k] = (i<all_kpts.size()? all_kpts[i] : std::vector<trtyolo::KeyPoint>{}); pose_ok[k] = !pose_kpts[k].empty(); ++k; }
+        if (d.box.width<=0 || d.box.height<=0) continue;
+        ds.emplace_back(d);
+        pose_kpts.emplace_back(i<all_kpts.size()? all_kpts[i] : std::vector<trtyolo::KeyPoint>{});
+        pose_ok.push_back(!pose_kpts.back().empty());
       }
     } else {
       ds.clear();

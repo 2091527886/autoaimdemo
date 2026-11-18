@@ -81,7 +81,7 @@ function(set_target_compile_options target)
         # CUDA编译选项
         target_compile_options(${target} PRIVATE
             $<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:CUDA>>:-Xcompiler=/O2 -O3>
-            $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CUDA>>:-Xcompiler=/Od -g -G>
+            $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CUDA>>:-Xcompiler=/Od -g -lineinfo>
         )
 
         set_target_properties(${target} PROPERTIES MSVC_RUNTIME_LIBRARY

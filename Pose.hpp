@@ -16,6 +16,9 @@ public:
     PoseInfer(const PoseInfer&) = delete;
     PoseInfer& operator=(const PoseInfer&) = delete;
     ~PoseInfer();
+    bool ready() const noexcept { return static_cast<bool>(model_); }
+    bool has_result() const noexcept { return has_result_; }
+    const std::vector<int>& result_classes() const noexcept { return result_classes_; }
 
     // Run pose on a cropped BGRA view for selected detections.
     // inputs are the full captured view buffer and detections in the same view coordinates (0..view_w/h)
@@ -37,4 +40,6 @@ public:
 private:
     std::unique_ptr<trtyolo::PoseModel> model_;
     metrics::TrtPerfReporting perf_;
+    bool has_result_ = false;
+    std::vector<int> result_classes_;
 };

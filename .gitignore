@@ -79,4 +79,13 @@ coverage/
 1.txt
 sunone/
 Control-Algorithm/
-
+opencv
+TensorRT-10.9.0.34
+.vs
+autolabel
+out
+venv
+labelout
+.github
+__pycache__
+best.pt

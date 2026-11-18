@@ -49,6 +49,8 @@ bool PoseInfer::run_on_view(unsigned char* data,
                             const Config& cfg,
                             Timing& tm){
     out_kpts.clear(); out_boxes.clear();
+    has_result_ = false;
+    result_classes_.clear();
     if (!model_) return false;
     Img img(data, view_w, view_h, pitch);
     std::vector<Img> batch; batch.emplace_back(img);
@@ -56,6 +58,8 @@ bool PoseInfer::run_on_view(unsigned char* data,
     if (cfg.timing){ auto t0=tn(); auto res=do_predict(batch); auto t1=tn(); tm.infer_ms += msd(t1-t0).count();
         if (cfg.perf_report) { auto pr = model_->performanceReport(); tm.trt_throughput = std::get<0>(pr); tm.trt_cpu_lat = std::get<1>(pr); tm.trt_gpu_lat = std::get<2>(pr); }
         if (res.empty()) return false; const auto& r = res[0];
+        has_result_ = true;
+        result_classes_ = r.classes;
         if (r.num<=0 || r.kpts.empty()) return false;
         out_kpts = r.kpts; // already in view coords
         out_boxes.clear(); out_boxes.reserve(r.boxes.size());
@@ -67,6 +71,8 @@ bool PoseInfer::run_on_view(unsigned char* data,
         auto res=do_predict(batch);
         if (cfg.perf_report) { auto pr = model_->performanceReport(); tm.trt_throughput = std::get<0>(pr); tm.trt_cpu_lat = std::get<1>(pr); tm.trt_gpu_lat = std::get<2>(pr); }
         if (res.empty()) return false; const auto& r = res[0];
+        has_result_ = true;
+        result_classes_ = r.classes;
         if (r.num<=0 || r.kpts.empty()) return false;
         out_kpts = r.kpts;
         out_boxes.clear(); out_boxes.reserve(r.boxes.size());
